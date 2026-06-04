@@ -1,0 +1,95 @@
+:root {
+  --er-orange: #ff9e3f;
+  --er-bg: rgba(8, 10, 14, 0.82);
+  --er-card: rgba(18, 22, 30, 0.88);
+  --er-border: rgba(255, 255, 255, 0.08);
+  --er-text: #f5f6f8;
+  --er-muted: #a7afbd;
+  --er-danger: #ff5d5d;
+  font-family: Inter, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--er-text);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 158, 63, 0.14), transparent 28%),
+    #080a0e;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.er-panel {
+  width: 420px;
+  padding: 26px;
+  border: 1px solid var(--er-border);
+  border-radius: 22px;
+  background: var(--er-bg);
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.35);
+}
+
+.er-title {
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.er-subtitle {
+  margin: 0 0 22px;
+  color: var(--er-muted);
+}
+
+.er-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.er-field span {
+  color: var(--er-muted);
+  font-size: 13px;
+}
+
+.er-input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--er-border);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: var(--er-text);
+  background: rgba(255, 255, 255, 0.055);
+  outline: none;
+}
+
+.er-input:focus {
+  border-color: rgba(255, 158, 63, 0.7);
+}
+
+.er-button {
+  width: 100%;
+  height: 46px;
+  border: 0;
+  border-radius: 12px;
+  color: #111;
+  background: var(--er-orange);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.er-button:hover {
+  filter: brightness(1.06);
+}
+
+.er-note {
+  margin-top: 14px;
+  color: var(--er-muted);
+  font-size: 13px;
+}

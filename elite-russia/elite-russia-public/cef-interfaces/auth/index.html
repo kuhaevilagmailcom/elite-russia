@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>ELITE RUSSIA Auth</title>
+  <link rel="stylesheet" href="../shared/interface.css">
+  <link rel="stylesheet" href="./auth.css">
+</head>
+<body>
+  <main class="auth-page">
+    <section class="er-panel">
+      <h1 class="er-title">ELITE RUSSIA</h1>
+      <p class="er-subtitle">Авторизация игрового аккаунта</p>
+
+      <label class="er-field">
+        <span>Никнейм</span>
+        <input id="nickname" class="er-input" autocomplete="username" value="Player_Name">
+      </label>
+
+      <label class="er-field">
+        <span>Пароль</span>
+        <input id="password" class="er-input" type="password" autocomplete="current-password">
+      </label>
+
+      <button id="submit" class="er-button">Войти</button>
+      <p id="message" class="er-note">Введите данные аккаунта.</p>
+    </section>
+  </main>
+
+  <script src="../shared/elite-bridge.js"></script>
+  <script src="./auth.js"></script>
+</body>
+</html>

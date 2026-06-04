@@ -1,0 +1,52 @@
+body {
+  background: transparent;
+}
+
+.hud {
+  position: fixed;
+  top: 28px;
+  right: 28px;
+  width: 260px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(8, 10, 14, 0.62);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+}
+
+.hud-logo {
+  color: var(--er-orange);
+  font-weight: 800;
+  letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.hud-row span,
+.hud-bars span {
+  color: var(--er-muted);
+}
+
+.hud-bars {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.hud-bars div {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--er-orange);
+}

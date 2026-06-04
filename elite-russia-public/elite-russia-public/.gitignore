@@ -1,0 +1,32 @@
+# local secrets
+.env
+*.env
+*.key
+*.pem
+secrets.json
+config.json
+appsettings.Production.json
+
+# build output
+bin/
+obj/
+dist/
+build/
+out/
+.vs/
+.idea/
+node_modules/
+
+# archives and game assets
+*.zip
+*.rar
+*.7z
+*.iso
+*.img
+*.dff
+*.txd
+*.col
+
+# logs
+*.log
+logs/

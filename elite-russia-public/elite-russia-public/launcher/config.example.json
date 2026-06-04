@@ -1,0 +1,9 @@
+{
+  "installPath": "C:/Games/ELITE RUSSIA",
+  "nickname": "Player_Name",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 7777
+  },
+  "graphicsPreset": "standard"
+}

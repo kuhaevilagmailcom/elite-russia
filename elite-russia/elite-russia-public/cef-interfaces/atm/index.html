@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>ELITE RUSSIA ATM</title>
+  <link rel="stylesheet" href="../shared/interface.css">
+  <link rel="stylesheet" href="./atm.css">
+</head>
+<body>
+  <main class="atm-page">
+    <section class="atm-machine">
+      <div class="atm-screen">
+        <h1>ATM</h1>
+        <p id="status">Введите PIN-код</p>
+        <input id="pin" maxlength="4" class="er-input" placeholder="••••" type="password">
+        <div class="atm-actions">
+          <button data-action="deposit">Deposit</button>
+          <button data-action="withdraw">Withdraw</button>
+          <button data-action="balance">Balance</button>
+          <button data-action="exit">Exit</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../shared/elite-bridge.js"></script>
+  <script src="./atm.js"></script>
+</body>
+</html>

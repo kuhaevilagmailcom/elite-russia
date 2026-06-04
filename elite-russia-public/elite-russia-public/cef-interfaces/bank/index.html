@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>ELITE RUSSIA Bank</title>
+  <link rel="stylesheet" href="../shared/interface.css">
+  <link rel="stylesheet" href="./bank.css">
+</head>
+<body>
+  <main class="bank-page">
+    <section class="bank-panel">
+      <header>
+        <h1>Банк</h1>
+        <p>Счета, операции и история</p>
+      </header>
+
+      <div class="bank-grid">
+        <article class="bank-card">
+          <span>Наличные</span>
+          <strong id="cash">0 ₽</strong>
+        </article>
+        <article class="bank-card">
+          <span>Банк</span>
+          <strong id="balance">0 ₽</strong>
+        </article>
+      </div>
+
+      <div class="bank-actions">
+        <button data-action="deposit">Пополнить</button>
+        <button data-action="withdraw">Снять</button>
+        <button data-action="transfer">Перевести</button>
+      </div>
+
+      <h2>История</h2>
+      <div id="history" class="bank-history"></div>
+    </section>
+  </main>
+
+  <script src="../shared/elite-bridge.js"></script>
+  <script src="./bank.js"></script>
+</body>
+</html>
