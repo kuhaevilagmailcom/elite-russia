@@ -205,9 +205,9 @@ class AdminPanel:
                 self.home(chat, message_id)
                 return True
             notice = (
-                f"<b>Заказ №{number}</b> принят в работу. специалист свяжется с вами для подтверждения времени выезда."
+                f"<b>Заказ №{number}</b> принят в работу. Специалист свяжется с вами для подтверждения времени выезда."
                 if status == "accepted"
-                else f"<b>Заказ №{number}</b> отклонён. Для уточнения будет суяжиться со специалистом: {h(self.bot.config.get('phone', ''))}"
+                else f"<b>Заказ №{number}</b> отклонён. Для уточнения свяжитесь со специалистом: {h(self.bot.config.get('phone', ''))}"
             )
             with self.db:
                 changed = self.db.execute("UPDATE bookings SET status=? WHERE id=? AND status='new'", (status, number)).rowcount
