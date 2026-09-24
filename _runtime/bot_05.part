@@ -1,0 +1,127 @@
+            f"<b>Новый заказ</b>\n{self.progress(7, 8)}\n\n{prefix}📍 Напишите адрес объекта.\n\nНаселённый пункт, улица, дом и квартира — если она есть.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def render_date(self, chat, data, message_id=None, error=None):
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(8, 8)}\n\n{prefix}🗓 Когда вам удобно?\n\nНапишите желаемые дату и время. Например: <code>25 сентября после 15:00</code>.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def show_order_summary(self, chat, data, message_id=None):
+        pets = data.get("pets", "Нет")
+        if pets == "Да" and data.get("pets_type"):
+            pets += f" — {data['pets_type']}"
+        price_line = f"<b>К оплате: {money(data['price'])}</b>" if data.get("price") is not None else "<b>Стоимость: после расчёта специалиста</b>"
+        text = (
+            "<b>🧾 Проверьте заказ</b>\n\n"
+            f"Обработка: {h(data['service'])}\n"
+            f"Объект: {h(data.get('property', '—'))}\n"
+            f"Площадь: {h(data['area'])} м²\n"
+            f"Дети: {h(data['children'])}\n"
+            f"Животные: {h(pets)}\n\n"
+            f"Имя: {h(data['name'])}\n"
+            f"Телефон: {h(data['phone'])}\n"
+            f"Адрес: {h(data['address'])}\n"
+            f"Удобное время: {h(data['date'])}\n\n"
+            f"{price_line}\n\n"
+        )
+        buttons = []
+        if data.get("price") is None:
+            text += "Нажмите кнопку ниже — заявка уйдёт специалисту на расчёт."
+            buttons.append([btn("📨 Отправить на расчёт", "order:manual", style="success")])
+        elif not getattr(self.api, "provider_token", ""):
+            text += "Онлайн-оплата сейчас недоступна. Можно отправить заказ специалисту — он свяжется с вами."
+            buttons.append([btn("📨 Отправить специалисту", "order:manual", style="success")])
+        else:
+            payment_url = data.get("payment_url")
+            if payment_url:
+                ttl = int(self.config.get("payment", {}).get("invoice_ttl_minutes", 45))
+                text += f"Ссылка на оплату действует около {ttl} минут. После оплаты заказ автоматически попадёт специалисту."
+                buttons.append([btn(f"💳 Оплатить {money(data['price'])}", url=payment_url, style="success", icon=self.e("payment"))])
+                buttons.append([btn("↻ Обновить ссылку", "order:prepare_pay")])
+            else:
+                text += "Нажмите «Подготовить оплату». Бот создаст защищённую ссылку Telegram Payments."
+                buttons.append([btn("💳 Подготовить оплату", "order:prepare_pay", style="success", icon=self.e("payment"))])
+        buttons.append([btn("✏️ Изменить данные", "nav:back")])
+        buttons.append(self.home_button())
+        self.render(chat, text, buttons, message_id=message_id)
+
+    def booking_summary(self, data):
+        pets = data.get("pets", "Не указано")
+        if pets == "Да" and data.get("pets_type"):
+            pets += f" ({data['pets_type']})"
+        price = money(data.get("price")) if data.get("price") is not None else "нужен расчёт"
+        return (
+            f"Услуга: {data.get('service', '—')}\n"
+            f"Объект: {data.get('property', '—')}\n"
+            f"Площадь: {data.get('area', '—')} м²\n"
+            f"Стоимость: {price}\n"
+            f"Дети: {data.get('children', '—')}\n"
+            f"Животные: {pets}\n"
+            f"Имя: {data.get('name', '—')}\n"
+            f"Телефон: {data.get('phone', '—')}\n"
+            f"Адрес: {data.get('address', '—')}\n"
+            f"Удобное время: {data.get('date', '—')}"
+        )
+
+    def invoice_ttl(self):
+        return max(5, int(self.config.get("payment", {}).get("invoice_ttl_minutes", 45))) * 60
+
+    def expire_pending_invoices(self):
+        cutoff = int(time.time()) - self.invoice_ttl()
+        with self.db:
+            self.db.execute(
+                "UPDATE bookings SET payment_status='expired',status='expired' "
+                "WHERE payment_status='pending' AND invoice_created IS NOT NULL AND invoice_created<?",
+                (cutoff,),
+            )
+
+    def create_pending_booking(self, chat, data):
+        self.expire_pending_invoices()
+        existing = data.get("booking_id")
+        if existing:
+            row = self.db.execute("SELECT * FROM bookings WHERE id=? AND chat=?", (existing, chat)).fetchone()
+            if row and row["payment_status"] == "pending" and (row["invoice_created"] or 0) >= int(time.time()) - self.invoice_ttl():
+                return row
+        payload = "dez:" + secrets.token_urlsafe(18)
+        booking_data = dict(data)
+        for key in ("booking_id", "payment_payload", "payment_url"):
+            booking_data.pop(key, None)
+        now = int(time.time())
+        with self.db:
+            cursor = self.db.execute(
+                "INSERT INTO bookings(chat,data,notified,status,payment_status,payment_payload,amount,currency,invoice_created) VALUES (?,?,?,?,?,?,?,?,?)",
+                (chat, json.dumps(booking_data, ensure_ascii=False), 0, "awaiting_payment", "pending", payload, int(data["price"]) * 100, "RUB", now),
+            )
+        data["booking_id"] = cursor.lastrowid
+        data["payment_payload"] = payload
+        self.save(chat, data)
+        return self.db.execute("SELECT * FROM bookings WHERE id=?", (cursor.lastrowid,)).fetchone()
+
+    def prepare_payment(self, chat, query_id, message_id=None):
+        data = self.session(chat)
+        if data.get("step") != "confirm" or data.get("price") is None:
+            self.api.answer_callback(query_id, "Сначала заполните заказ.", True)
+            return
+        if not getattr(self.api, "provider_token", ""):
+            self.api.answer_callback(query_id, "Онлайн-оплата не настроена. Отправьте заказ специалисту.", True)
+            self.show_order_summary(chat, data, message_id)
+            return
+        try:
+            row = self.create_pending_booking(chat, data)
+            payment_url = row["payment_url"]
+            if not payment_url:
+                payment_url = self.api.create_invoice_link(row["id"], data, row["payment_payload"])
+                with self.db:
+                    self.db.execute("UPDATE bookings SET payment_url=? WHERE id=?", (payment_url, row["id"]))
+            data["payment_url"] = payment_url
+            data["booking_id"] = row["id"]
+            self.save(chat, data)
+            self.api.answer_callback(query_id, "Ссылка на оплату готова")
+            self.show_order_summary(chat, data, message_id)
+        except Exception as error:

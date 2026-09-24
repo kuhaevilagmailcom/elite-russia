@@ -1,0 +1,181 @@
+                if not data.get("selected"):
+                    self.api.answer_callback(query["id"], "Сначала выберите хотя бы одну услугу.")
+                    return
+                data["service"] = ", ".join(data["selected"])
+                data["step"] = "property"
+                self.save(chat, data)
+                self.api.answer_callback(query["id"])
+                self.render_property(chat, data, message_id)
+                return
+            try:
+                idx = int(action.split(":", 1)[1])
+                service = self.config["services"][idx]
+            except (ValueError, IndexError):
+                self.api.answer_callback(query["id"], "Услуга не найдена.")
+                return
+            selected = data.setdefault("selected", [])
+            if service["name"] in selected:
+                selected.remove(service["name"])
+            else:
+                selected.append(service["name"])
+            self.save(chat, data)
+            self.api.answer_callback(query["id"], "Выбор обновлён")
+            self.render(chat, self.service_text(data["mode"], selected), self.service_buttons(data), message_id=message_id)
+            return
+
+        if action.startswith("property:") and data.get("step") == "property":
+            choice = action.split(":", 1)[1]
+            self.api.answer_callback(query["id"])
+            data["property"] = "Другой объект / участок" if choice == "other" else "Квартира / частный дом"
+            data["force_individual"] = choice == "other"
+            data["step"] = "area"
+            self.save(chat, data)
+            self.render_area(chat, data, message_id)
+            return
+
+        if action == "calc:to_order" and data.get("mode") == "calculator" and data.get("step") == "result":
+            self.api.answer_callback(query["id"])
+            data["mode"] = "booking"
+            data["step"] = "children"
+            self.save(chat, data)
+            self.render_children(chat, data, message_id)
+            return
+
+        if action.startswith("children:") and data.get("step") == "children":
+            data["children"] = "Да" if action.endswith("yes") else "Нет"
+            data["step"] = "pets"
+            self.save(chat, data)
+            self.api.answer_callback(query["id"])
+            self.render_pets(chat, data, message_id)
+            return
+
+        if action.startswith("pets:") and data.get("step") == "pets":
+            yes = action.endswith("yes")
+            data["pets"] = "Да" if yes else "Нет"
+            data["step"] = "pets_type" if yes else "name"
+            if not yes:
+                data.pop("pets_type", None)
+            self.save(chat, data)
+            self.api.answer_callback(query["id"])
+            if yes:
+                self.render_pets_type(chat, data, message_id)
+            else:
+                self.render_name(chat, data, message_id)
+            return
+
+        if action == "order:prepare_pay":
+            self.prepare_payment(chat, query["id"], message_id)
+            return
+
+        if action == "order:manual":
+            self.submit_manual(chat, query["id"], message_id)
+            return
+
+        self.api.answer_callback(query["id"], "Эта кнопка уже неактуальна.")
+
+    def handle(self, message):
+        if message.get("chat", {}).get("type") != "private":
+            return
+        if message.get("successful_payment"):
+            self.handle_successful_payment(message)
+            return
+        if self.panel.handle(message):
+            return
+        chat = message["chat"]["id"]
+        text = (message.get("text") or "").strip()
+
+        if text == "/id":
+            if chat == self.admin:
+                self.api.send(chat, f"Ваш Telegram ID: <code>{chat}</code>", [self.home_button()])
+            else:
+                self.render(chat, "<b>DEZ REMKA</b>\n\nИспользуйте меню ниже — все нужные действия уже там.", self.main_buttons(False))
+            return
+        if text == "/admin" and chat == self.admin:
+            self.panel.home(chat)
+            return
+        if text in ("/start",):
+            self.clear(chat)
+            self.show_home(chat, force=True)
+            self.consume_message(message)
+            return
+        if text == "/cancel":
+            self.show_leave_confirmation(chat)
+            self.consume_message(message)
+            return
+
+        # Persistent bottom menu.
+        bottom_actions = {
+            "🏠 Главная": "home",
+            "🛒 Заказ": "order",
+            "🧮 Расчёт": "calc",
+            "💰 Цены": "prices",
+            "⚙️ Админ": "admin",
+        }
+        if text in bottom_actions:
+            action = bottom_actions[text]
+            self.consume_message(message)
+            if action == "home":
+                self.show_home(chat)
+            elif action == "order":
+                if self.session(chat):
+                    self.show_leave_confirmation(chat)
+                else:
+                    self.start_flow(chat, "booking")
+            elif action == "calc":
+                if self.session(chat):
+                    self.show_leave_confirmation(chat)
+                else:
+                    self.start_flow(chat, "calculator")
+            elif action == "prices":
+                self.show_prices(chat)
+            elif action == "admin" and chat == self.admin:
+                self.panel.home(chat)
+            return
+
+        data = self.session(chat)
+        step = data.get("step")
+        ui_message_id = self.ui(chat).get("message_id")
+
+        if step == "area":
+            try:
+                self.compute_price(data, text)
+            except ValueError as error:
+                self.render_area(chat, data, ui_message_id, str(error))
+                return
+            self.consume_message(message)
+            self.next_after_price(chat, data, ui_message_id)
+            return
+
+        if step == "pets_type":
+            if not 2 <= len(text) <= 100:
+                self.render_pets_type(chat, data, ui_message_id, "Напишите коротко, какие животные находятся на объекте.")
+                return
+            data.update(pets_type=text, step="name")
+            self.save(chat, data)
+            self.consume_message(message)
+            self.render_name(chat, data, ui_message_id)
+            return
+
+        if step == "name":
+            if not 2 <= len(text) <= 80:
+                self.render_name(chat, data, ui_message_id, "Имя должно содержать от 2 до 80 символов.")
+                return
+            data.update(name=text, step="phone")
+            self.save(chat, data)
+            self.consume_message(message)
+            self.render_phone(chat, data, ui_message_id)
+            return
+
+        if step == "phone":
+            contact = message.get("contact") or {}
+            phone_text = contact.get("phone_number") or text
+            phone = re.sub(r"[\s()+-]", "", phone_text)
+            if not re.fullmatch(r"[0-9]{10,15}", phone):
+                self.render_phone(chat, data, ui_message_id, "Проверьте номер телефона и отправьте его ещё раз.")
+                return
+            data.update(phone=phone_text, step="address")
+            self.save(chat, data)
+            self.consume_message(message)
+            self.render_address(chat, data, ui_message_id)
+            return
+

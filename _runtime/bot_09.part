@@ -1,0 +1,123 @@
+        if step == "address":
+            if not 5 <= len(text) <= 250:
+                self.render_address(chat, data, ui_message_id, "Напишите адрес чуть подробнее.")
+                return
+            data.update(address=text, step="date")
+            self.save(chat, data)
+            self.consume_message(message)
+            self.render_date(chat, data, ui_message_id)
+            return
+
+        if step == "date":
+            if not 5 <= len(text) <= 150:
+                self.render_date(chat, data, ui_message_id, "Напишите удобные дату и время чуть подробнее.")
+                return
+            data.update(date=text, step="confirm")
+            for key in ("payment_url", "payment_payload", "booking_id"):
+                data.pop(key, None)
+            self.save(chat, data)
+            self.consume_message(message)
+            self.show_order_summary(chat, data, ui_message_id)
+            return
+
+        self.render(
+            chat,
+            "<b>DEZ REMKA</b>\n\nВыберите действие кнопками на экране или в нижнем меню.",
+            self.main_buttons(chat == self.admin),
+        )
+        self.consume_message(message)
+
+
+def load_env():
+    path = ROOT / ".env"
+    if path.exists():
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            if line.strip() and not line.lstrip().startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def main():
+    load_env()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    token = os.environ.get("BOT_TOKEN", "")
+    if not token or token == "PASTE_TOKEN_HERE":
+        raise SystemExit("Добавьте BOT_TOKEN в файл .env.")
+    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+    for service in config["services"]:
+        prices = service.get("area_prices", [])
+        if prices and (len(prices) != 4 or any(type(p) is not int or p <= 0 for p in prices)):
+            raise SystemExit(f"Некорректные тарифы: {service['name']}")
+    admin = int(os.environ.get("ADMIN_CHAT_ID") or 0)
+    provider_token = os.environ.get("PAYMENT_PROVIDER_TOKEN", "")
+    api = Telegram(token, provider_token=provider_token, ui=config.get("ui"))
+    # Bothost keeps persistent data under /app/data. Locally we keep the DB beside bot.py.
+    data_dir_env = os.environ.get("DATA_DIR", "").strip()
+    if data_dir_env:
+        data_dir = Path(data_dir_env)
+    elif Path("/app/data").exists():
+        data_dir = Path("/app/data")
+    else:
+        data_dir = ROOT
+    data_dir.mkdir(parents=True, exist_ok=True)
+    bot = Bot(api, config, data_dir / "data.sqlite3", admin)
+
+    webhook = api.call("getWebhookInfo")
+    if webhook.get("url"):
+        raise SystemExit("У бота установлен webhook. Отключите его перед запуском polling-версии.")
+
+    profile = config.get("profile", {})
+    try:
+        api.call("setMyName", name=profile.get("name", "DEZ REMKA")[:64])
+        api.call("setMyShortDescription", short_description=profile.get("short_description", "")[:120])
+        api.call("setMyDescription", description=profile.get("description", "")[:512])
+    except Exception as error:
+        logging.info("Не удалось обновить профиль бота: %s", error)
+
+    # Customers see only the useful command. Admin commands are scoped to the admin chat.
+    try:
+        api.call("setMyCommands", commands=[{"command": "start", "description": "Открыть главное меню"}], scope={"type": "default"})
+        if admin:
+            api.call(
+                "setMyCommands",
+                commands=[
+                    {"command": "start", "description": "Главное меню"},
+                    {"command": "admin", "description": "Панель администратора"},
+                    {"command": "id", "description": "Мой Telegram ID"},
+                ],
+                scope={"type": "chat", "chat_id": admin},
+            )
+    except Exception as error:
+        logging.info("Не удалось обновить команды бота: %s", error)
+
+    row = bot.db.execute("SELECT value FROM meta WHERE key='offset'").fetchone()
+    offset = row[0] if row else 0
+    logging.info("DEZ REMKA bot started.")
+    while True:
+        try:
+            bot.janitor()
+            bot.flush_notifications()
+            bot.panel.flush()
+            updates = api.call(
+                "getUpdates", offset=offset, timeout=25,
+                allowed_updates=["message", "callback_query", "pre_checkout_query"],
+            )
+            for update in updates:
+                if "pre_checkout_query" in update:
+                    bot.handle_pre_checkout(update["pre_checkout_query"])
+                elif "message" in update:
+                    bot.handle(update["message"])
+                elif "callback_query" in update:
+                    bot.handle_callback(update["callback_query"])
+                offset = update["update_id"] + 1
+                with bot.db:
+                    bot.db.execute("INSERT OR REPLACE INTO meta VALUES ('offset',?)", (offset,))
+        except KeyboardInterrupt:
+            break
+        except Exception as error:
+            logging.warning("Ошибка %s: %s. Повтор через 5 секунд.", type(error).__name__, error)
+            time.sleep(5)
+
+
+if __name__ == "__main__":
+    main()

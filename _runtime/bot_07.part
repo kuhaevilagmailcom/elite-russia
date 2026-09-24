@@ -1,0 +1,183 @@
+            self.db.execute("DELETE FROM sessions WHERE updated>0 AND updated<?", (now - DEFAULT_SESSION_TTL,))
+        self.expire_pending_invoices()
+        self.anonymize_old_bookings()
+
+    def invalidate_pending_booking(self, chat, data):
+        booking_id = data.get("booking_id") if isinstance(data, dict) else None
+        if not booking_id:
+            return
+        with self.db:
+            self.db.execute(
+                "UPDATE bookings SET payment_status='expired',status='expired' WHERE id=? AND chat=? AND payment_status='pending'",
+                (booking_id, chat),
+            )
+        for key in ("booking_id", "payment_payload", "payment_url"):
+            data.pop(key, None)
+
+    def back(self, chat, message_id=None):
+        data = self.session(chat)
+        if not data:
+            self.show_home(chat, edit_message_id=message_id, force=True)
+            return
+        step = data.get("step")
+        if step == "services":
+            self.show_leave_confirmation(chat, message_id)
+        elif step == "property":
+            data["step"] = "services"
+            data.pop("property", None)
+            data["force_individual"] = False
+            self.save(chat, data)
+            self.render(chat, self.service_text(data["mode"], data.get("selected", [])), self.service_buttons(data), message_id=message_id)
+        elif step == "area":
+            data["step"] = "property"
+            for key in ("area", "price", "base_price", "extra_count"):
+                data.pop(key, None)
+            self.save(chat, data)
+            self.render_property(chat, data, message_id)
+        elif step == "result":
+            data["step"] = "area"
+            self.save(chat, data)
+            self.render_area(chat, data, message_id)
+        elif step == "children":
+            if data.get("mode") == "booking":
+                data["step"] = "area"
+                self.save(chat, data)
+                self.render_area(chat, data, message_id)
+        elif step == "pets":
+            data["step"] = "children"
+            data.pop("children", None)
+            self.save(chat, data)
+            self.render_children(chat, data, message_id)
+        elif step == "pets_type":
+            data["step"] = "pets"
+            data.pop("pets", None)
+            data.pop("pets_type", None)
+            self.save(chat, data)
+            self.render_pets(chat, data, message_id)
+        elif step == "name":
+            data["step"] = "pets"
+            data.pop("pets", None)
+            data.pop("pets_type", None)
+            data.pop("name", None)
+            self.save(chat, data)
+            self.render_pets(chat, data, message_id)
+        elif step == "phone":
+            data["step"] = "name"
+            data.pop("phone", None)
+            self.save(chat, data)
+            self.render_name(chat, data, message_id)
+        elif step == "address":
+            data["step"] = "phone"
+            data.pop("address", None)
+            self.save(chat, data)
+            self.render_phone(chat, data, message_id)
+        elif step == "date":
+            data["step"] = "address"
+            data.pop("date", None)
+            self.save(chat, data)
+            self.render_address(chat, data, message_id)
+        elif step == "confirm":
+            self.invalidate_pending_booking(chat, data)
+            data["step"] = "date"
+            data.pop("date", None)
+            self.save(chat, data)
+            self.render_date(chat, data, message_id)
+        else:
+            self.show_leave_confirmation(chat, message_id)
+
+    def resume(self, chat, message_id=None):
+        data = self.session(chat)
+        step = data.get("step")
+        if not data:
+            self.show_home(chat, edit_message_id=message_id, force=True)
+        elif step == "services":
+            self.render(chat, self.service_text(data["mode"], data.get("selected", [])), self.service_buttons(data), message_id=message_id)
+        elif step == "property":
+            self.render_property(chat, data, message_id)
+        elif step == "area":
+            self.render_area(chat, data, message_id)
+        elif step == "result":
+            self.show_calculator_result(chat, data, message_id)
+        elif step == "children":
+            self.render_children(chat, data, message_id)
+        elif step == "pets":
+            self.render_pets(chat, data, message_id)
+        elif step == "pets_type":
+            self.render_pets_type(chat, data, message_id)
+        elif step == "name":
+            self.render_name(chat, data, message_id)
+        elif step == "phone":
+            self.render_phone(chat, data, message_id)
+        elif step == "address":
+            self.render_address(chat, data, message_id)
+        elif step == "date":
+            self.render_date(chat, data, message_id)
+        elif step == "confirm":
+            self.show_order_summary(chat, data, message_id)
+        else:
+            self.show_home(chat, edit_message_id=message_id, force=True)
+
+    def handle_callback(self, query):
+        message = query.get("message") or {}
+        chat_obj = message.get("chat") or {}
+        user = query.get("from") or {}
+        chat = chat_obj.get("id")
+        if chat_obj.get("type") != "private" or chat != user.get("id"):
+            self.api.answer_callback(query["id"], "Эта кнопка недоступна.")
+            return
+        action = query.get("data", "")
+        message_id = message.get("message_id")
+
+        if action.startswith("adm:"):
+            if self.panel.handle_callback(query):
+                return
+
+        current_ui = self.ui(chat).get("message_id")
+        if current_ui and message_id and current_ui != message_id:
+            self.api.answer_callback(query["id"], "Эта кнопка уже устарела. Используйте текущее меню.")
+            return
+
+        if action in ("menu:home", "nav:home"):
+            self.api.answer_callback(query["id"])
+            self.show_home(chat, edit_message_id=message_id)
+            return
+        if action == "nav:discard":
+            self.api.answer_callback(query["id"])
+            self.clear(chat)
+            self.show_home(chat, edit_message_id=message_id, force=True)
+            return
+        if action == "nav:resume":
+            self.api.answer_callback(query["id"])
+            self.resume(chat, message_id)
+            return
+        if action == "nav:back":
+            self.api.answer_callback(query["id"])
+            self.back(chat, message_id)
+            return
+        if action == "flow:restart_calc":
+            self.api.answer_callback(query["id"])
+            self.clear(chat)
+            self.start_flow(chat, "calculator", message_id)
+            return
+        if action == "menu:calc":
+            self.api.answer_callback(query["id"])
+            if self.session(chat):
+                self.show_leave_confirmation(chat, message_id)
+            else:
+                self.start_flow(chat, "calculator", message_id)
+            return
+        if action == "menu:order":
+            self.api.answer_callback(query["id"])
+            if self.session(chat):
+                self.show_leave_confirmation(chat, message_id)
+            else:
+                self.start_flow(chat, "booking", message_id)
+            return
+        if action == "menu:prices":
+            self.api.answer_callback(query["id"])
+            self.show_prices(chat, message_id)
+            return
+
+        data = self.session(chat)
+        if action.startswith("svc:") and data.get("step") == "services":
+            if action == "svc:done":

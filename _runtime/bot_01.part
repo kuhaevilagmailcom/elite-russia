@@ -1,0 +1,207 @@
+"""DEZ REMKA Telegram bot. Python 3.11+, no third-party dependencies."""
+import json
+import logging
+import os
+import re
+import secrets
+import sqlite3
+import time
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from admin import AdminPanel
+from presentation import h, money, price_lines, short_service
+
+ROOT = Path(__file__).resolve().parent
+PRICING_VERSION = 11
+AREA_LIMITS = (40, 60, 100, 150)
+DEFAULT_INVOICE_TTL = 45 * 60
+DEFAULT_SESSION_TTL = 2 * 24 * 60 * 60
+DEFAULT_RETENTION_DAYS = 90
+
+
+class TelegramAPIError(RuntimeError):
+    pass
+
+
+def calculate(area, service):
+    try:
+        value = Decimal(str(area).replace(",", "."))
+    except InvalidOperation:
+        raise ValueError("Введите площадь числом. Например: 42 или 42,5.")
+    if not value.is_finite() or not 1 <= value <= 10000:
+        raise ValueError("Укажите площадь от 1 до 10 000 м².")
+    for maximum, price in zip(AREA_LIMITS, service.get("area_prices", [])):
+        if value <= maximum:
+            return str(value.normalize() if value % 1 else int(value)), price
+    return str(value.normalize() if value % 1 else int(value)), None
+
+
+def btn(text, data=None, *, style=None, icon=None, url=None):
+    result = {"text": text}
+    if data is not None:
+        result["callback_data"] = data
+    if url is not None:
+        result["url"] = url
+    if style:
+        result["style"] = style
+    if icon:
+        result["icon_custom_emoji_id"] = icon
+    return result
+
+
+def inline(rows):
+    return {"inline_keyboard": rows}
+
+
+def bottom_keyboard(include_admin=False, custom_emoji=None):
+    custom_emoji = custom_emoji or {}
+
+    def key(text, style=None, icon_key=None):
+        item = {"text": text}
+        if style:
+            item["style"] = style
+        icon = custom_emoji.get(icon_key or "")
+        if icon:
+            item["icon_custom_emoji_id"] = icon
+        return item
+
+    rows = [
+        [key("🏠 Главная", "primary", "home"), key("🛒 Заказ", "success", "order")],
+        [key("🧮 Расчёт", "primary", "calculator"), key("💰 Цены", None, "prices")],
+    ]
+    if include_admin:
+        rows.append([key("⚙️ Админ")])
+    return {
+        "keyboard": rows,
+        "resize_keyboard": True,
+        "is_persistent": True,
+        "input_field_placeholder": "Выберите действие или напишите ответ",
+    }
+
+
+class Telegram:
+    def __init__(self, token, provider_token="", ui=None):
+        self.base = f"https://api.telegram.org/bot{token}/"
+        self.provider_token = provider_token
+        self.ui = ui or {}
+        self._sticker_cache = {}
+
+    def call(self, method, **params):
+        request = Request(
+            self.base + method,
+            data=json.dumps(params, ensure_ascii=False).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urlopen(request, timeout=40) as response:
+                result = json.load(response)
+        except HTTPError as error:
+            try:
+                body = json.loads(error.read().decode("utf-8", "ignore"))
+                description = body.get("description", "Telegram API request failed")
+            except Exception:
+                description = "Telegram API request failed"
+            raise TelegramAPIError(description) from None
+        if not result.get("ok"):
+            raise TelegramAPIError(result.get("description", "Telegram API request failed"))
+        return result["result"]
+
+    @staticmethod
+    def _strip_custom_icons(markup):
+        if not markup:
+            return markup
+        clone = json.loads(json.dumps(markup))
+        for row in clone.get("inline_keyboard", []):
+            for button in row:
+                button.pop("icon_custom_emoji_id", None)
+        return clone
+
+    def _markup_call(self, method, markup, **params):
+        try:
+            return self.call(method, reply_markup=markup, **params)
+        except TelegramAPIError:
+            if markup and any(
+                "icon_custom_emoji_id" in button
+                for row in markup.get("inline_keyboard", [])
+                for button in row
+            ):
+                logging.info("Custom emoji buttons unavailable; using normal emoji fallback.")
+                return self.call(method, reply_markup=self._strip_custom_icons(markup), **params)
+            raise
+
+    def send(self, chat, text, buttons=None):
+        markup = inline(buttons) if buttons else None
+        return self._markup_call(
+            "sendMessage", markup, chat_id=chat, text=text, parse_mode="HTML",
+            link_preview_options={"is_disabled": True},
+        )
+
+    def send_with_bottom_keyboard(self, chat, text, include_admin=False):
+        return self.call(
+            "sendMessage",
+            chat_id=chat,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=bottom_keyboard(include_admin, self.ui.get("custom_emoji", {})),
+            link_preview_options={"is_disabled": True},
+        )
+
+    def edit(self, chat, message_id, text, buttons=None):
+        markup = inline(buttons) if buttons else None
+        try:
+            return self._markup_call(
+                "editMessageText", markup, chat_id=chat, message_id=message_id,
+                text=text, parse_mode="HTML", link_preview_options={"is_disabled": True},
+            )
+        except TelegramAPIError as error:
+            if "message is not modified" in str(error).lower():
+                return None
+            raise
+
+    def delete(self, chat, message_id):
+        try:
+            return self.call("deleteMessage", chat_id=chat, message_id=message_id)
+        except Exception:
+            return None
+
+    def answer_callback(self, query_id, text="", alert=False):
+        return self.call("answerCallbackQuery", callback_query_id=query_id, text=text, show_alert=alert)
+
+    def answer_pre_checkout(self, query_id, ok, error_message=None):
+        params = {"pre_checkout_query_id": query_id, "ok": ok}
+        if error_message:
+            params["error_message"] = error_message
+        return self.call("answerPreCheckoutQuery", **params)
+
+    def create_invoice_link(self, booking_id, data, payload):
+        if not self.provider_token:
+            raise TelegramAPIError("PAYMENT_PROVIDER_TOKEN is not configured")
+        service = data.get("service", "Обработка")
+        area = data.get("area")
+        description = service + (f" · {area} м²" if area else "")
+        return self.call(
+            "createInvoiceLink",
+            title="DEZ REMKA · обработка",
+            description=description[:255],
+            payload=payload,
+            provider_token=self.provider_token,
+            currency="RUB",
+            prices=[{"label": f"Заказ №{booking_id}", "amount": int(data["price"]) * 100}],
+        )
+
+    def premium_sticker(self, chat, custom_emoji_id):
+        """Send a configured custom emoji as a sticker. Silently skip when unavailable."""
+        if not custom_emoji_id:
+            return None
+        try:
+            file_id = self._sticker_cache.get(custom_emoji_id)
+            if not file_id:
+                stickers = self.call("getCustomEmojiStickers", custom_emoji_ids=[custom_emoji_id])
+                if not stickers:
+                    return None
+                file_id = stickers[0].get("file_id")
+                if not file_id:
+                    return None

@@ -1,0 +1,140 @@
+            raise ValueError("Введите площадь числом. Например: 42 или 42,5.")
+        if not value.is_finite() or not 1 <= value <= 10000:
+            raise ValueError("Укажите пллощадь от 1 до 10 000 м².")
+        normalized = str(value.normalize() if value % 1 else int(value))
+        data["area"] = normalized
+        if data.get("force_individual") or any(not s.get("area_prices") for s in services):
+            data.update(price=None, base_price=None, extra_count=max(0, len(services) - 1))
+            return
+        results = [calculate(normalized, s) for s in services]
+        prices = [r[1] for r in results]
+        if any(p is None for p in prices):
+            data.update(price=None, base_price=None, extra_count=max(0, len(services) - 1))
+            return
+        base_price = max(prices)
+        extra_count = len(services) - 1
+        data.update(
+            base_price=base_price,
+            extra_count=extra_count,
+            price=base_price + extra_count * self.config["additional_pest_price"],
+        )
+
+    def result_text(self, data):
+        if data.get("price") is None:
+            return (
+                "<b>📋 Нужен индивидуальный расчёт< �b>\n\n"
+                f"Услуга: {h(data.get('service', ''))}\n"
+                f"Объект: {h(data.get('property', '—'))}\n"
+                + (f"Площадь: {h(data.get('area'))} м²\n" if data.get("area") else "")
+                + "\nСпециалист уточнит условия и назовёт точную стоимость. Вы можете сразу оставить заявку — повторно заполнять данные не придётся."
+            )
+        details = ""
+        if data.get("extra_count"):
+            details = (
+                f"\nБазовый тариф: {money(data['base_price'])}"
+                f"\nДополнительные виды: {data['extra_count']} × {money(self.config['additional_pest_price'])}"
+            )
+        return (
+            "<b>✅ Стоимость рассчитана</b>\n\n"
+            f"Услуга: {h(data['service'])}\n"
+            f"Объект: {h(data.get('property', '—'))}\n"
+            f"Площадь: {h(data['area'])} м²\n"
+            f"<b>Итого: {money(data['price'])}</b>"
+            f"{details}\n\n"
+            "Финальная сумма будет показана ещё раз перед оплатой."
+        )
+
+    def show_calculator_result(self, chat, data, message_id=None):
+        data["step"] = "result"
+        self.save(chat, data)
+        buttons = [[btn("🛒 Оформить заказ", "calc:to_order", style="success", icon=self.e("order"))]]
+        buttons.append([btn("↻ Посчитать заново", "flow:restart_calc", style="primary")])
+        buttons.append(self.home_button())
+        self.render(chat, self.result_text(data), buttons, message_id=message_id)
+
+    def next_after_price(self, chat, data, message_id=None):
+        if data.get("mode") == "calculator":
+            self.show_calculator_result(chat, data, message_id)
+            return
+        data["step"] = "children"
+        self.save(chat, data)
+        self.render_children(chat, data, message_id)
+
+    def render_property(self, chat, data, message_id=None):
+        total = 3 if data["mode"] == "calculator" else 8
+        self.render(
+            chat,
+            f"<b>{'Расчёт стоимости' if data['mode']=='calculator' else 'Новый заказ'}</b>\n{self.progress(2, total)}\n\nГде нужна обработка?",
+            [
+                [btn("🏠 Квартира / частный дом", "property:home", style="primary")],
+                [btn("🏢 Другой объект / участок", "property:other")],
+                *self.nav_rows(),
+            ],
+            message_id=message_id,
+        )
+
+    def render_area(self, chat, data, message_id=None, error=None):
+        total = 3 if data["mode"] == "calculator" else 8
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,
+            f"<b>{'Расчёт стоимости' if data['mode']=='calculator' else 'Новый заказ'}</b>\n{self.progress(3, total)}\n\n"
+            + prefix
+            + "Напишите площадь объекта в м² одним сообщением.\n\nНапример: <code>42</code> или <code>42,5</code>.\nЕсли площадь больше 150 м², заявку рассчитает специалист.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def render_children(self, chat, data, message_id=None):
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(4, 8)}\n\n👶 Есть ли на объекте дети?\n\nЭто поможет специалисту заранее учесть условия обработки.",
+            [
+                [btn("✅ Да", "children:yes", style="success", icon=self.e("yes")), btn("Нет", "children:no", style="primary", icon=self.e("no"))],
+                *self.nav_rows(),
+            ],
+            message_id=message_id,
+        )
+
+    def render_pets(self, chat, data, message_id=None):
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(5, 8)}\n\n🐾 Есть ли на объекте домашние животные?\n\nКошка, собака, птицы, рыбки и другие животные — всё лучше указать заранее.",
+            [
+                [btn("✅ Да", "pets:yes", style="success", icon=self.e("yes")), btn("Нет", "pets:no", style="primary", icon=self.e("no"))],
+                *self.nav_rows(),
+            ],
+            message_id=message_id,
+        )
+
+    def render_pets_type(self, chat, data, message_id=None, error=None):
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(5, 8)}\n\n{prefix}Напишите коротко, какие животные находятся на объекте.\n\nНапример: <code>кошка и аквариум</code>.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def render_name(self, chat, data, message_id=None, error=None):
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(6, 8)}\n\n{prefix}👤 Как к вам обращаться?\n\nНапишите имя одним сообщением.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def render_phone(self, chat, data, message_id=None, error=None):
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,
+            f"<b>Новый заказ</b>\n{self.progress(6, 8)}\n\n{prefix}📱 Напишите номер телефона.\n\nНапример: <code>+7 900 123-45-67</code>.\nМожно также отправить контакт Telegram обычным способом.",
+            self.nav_rows(),
+            message_id=message_id,
+        )
+
+    def render_address(self, chat, data, message_id=None, error=None):
+        prefix = f"⚠️ {h(error)}\n\n" if error else ""
+        self.render(
+            chat,

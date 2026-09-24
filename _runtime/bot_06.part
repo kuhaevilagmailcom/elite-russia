@@ -1,0 +1,131 @@
+            logging.warning("Could not create payment link for chat %s: %s", chat, error)
+            self.api.answer_callback(query_id, "Не удалось открыть оплату. Попробуйте ещё раз или отправьте заказ специалисту.", True)
+
+    def create_manual_booking(self, chat, data):
+        existing = data.get("booking_id")
+        if existing:
+            row = self.db.execute("SELECT * FROM bookings WHERE id=? AND chat=?", (existing, chat)).fetchone()
+            if row and row["payment_status"] in ("manual", "quote") and row["status"] == "new":
+                return row
+        booking_data = dict(data)
+        for key in ("booking_id", "payment_payload", "payment_url"):
+            booking_data.pop(key, None)
+        payment_status = "quote" if data.get("price") is None else "manual"
+        amount = int(data["price"]) * 100 if data.get("price") is not None else None
+        with self.db:
+            cursor = self.db.execute(
+                "INSERT INTO bookings(chat,data,notified,status,payment_status,amount,currency) VALUES (?,?,?,?,?,?,?)",
+                (chat, json.dumps(booking_data, ensure_ascii=False), 0, "new", payment_status, amount, "RUB"),
+            )
+        return self.db.execute("SELECT * FROM bookings WHERE id=?", (cursor.lastrowid,)).fetchone()
+
+    def submit_manual(self, chat, query_id, message_id=None):
+        data = self.session(chat)
+        if data.get("step") != "confirm":
+            self.api.answer_callback(query_id, "Заказ уже отправлен или форма устарела.", True)
+            return
+        row = self.create_manual_booking(chat, data)
+        self.api.answer_callback(query_id, "Заявка отправлена")
+        self.clear(chat)
+        if data.get("price") is None:
+            text = f"<b>✅ Заявка №{row['id']} отправлена</b>\n\nСпециалист уточнит детали, рассчитает стоимость и свяжется с вами."
+        else:
+            text = f"<b>✅ Заказ №{row['id']} отправлен</b>\n\nОнлайн-оплата сейчас недоступна. Специалист свяжется с вами и подскажет дальнейшие действия."
+        self.render(chat, text, [[btn("🏠 На главную", "menu:home", style="primary")]], message_id=message_id)
+
+    def handle_pre_checkout(self, query):
+        self.expire_pending_invoices()
+        row = self.db.execute("SELECT * FROM bookings WHERE payment_payload=?", (query.get("invoice_payload"),)).fetchone()
+        valid = bool(
+            row
+            and row["chat"] == query.get("from", {}).get("id")
+            and row["payment_status"] == "pending"
+            and row["currency"] == query.get("currency")
+            and row["amount"] == query.get("total_amount")
+            and (row["invoice_created"] or 0) >= int(time.time()) - self.invoice_ttl()
+        )
+        if valid:
+            self.api.answer_pre_checkout(query["id"], True)
+        else:
+            self.api.answer_pre_checkout(query["id"], False, "Ссылка устарела или заказ изменился. Вернитесь в бот и обновите оплату.")
+
+    def handle_successful_payment(self, message):
+        payment = message.get("successful_payment") or {}
+        chat = message.get("chat", {}).get("id")
+        row = self.db.execute("SELECT * FROM bookings WHERE payment_payload=? AND chat=?", (payment.get("invoice_payload"), chat)).fetchone()
+        if not row or row["payment_status"] == "paid":
+            return
+        if row["payment_status"] not in ("pending", "expired"):
+            return
+        if row["currency"] != payment.get("currency") or row["amount"] != payment.get("total_amount"):
+            logging.warning("Payment mismatch for booking %s", row["id"])
+            return
+        with self.db:
+            changed = self.db.execute(
+                "UPDATE bookings SET payment_status='paid',status='new',telegram_charge_id=?,provider_charge_id=?,notified=0 "
+                "WHERE id=? AND payment_status IN ('pending','expired')",
+                (payment.get("telegram_payment_charge_id"), payment.get("provider_payment_charge_id"), row["id"]),
+            ).rowcount
+            self.db.execute("DELETE FROM sessions WHERE chat=?", (chat,))
+        if not changed:
+            return
+        self.api.premium_sticker(chat, self.stickers.get("paid"))
+        self.render(
+            chat,
+            f"<b>✅ Оплата прошла успешно</b>\n\nЗаказ №{row['id']} принят и передан специалисту.\n\nС вами свяжутся для подтверждения времени выезда. Спасибо, что выбрали DEZ REMKA.",
+            [[btn("🏠 На главную", "menu:home", style="primary")]],
+        )
+
+    def flush_notifications(self):
+        if not self.admin:
+            return
+        rows = self.db.execute(
+            "SELECT * FROM bookings WHERE notified=0 AND payment_status IN ('paid','manual','quote') AND status='new' ORDER BY id LIMIT 20"
+        ).fetchall()
+        for row in rows:
+            data = json.loads(row["data"])
+            if row["payment_status"] == "paid":
+                title = f"Новый оплаченный заказ №{row['id']}"
+                payment = f"Оплата: {money(row['amount'] // 100)}"
+            elif row["payment_status"] == "quote":
+                title = f"Новая заявка на расчёт №{row['id']}"
+                payment = "Стоимость: нужно рассчитать"
+            else:
+                title = f"Новый заказ без онлайн-оплаты №{row['id']}"
+                payment = f"Сумма: {money(row['amount'] // 100) if row['amount'] else '—'}"
+            try:
+                self.api.send(
+                    self.admin,
+                    f"<b>{title}</b>\n\n{h(self.booking_summary(data))}\n\n{payment}",
+                    [[btn("Открыть заказ", f"adm:card:{row['id']}", style="primary")]],
+                )
+            except Exception as error:
+                logging.warning("Не удалось уведомить администратора о заказе №%s: %s", row["id"], error)
+                break
+            with self.db:
+                self.db.execute("UPDATE bookings SET notified=1 WHERE id=?", (row["id"],))
+
+    def anonymize_old_bookings(self):
+        days = max(1, int(self.config.get("privacy", {}).get("retention_days", DEFAULT_RETENTION_DAYS)))
+        rows = self.db.execute(
+            "SELECT id,data FROM bookings WHERE anonymized=0 AND status IN ('accepted','rejected','expired') "
+            "AND created < datetime('now', ?)",
+            (f"-{days} days",),
+        ).fetchall()
+        for row in rows:
+            data = json.loads(row["data"])
+            for key in ("name", "phone", "address", "date", "pets_type"):
+                if key in data:
+                    data[key] = "удалено по сроку хранения"
+            with self.db:
+                self.db.execute(
+                    "UPDATE bookings SET data=?,anonymized=1 WHERE id=?",
+                    (json.dumps(data, ensure_ascii=False), row["id"]),
+                )
+
+    def janitor(self):
+        now = int(time.time())
+        if now - self._last_janitor < 300:
+            return
+        self._last_janitor = now
+        with self.db:

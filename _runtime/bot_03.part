@@ -1,0 +1,150 @@
+                except Exception as error:
+                    if not self._editable_error(error):
+                        raise
+        else:
+            sent = self.api.send(chat, text, buttons)
+            new_id = (sent or {}).get("message_id") if isinstance(sent, dict) else None
+            if new_id:
+                self.save_ui(chat, new_id, True)
+            return new_id
+        sent = self.api.send(chat, text, buttons)
+        final_id = (sent or {}).get("message_id") if isinstance(sent, dict) else new_id
+        if final_id:
+            self.save_ui(chat, final_id, True)
+        return final_id
+
+    def consume_message(self, message):
+        if not self.config.get("ui", {}).get("cleanup_user_messages", True):
+            return
+        chat = message.get("chat", {}).get("id")
+        message_id = message.get("message_id")
+        if chat and message_id and hasattr(self.api, "delete"):
+            self.api.delete(chat, message_id)
+
+    def main_buttons(self, include_admin=False):
+        rows = [
+            [btn("🧮 Рассчитать стоимость", "menu:calc", style="primary", icon=self.e("calculator"))],
+            [btn("🛒 Создать заказ", "menu:order", style="success", icon=self.e("order"))],
+            [btn("💰 Цены", "menu:prices", icon=self.e("prices"))],
+        ]
+        if include_admin:
+            rows.append([btn("⚙️ Админ-панель", "adm:home")])
+        return rows
+
+    def home_button(self):
+        return [btn("🏠 Главная", "nav:home", icon=self.e("home"))]
+
+    def nav_rows(self, *, back=True):
+        row = []
+        if back:
+            row.append(btn("← Назад", "nav:back"))
+        row.append(btn("🏠 Главная", "nav:home", icon=self.e("home")))
+        return [row]
+
+    def progress(self, current, total):
+        current = max(1, min(current, total))
+        return "●" * current + "○" * (total - current) + f"  {current}/{total}"
+
+    def welcome_text(self):
+        return (
+            "<b>🛡 DEZ REMKA</b>\n"
+            "Обработка от насекомых и клещей\n\n"
+            "Здесь можно быстро узнать цену, оформить заказ и безопасно оплатить его в Telegram.\n\n"
+            f"📍 {h(self.config.get('service_area', ''))}\n"
+            f"☎️ {h(self.config.get('phone', ''))}\n\n"
+            "<b>Что хотите сделать?</b>"
+        )
+
+    def show_home(self, chat, *, edit_message_id=None, force=False):
+        draft = self.session(chat)
+        if draft and draft.get("step") and not force:
+            self.show_leave_confirmation(chat, edit_message_id)
+            return
+        self.clear(chat)
+        self.render(chat, self.welcome_text(), self.main_buttons(chat == self.admin), message_id=edit_message_id)
+
+    def show_leave_confirmation(self, chat, message_id=None):
+        data = self.session(chat)
+        if not data:
+            self.show_home(chat, edit_message_id=message_id, force=True)
+            return
+        title = "расчёт" if data.get("mode") == "calculator" else "заказ"
+        self.render(
+            chat,
+            f"<b>Сохранить текущий {title}?</b>\n\nВы уже начали заполнение. Можно продолжить или отменить черновик и вернуться на главную.",
+            [
+                [btn("Продолжить", "nav:resume", style="primary")],
+                [btn("Отменить и на главную", "nav:discard", style="danger")],
+            ],
+            message_id=message_id,
+        )
+
+    def service_buttons(self, data):
+        selected = set(data.get("selected", []))
+        buttons = []
+        for i, service in enumerate(self.config["services"]):
+            chosen = service["name"] in selected
+            label = short_service(service["name"])
+            if not service.get("area_prices"):
+                label += " · расчёт"
+            buttons.append(btn(("✓ " if chosen else "") + label, f"svc:{i}", style="success" if chosen else None))
+        rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+        rows.append([btn("Продолжить →", "svc:done", style="primary")])
+        rows.extend(self.nav_rows(back=False))
+        return rows
+
+    def service_text(self, mode, selected):
+        title = "Расчёт стоимости" if mode == "calculator" else "Новый заказ"
+        total = 3 if mode == "calculator" else 8
+        chosen = ", ".join(short_service(x) for x in selected) if selected else "ничего не выбрано"
+        return (
+            f"<b>{title}</b>\n{self.progress(1, total)}\n\n"
+            "Выберите, от кого нужна обработка. Можно отметить несколько вариантов.\n\n"
+            f"<b>Выбрано:</b> {h(chosen)}"
+        )
+
+    def start_flow(self, chat, mode, message_id=None):
+        data = {
+            "pricing_version": PRICING_VERSION,
+            "mode": mode,
+            "step": "services",
+            "selected": [],
+            "force_individual": False,
+        }
+        self.save(chat, data)
+        self.render(chat, self.service_text(mode, []), self.service_buttons(data), message_id=message_id)
+
+    def show_prices(self, chat, message_id=None):
+        blocks = price_lines(self.config["services"])
+        individual = [s for s in self.config["services"] if not s.get("area_prices")]
+        text = (
+            "<b>💰 Цены DEZ REMKA</b>\n\n"
+            "Стоимость зависит от вида вредителя и площади. Если выбрано несколько видов, добавляется доплата за каждый дополнительный вид.\n\n"
+            + "\n\n".join(blocks)
+        )
+        if individual:
+            text += "\n\n<b>По расчёту специалиста</b>\n" + "\n".join("• " + h(short_service(s["name"])) for s in individual)
+        text += (
+            f"\n\n<b>Дополнительный вид:</b> +{money(self.config['additional_pest_price'])}\n"
+            "Объекты свыше 150 м², участки и нестандартные помещения рассчитываются отдельно."
+        )
+        draft = self.session(chat)
+        if draft:
+            label = "↩️ Продолжить заказ" if draft.get("mode") == "booking" else "↩️ Продолжить расчёт"
+            buttons = [[btn(label, "nav:resume", style="primary")], self.home_button()]
+        else:
+            buttons = [
+                [btn("🧮 Рассчитать мою стоимость", "menu:calc", style="primary", icon=self.e("calculator"))],
+                [btn("🛒 Создать заказ", "menu:order", style="success", icon=self.e("order"))],
+                self.home_button(),
+            ]
+        self.render(chat, text, buttons, message_id=message_id)
+
+    def compute_price(self, data, area_text):
+        services = [s for s in self.config["services"] if s["name"] in data["selected"]]
+        if not services:
+            raise ValueError("Сначала выберите услугу.")
+        # Validate and normalize area even for individually priced services.
+        try:
+            value = Decimal(str(area_text).replace(",", "."))
+        except InvalidOperation:
