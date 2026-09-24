@@ -105,6 +105,32 @@
             with self.db:
                 self.db.execute("UPDATE bookings SET notified=1 WHERE id=?", (row["id"],))
 
+    def count_svyatosha_message(self):
+        with self.db:
+            self.db.execute("INSERT OR IGNORE INTO meta VALUES ('message_report_count',0)")
+            self.db.execute("UPDATE meta SET value=value+1 WHERE key='message_report_count'")
+
+    def flush_message_report(self):
+        if not self.admin:
+            return
+        now = int(time.time())
+        row = self.db.execute("SELECT value FROM meta WHERE key='message_report_at'").fetchone()
+        if not row:
+            with self.db:
+                self.db.execute("INSERT INTO meta VALUES ('message_report_at',?)", (now,))
+            return
+        if now - row[0] < MESSAGE_REPORT_INTERVAL:
+            return
+        count = self.db.execute("SELECT value FROM meta WHERE key='message_report_count'").fetchone()
+        try:
+            self.api.send(self.admin, f"Новых сообщений у Святоши за последние 5 часов: <b>{count[0] if count else 0}</b>.")
+        except Exception as error:
+            logging.warning("Не удалось отправить отчёт по сообщениям: %s", error)
+            return
+        with self.db:
+            self.db.execute("INSERT OR REPLACE INTO meta VALUES ('message_report_count',0)")
+            self.db.execute("INSERT OR REPLACE INTO meta VALUES ('message_report_at',?)", (now,))
+
     def anonymize_old_bookings(self):
         days = max(1, int(self.config.get("privacy", {}).get("retention_days", DEFAULT_RETENTION_DAYS)))
         rows = self.db.execute(

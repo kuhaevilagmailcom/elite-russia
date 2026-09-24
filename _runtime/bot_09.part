@@ -97,6 +97,7 @@ def main():
         try:
             bot.janitor()
             bot.flush_notifications()
+            bot.flush_message_report()
             bot.panel.flush()
             updates = api.call(
                 "getUpdates", offset=offset, timeout=25,
