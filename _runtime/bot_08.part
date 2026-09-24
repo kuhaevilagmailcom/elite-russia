@@ -76,8 +76,6 @@
     def handle(self, message):
         if message.get("chat", {}).get("type") != "private":
             return
-        if message.get("from", {}).get("id") == SVYATOSHA_USER_ID:
-            self.count_svyatosha_message()
         if message.get("successful_payment"):
             self.handle_successful_payment(message)
             return

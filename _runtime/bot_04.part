@@ -22,7 +22,7 @@
     def result_text(self, data):
         if data.get("price") is None:
             return (
-                "<b>📋 Нужен индивидуальный расчёт</b>\n\n"
+                "<b>📋 Нужен индивидуальный расчёт< �b>\n\n"
                 f"Услуга: {h(data.get('service', ''))}\n"
                 f"Объект: {h(data.get('property', '—'))}\n"
                 + (f"Площадь: {h(data.get('area'))} м²\n" if data.get("area") else "")
