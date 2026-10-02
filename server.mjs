@@ -10,7 +10,7 @@ const PORT=Number(process.env.PORT||8080);
 const BOT_TOKEN=process.env.BOT_TOKEN||'';
 const BOT_USERNAME=(process.env.BOT_USERNAME||'PerekupGameBot').replace(/^@/,'');
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
-const WEBAPP_URL=process.env.WEBAPP_URL||`http://localhost:${PORT}`;
+const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
 const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 fs.mkdirSync(DATA_DIR,{recursive:true});
@@ -61,6 +61,51 @@ function validateInitData(initData){
   if(calc.length!==hash.length||!crypto.timingSafeEqual(Buffer.from(calc),Buffer.from(hash)))return null;
   const authDate=Number(params.get('auth_date')||0);if(!authDate||Math.abs(Date.now()/1000-authDate)>86400)return null;
   try{return JSON.parse(params.get('user')||'{}')}catch{return null}
+}
+
+
+async function telegramApi(method,payload={}){
+  if(!BOT_TOKEN)throw new Error('bot_token_missing');
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),35000);
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+    const j=await r.json().catch(()=>({ok:false,description:'bad_json'}));
+    if(!r.ok||!j.ok)throw new Error(j.description||`telegram_http_${r.status}`);
+    return j.result;
+  }finally{clearTimeout(timer)}
+}
+function publicWebAppUrl(){
+  try{const u=new URL(WEBAPP_URL);return u.protocol==='https:'?u.toString():''}catch{return ''}
+}
+async function sendStartMessage(chatId,firstName=''){
+  const url=publicWebAppUrl();const name=String(firstName||'').trim();
+  const text=`${name?`Привет, ${name}! 👋\\n\\n`:''}🚘 <b>ПЕРЕКУП | ИГРА</b>\\n\\nПокупай машины, проверяй их, ремонтируй и продавай дороже.`;
+  const payload={chat_id:chatId,text,parse_mode:'HTML'};
+  if(url)payload.reply_markup={inline_keyboard:[[{text:'🚘 Открыть игру',web_app:{url}}]]};
+  return telegramApi('sendMessage',payload);
+}
+async function handleTelegramUpdate(update){
+  const m=update?.message;if(!m?.chat?.id)return;
+  const text=String(m.text||'').trim();
+  if(/^\\/start(?:@\\w+)?(?:\\s|$)/i.test(text))await sendStartMessage(m.chat.id,m.from?.first_name||'');
+}
+let telegramPolling=false;
+async function startTelegramPolling(){
+  if(telegramPolling||!BOT_TOKEN)return;
+  telegramPolling=true;
+  try{
+    await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(e=>console.warn('Telegram deleteWebhook:',e.message));
+    const url=publicWebAppUrl();
+    if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:'🚘 Играть',web_app:{url}}}).catch(e=>console.warn('Telegram menu button:',e.message));
+    await telegramApi('setMyCommands',{commands:[{command:'start',description:'Запустить игру'}]}).catch(()=>{});
+    let offset=0;console.log('Telegram bot polling started');
+    while(telegramPolling){
+      try{
+        const updates=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message']});
+        for(const u of updates||[]){offset=Math.max(offset,Number(u.update_id||0)+1);try{await handleTelegramUpdate(u)}catch(e){console.error('Telegram update error:',e)}}
+      }catch(e){if(!telegramPolling)break;console.error('Telegram polling error:',e.message);await new Promise(r=>setTimeout(r,2000))}
+    }
+  }finally{telegramPolling=false}
 }
 
 function initDb(){
@@ -261,7 +306,7 @@ async function api(req,res,url){
 function serveStatic(req,res,url){let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-store, max-age=0':'public, max-age=86400','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})}
 
 initDb();
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'5.1.1'});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'5.2.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
-if(isMain)server.listen(PORT,()=>console.log(`PEREKUP v5.1.1 running on http://localhost:${PORT}`));
+if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP v5.2.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
 export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST};
