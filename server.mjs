@@ -79,7 +79,7 @@ function publicWebAppUrl(){
 }
 async function sendStartMessage(chatId,firstName=''){
   const url=publicWebAppUrl();const name=String(firstName||'').trim();
-  const text=`${name?`Привет, ${name}! 👋\\n\\n`:''}🚘 <b>ПЕРЕКУП | ИГРА</b>\\n\\nПокупай машины, проверяй их, ремонтируй и продавай дороже.`;
+  const text=(name?`Привет, ${name}! 👋\n\n`:'')+'🚘 <b>ПЕРЕКУП | ИГРА</b>\n\nПокупай машины, проверяй их, ремонтируй и продавай дороже.';
   const payload={chat_id:chatId,text,parse_mode:'HTML'};
   if(url)payload.reply_markup={inline_keyboard:[[{text:'🚘 Открыть игру',web_app:{url}}]]};
   return telegramApi('sendMessage',payload);
@@ -87,7 +87,7 @@ async function sendStartMessage(chatId,firstName=''){
 async function handleTelegramUpdate(update){
   const m=update?.message;if(!m?.chat?.id)return;
   const text=String(m.text||'').trim();
-  if(/^\\/start(?:@\\w+)?(?:\\s|$)/i.test(text))await sendStartMessage(m.chat.id,m.from?.first_name||'');
+  if(/^\/start(?:@\w+)?(?:\s|$)/i.test(text))await sendStartMessage(m.chat.id,m.from?.first_name||'');
 }
 let telegramPolling=false;
 async function startTelegramPolling(){
