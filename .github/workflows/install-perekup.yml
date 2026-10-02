@@ -55,15 +55,7 @@ jobs:
           rsync -a --exclude 'data/*.sqlite' --exclude 'data/*.sqlite-wal' --exclude 'data/*.sqlite-shm' "$SRC/" ./
 
           mkdir -p data public/assets/cars public/assets/icons
-          cat > .gitignore <<'TXT'
-node_modules/
-.env
-data/
-*.sqlite
-*.sqlite-wal
-*.sqlite-shm
-.DS_Store
-TXT
+          printf '%s\n' 'node_modules/' '.env' 'data/' '*.sqlite' '*.sqlite-wal' '*.sqlite-shm' '.DS_Store' > .gitignore
 
       - name: Download local car PNG assets
         shell: bash
@@ -100,13 +92,7 @@ TXT
       - name: Record third party sources
         shell: bash
         run: |
-          cat > THIRD_PARTY_ASSETS.md <<'TXT'
-# Third-party assets
-
-- UI icons: Tabler Icons, MIT license: https://github.com/tabler/tabler-icons
-- Development car imagery is copied locally during this workflow from the pinned public GitHub revisions shown in the workflow.
-- Before commercial distribution, verify the license/source of every vehicle image and replace any asset without a suitable redistribution license.
-TXT
+          printf '%s\n' '# Third-party assets' '' '- UI icons: Tabler Icons, MIT license: https://github.com/tabler/tabler-icons' '- Development car imagery is copied locally during this workflow from pinned public GitHub revisions.' '- Verify the license/source of every vehicle image before commercial distribution.' > THIRD_PARTY_ASSETS.md
 
       - name: Test
         run: npm test
