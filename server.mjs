@@ -19,6 +19,8 @@ db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=30
 
 const SEARCH_COST=1000;
 const OFFER_INSPECTION_COST=1500;
+const ROULETTE_PRICES=Object.freeze({1:65000,2:150000,3:350000,4:750000,5:1500000});
+function roulettePriceForTier(tier){return ROULETTE_PRICES[Math.max(1,Math.min(5,Number(tier)||1))]}
 const regions=[['74','Челябинская область'],['77','Москва'],['116','Республика Татарстан'],['66','Свердловская область'],['163','Самарская область'],['23','Краснодарский край'],['78','Санкт-Петербург'],['54','Новосибирская область'],['51','Мурманская область'],['95','Чеченская Республика']];
 const letters=['А','В','Е','К','М','Н','О','Р','С','Т','У','Х'];
 const tierMeta={
@@ -284,8 +286,22 @@ function audit(adminId,action,target,metadata={}){db.prepare('INSERT INTO admin_
 async function api(req,res,url){
   try{
     const user=ensureUser(req);if(!user)return json(res,401,{error:'unauthorized'});if(user.blocked)return json(res,403,{error:'blocked'});settleExpiredFor(user.id);
-    if(req.method==='GET'&&url.pathname==='/api/me')return json(res,200,{user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),config:{searchCost:SEARCH_COST,inspectionCost:OFFER_INSPECTION_COST}});
+    if(req.method==='GET'&&url.pathname==='/api/me')return json(res,200,{user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),config:{searchCost:SEARCH_COST,inspectionCost:OFFER_INSPECTION_COST,roulettePrices:ROULETTE_PRICES}});
     if(req.method==='GET'&&url.pathname==='/api/game/current')return json(res,200,{offer:offerFor(user.id)});
+    if(req.method==='GET'&&url.pathname==='/api/game/roulette-preview'){
+      const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);const max=unlockedTier(levelFromXp(fresh.xp));const tier=Math.max(1,Math.min(max,Number(url.searchParams.get('tier'))||1));const seedUser={...fresh,searches:Math.max(1,fresh.searches)};
+      const offers=Array.from({length:7},()=>generateOffer(seedUser,tier));
+      return json(res,200,{tier,price:roulettePriceForTier(tier),offers});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/game/roulette'){
+      const b=await readBody(req),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);const max=unlockedTier(levelFromXp(fresh.xp));const tier=Math.max(1,Math.min(max,Number(b.tier)||1));const price=roulettePriceForTier(tier);
+      const result=generateOffer({...fresh,searches:Math.max(1,fresh.searches)},tier);result.sellerPrice=price;result.potentialProfit=Math.max(0,result.trueValue-price);
+      txBalance(user.id,'roulette_buy',-price,{tier,vehicleId:result.id,brand:result.brand,model:result.model});
+      insertOwned(user.id,result);clearOffer(user.id);
+      db.prepare('UPDATE users SET buys=buys+1,searches=searches+1,xp=xp+25,reputation=reputation+1 WHERE id=?').run(user.id);refreshLevel(user.id);
+      return json(res,200,{ok:true,tier,price,result,user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))});
+    }
+
     if(req.method==='POST'&&url.pathname==='/api/game/search'){
       const b=await readBody(req),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);const max=unlockedTier(levelFromXp(fresh.xp));const tier=Math.max(1,Math.min(max,Number(b.tier)||max));txBalance(user.id,'search',-SEARCH_COST,{tier});db.prepare('UPDATE users SET searches=searches+1,xp=xp+5 WHERE id=?').run(user.id);refreshLevel(user.id);const o=generateOffer({...fresh,searches:fresh.searches},tier);saveOffer(user.id,o);return json(res,200,{offer:o,user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))})
     }
@@ -324,7 +340,7 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/stats')return json(res,200,{stats:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),transactions:db.prepare('SELECT type,amount,created_at FROM balance_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 20').all(user.id)});
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))});
     if(req.method==='GET'&&url.pathname==='/api/achievements'){const u=publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id));const items=[['🚘','Первая покупка',u.buys>=1],['🔧','Первый ремонт',u.repairs>=1],['🤝','Первая продажа',u.sales>=1],['💸','100 000 ₽ прибыли',u.profit>=100000],['⭐','5 уровень',u.level>=5],['🏁','Топ-класс открыт',u.unlockedTier>=5]].map(([emoji,name,done])=>({emoji,name,done}));return json(res,200,{items})}
-    if(req.method==='GET'&&url.pathname==='/api/rules')return json(res,200,{items:['🔎 Поиск автомобиля стоит 1 000 ₽.','🧪 Диагностика показывает скрытые дефекты до покупки.','🔧 Ремонт повышает состояние и стоимость машины.','🔨 На торгах за машину конкурируют системные дилеры.','💸 Можно продать системе сразу дешевле или подождать торги.','⭐ С ростом уровня открываются новые классы машин.']})
+    if(req.method==='GET'&&url.pathname==='/api/rules')return json(res,200,{items:['🎲 На главной ты покупаешь случайную машину выбранного класса по цене рулетки.','💰 Цена покупки всегда написана на кнопке до запуска рулетки.','🔧 После выпадения машина сразу попадает в гараж — её можно ремонтировать и улучшать.','🔨 На торгах за машину конкурируют системные дилеры.','💸 Можно продать системе сразу дешевле или подождать торги.','⭐ С ростом уровня открываются новые классы машин.']})
     if(req.method==='GET'&&url.pathname==='/api/dealer-tiers'){const u=publicUser(user);return json(res,200,{tiers:u.tiers,level:u.level,unlockedTier:u.unlockedTier})}
 
     if(url.pathname.startsWith('/api/admin/')){
@@ -349,7 +365,7 @@ async function api(req,res,url){
 function serveStatic(req,res,url){let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-store, max-age=0':'public, max-age=86400','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})}
 
 initDb();
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'6.1.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'7.0.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
-if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP v6.1.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
-export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST};
+if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP.RU v7.0.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
+export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST,ROULETTE_PRICES,roulettePriceForTier};
