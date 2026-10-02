@@ -3,7 +3,9 @@ name: Install Perekup v5
 on:
   push:
     branches: [main]
-    paths: [perekup-v5-bootstrap.zip]
+    paths:
+      - perekup-v5-bootstrap.zip
+      - .github/workflows/install-perekup.yml
   workflow_dispatch:
 
 permissions:
@@ -17,15 +19,52 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Replace legacy project
+
+      - name: Validate bootstrap archive
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf _runtime admin.py presentation.py config.json requirements.txt elite-russia elite-russia-public
-          rm -rf public tests data
+          unzip -tq perekup-v5-bootstrap.zip
+
+      - name: Replace legacy project safely
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/perekup
+          mkdir -p /tmp/perekup
           unzip -q perekup-v5-bootstrap.zip -d /tmp/perekup
-          cp -a /tmp/perekup/perekup-game-v5/. .
-          mkdir -p public/assets/cars public/assets/icons
+
+          SRC=/tmp/perekup
+          if [ -d /tmp/perekup/perekup-game-v5 ]; then
+            SRC=/tmp/perekup/perekup-game-v5
+          fi
+
+          test -f "$SRC/package.json"
+          test -f "$SRC/server.mjs"
+          test -f "$SRC/public/index.html"
+          test -f "$SRC/public/app.js"
+          test -f "$SRC/public/styles.css"
+
+          # Remove only legacy application code. Runtime data is deliberately preserved.
+          rm -rf _runtime admin.py presentation.py config.json requirements.txt elite-russia elite-russia-public
+          rm -rf public tests
+          rm -f package.json server.mjs
+
+          # Copy source, but never overwrite a production SQLite database from the archive.
+          rsync -a --exclude 'data/*.sqlite' --exclude 'data/*.sqlite-wal' --exclude 'data/*.sqlite-shm' "$SRC/" ./
+
+          mkdir -p data public/assets/cars public/assets/icons
+          cat > .gitignore <<'TXT'
+node_modules/
+.env
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
+TXT
+
       - name: Download local car PNG assets
         shell: bash
         run: |
@@ -46,6 +85,7 @@ jobs:
           curl -fL "$cbase/skoda.png" -o public/assets/cars/skoda.png
           curl -fL "https://raw.githubusercontent.com/Oussama-hamdi/DriveSync/2d6567205f904111c8b1f6a0fa314d38d62a8fa5/client/src/assets/images/toyotaCamry.png" -o public/assets/cars/toyota-camry.png
           curl -fL "https://raw.githubusercontent.com/katto-1204/RENTO-A-Car-Rental-System/dd4aa2fa25aa3446370615bbd14b91a5c033d3f1/assets/cars/nissan_gtr.png" -o public/assets/cars/nissan-gtr.png
+
       - name: Download Tabler UI icons
         shell: bash
         run: |
@@ -56,16 +96,21 @@ jobs:
           done
           curl -fL "$ibase/stack-2.svg" -o public/assets/icons/layers.svg
           curl -fL "$ibase/chart-bar.svg" -o public/assets/icons/chart.svg
+
       - name: Record third party sources
         shell: bash
         run: |
-          cat > THIRD_PARTY.md <<'TXT'
-          # Third-party assets
-          - UI icons: Tabler Icons, MIT licensed: https://github.com/tabler/tabler-icons
-          - Car PNG development assets are sourced from the public GitHub repositories listed in this file's commit history. Verify upstream asset licensing before a commercial release.
-          TXT
+          cat > THIRD_PARTY_ASSETS.md <<'TXT'
+# Third-party assets
+
+- UI icons: Tabler Icons, MIT license: https://github.com/tabler/tabler-icons
+- Development car imagery is copied locally during this workflow from the pinned public GitHub revisions shown in the workflow.
+- Before commercial distribution, verify the license/source of every vehicle image and replace any asset without a suitable redistribution license.
+TXT
+
       - name: Test
         run: npm test
+
       - name: Commit installed app
         shell: bash
         run: |
@@ -75,5 +120,5 @@ jobs:
           git config user.name "Perekup Installer"
           git config user.email "actions@users.noreply.github.com"
           git add -A
-          git commit -m "Build PEREKUP v5 Telegram Mini App"
+          git commit -m "Build PEREKUP Telegram Mini App from uploaded source"
           git push
