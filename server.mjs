@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
+import Database from 'better-sqlite3';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -14,7 +14,7 @@ const WEBAPP_URL=process.env.WEBAPP_URL||`http://localhost:${PORT}`;
 const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 fs.mkdirSync(DATA_DIR,{recursive:true});
-const db=new DatabaseSync(path.join(DATA_DIR,'perekup.sqlite'));
+const db=new Database(path.join(DATA_DIR,'perekup.sqlite'));
 db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=3000;');
 
 const SEARCH_COST=1000;
