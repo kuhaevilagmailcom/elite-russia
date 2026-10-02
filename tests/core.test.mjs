@@ -42,7 +42,9 @@ test('generated faults use known keys',()=>assert.ok(makeFaults(3,60).every(x=>f
 test('production dev auth is explicit opt-in',()=>assert.match(serverSrc,/ALLOW_DEV_AUTH=process\.env\.ALLOW_DEV_AUTH==='1'/));
 test('server validates Telegram init data',()=>assert.match(serverSrc,/validateInitData/));
 test('server limits request body size',()=>assert.match(serverSrc,/body_too_large/));
-test('server has CSP',()=>assert.match(serverSrc,/Content-Security-Policy/));\ntest('Telegram Web iframe is not blocked by X-Frame-Options',()=>assert.doesNotMatch(serverSrc,/X-Frame-Options/));\ntest('server exposes health endpoint',()=>assert.match(serverSrc,/\\/healthz/));
+test('server has CSP',()=>assert.match(serverSrc,/Content-Security-Policy/));
+test('Telegram Web iframe is not blocked by X-Frame-Options',()=>assert.doesNotMatch(serverSrc,/X-Frame-Options/));
+test('server exposes health endpoint',()=>assert.match(serverSrc,/\\/healthz/));
 test('repeat service is blocked server-side',()=>assert.match(serverSrc,/service_already_done/));
 test('service history table exists',()=>assert.match(serverSrc,/vehicle_service_history/));
 test('daily progress table exists',()=>assert.match(serverSrc,/daily_task_progress/));
@@ -50,8 +52,8 @@ test('daily tasks read date-scoped progress',()=>assert.match(serverSrc,/dailyVa
 test('client uses Telegram stable viewport',()=>assert.match(appSrc,/viewportStableHeight/));
 test('client handles Telegram safe area',()=>assert.match(appSrc,/safeAreaInset/));
 test('client has API timeout',()=>assert.match(appSrc,/AbortController/));
-test('client car images are local',()=>assert.doesNotMatch(appSrc,/raw\.githubusercontent\.com/));
-test('client icons are local assets',()=>assert.match(appSrc,/\/assets\/icons\//));
+test('client car visuals do not hotlink remote images',()=>{assert.doesNotMatch(appSrc,/raw\.githubusercontent\.com/);assert.doesNotMatch(appSrc,/\/assets\/cars\//)});
+test('client icons are embedded SVG and do not depend on missing asset files',()=>{assert.match(appSrc,/ICON_PATHS/);assert.doesNotMatch(appSrc,/\/assets\/icons\//)});
 test('body has no vertical scrolling',()=>assert.match(cssSrc,/html,body\{[^}]*overflow:hidden/));
 test('app uses dynamic Telegram viewport height',()=>assert.match(cssSrc,/--app-h:var\(--tg-viewport-stable-height,100dvh\)/));
 test('desktop stays phone width',()=>assert.match(cssSrc,/max-width:440px/));
