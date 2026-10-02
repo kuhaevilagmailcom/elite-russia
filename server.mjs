@@ -45,7 +45,7 @@ function uid(){return crypto.randomUUID()}
 function money(n){return Math.max(0,Math.round(Number(n)||0))}
 function randInt(min,max){return crypto.randomInt(min,max+1)}
 function choice(a){return a[crypto.randomInt(0,a.length)]}
-function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
+function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org; connect-src 'self'; font-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){const body=JSON.stringify(payload);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(body)}
 function readBody(req){return new Promise((resolve,reject)=>{let s='';req.on('data',c=>{s+=c;if(s.length>1e6){reject(new Error('body_too_large'));req.destroy()}});req.on('end',()=>{try{resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});req.on('error',reject)})}
 function isAdminTelegramId(id){return ADMIN_IDS.has(String(id))||(ALLOW_DEV_AUTH&&String(id)==='10001')}
@@ -146,40 +146,83 @@ function initDb(){
   CREATE INDEX IF NOT EXISTS idx_owned_owner ON owned_vehicles(owner_id,status);
   CREATE INDEX IF NOT EXISTS idx_auction_user ON system_auctions(user_id,status,created_at);
   CREATE INDEX IF NOT EXISTS idx_tx_user ON balance_transactions(user_id,created_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_catalog_unique ON vehicle_catalog(brand,model,generation);
   `);
-  if(db.prepare('SELECT COUNT(*) c FROM vehicle_catalog').get().c===0)seedCatalog();
+  seedCatalog();
 }
 
 function seedCatalog(){
   const rows=[
+    ['LADA','2108','Samara',1984,2004,38000,1,'Россия','hatch','lada2109'],
     ['LADA','2109','Samara',1987,2004,42000,1,'Россия','hatch','lada2109'],
     ['LADA','2110','110',1995,2007,52000,1,'Россия','sedan','lada2110'],
+    ['LADA','2112','112',1999,2008,56000,1,'Россия','hatch','lada2110'],
+    ['LADA','2114','Samara 2',2001,2013,61000,1,'Россия','hatch','lada2109'],
     ['LADA','Priora','2170',2007,2018,68000,1,'Россия','sedan','priora'],
-    ['LADA','Granta','I',2011,2024,84000,1,'Россия','sedan','priora'],
-    ['LADA','Vesta','I',2015,2024,118000,1,'Россия','sedan','priora'],
+    ['LADA','Kalina','I',2004,2013,72000,1,'Россия','hatch','granta'],
+    ['LADA','Granta','I',2011,2024,84000,1,'Россия','sedan','granta'],
+    ['LADA','Vesta','I',2015,2024,118000,1,'Россия','sedan','vesta'],
+    ['LADA','Niva','Legend',1995,2024,105000,1,'Россия','suv','niva'],
+
     ['Renault','Logan','I',2005,2015,122000,2,'Франция','sedan','logan'],
-    ['Hyundai','Solaris','I',2011,2017,138000,2,'Корея','sedan','skoda'],
+    ['Renault','Sandero','I',2009,2014,128000,2,'Франция','hatch','logan'],
+    ['Hyundai','Solaris','I',2011,2017,138000,2,'Корея','sedan','solaris'],
+    ['Kia','Rio','III',2011,2017,142000,2,'Корея','sedan','rio'],
+    ['Volkswagen','Polo','V',2010,2020,148000,2,'Германия','sedan','golf'],
     ['Volkswagen','Golf','Mk6',2008,2013,158000,2,'Германия','hatch','golf'],
-    ['Skoda','Octavia','A7',2013,2020,188000,2,'Чехия','liftback','skoda'],
-    ['Toyota','Camry 40','XV40',2006,2011,195000,2,'Япония','sedan','camry'],
-    ['Kia','K5','DL3',2019,2024,338000,3,'Корея','sedan','skoda'],
-    ['BMW','E39','5 Series',1995,2004,285000,3,'Германия','sedan','bmw'],
+    ['Skoda','Rapid','I',2012,2020,162000,2,'Чехия','liftback','octavia'],
+    ['Skoda','Octavia','A5',2004,2013,168000,2,'Чехия','liftback','octavia'],
+    ['Skoda','Octavia','A7',2013,2020,188000,2,'Чехия','liftback','octavia'],
+    ['Toyota','Corolla','E150',2006,2013,175000,2,'Япония','sedan','camry40'],
+    ['Toyota','Camry 40','XV40',2006,2011,195000,2,'Япония','sedan','camry40'],
+    ['Ford','Focus','II',2004,2011,132000,2,'США','hatch','focus'],
+    ['Mazda','3','BL',2009,2013,154000,2,'Япония','sedan','mazda3'],
+    ['Honda','Civic','VIII',2005,2011,172000,2,'Япония','sedan','civic'],
+    ['Chevrolet','Cruze','J300',2008,2016,145000,2,'США','sedan','cruze'],
+
+    ['Kia','K5','DL3',2019,2024,338000,3,'Корея','sedan','k5'],
+    ['Toyota','Camry 50','XV50',2011,2017,295000,3,'Япония','sedan','camry40'],
+    ['Toyota','Camry 70','XV70',2017,2024,430000,3,'Япония','sedan','camry40'],
+    ['BMW','E39','5 Series',1995,2004,285000,3,'Германия','sedan','bmwf10'],
+    ['BMW','E60','5 Series',2003,2010,335000,3,'Германия','sedan','bmwf10'],
     ['Mercedes-Benz','W211','E-Class',2002,2009,310000,3,'Германия','sedan','mercedes'],
-    ['Audi','A6','C7',2011,2018,355000,3,'Германия','sedan','audi'],
-    ['Toyota','Camry 50','XV50',2011,2017,295000,3,'Япония','sedan','camry'],
-    ['BMW','F10','5 Series',2010,2017,535000,4,'Германия','sedan','bmw'],
+    ['Mercedes-Benz','W204','C-Class',2007,2014,325000,3,'Германия','sedan','mercedes'],
+    ['Audi','A4','B8',2007,2015,318000,3,'Германия','sedan','audia7'],
+    ['Audi','A6','C7',2011,2018,355000,3,'Германия','sedan','audia7'],
+    ['Lexus','ES','VI',2012,2018,405000,3,'Япония','sedan','lexus'],
+    ['Lexus','RX','III',2008,2015,445000,3,'Япония','suv','lexus'],
+    ['Volvo','S60','II',2010,2018,350000,3,'Швеция','sedan','volvo'],
+    ['Genesis','G70','I',2017,2023,465000,3,'Корея','sedan','genesis'],
+    ['Volkswagen','Passat','B8',2014,2023,390000,3,'Германия','sedan','golf'],
+    ['Skoda','Superb','III',2015,2024,410000,3,'Чехия','liftback','octavia'],
+
+    ['BMW','F10','5 Series',2010,2017,535000,4,'Германия','sedan','bmwf10'],
+    ['BMW','G30','5 Series',2016,2024,745000,4,'Германия','sedan','bmwf10'],
     ['Mercedes-Benz','W212','E-Class',2009,2016,565000,4,'Германия','sedan','mercedes'],
-    ['Audi','A7','4G',2010,2018,590000,4,'Германия','liftback','audi'],
+    ['Mercedes-Benz','W213','E-Class',2016,2023,760000,4,'Германия','sedan','mercedes'],
+    ['Audi','A7','4G',2010,2018,590000,4,'Германия','liftback','audia7'],
+    ['Audi','Q7','4M',2015,2024,820000,4,'Германия','suv','audia7'],
     ['Toyota','Mark II','JZX100',1996,2000,520000,4,'Япония','sedan','supra'],
-    ['Audi','R8','I',2006,2015,780000,4,'Германия','sport','r8'],
-    ['Toyota','Supra A80','A80',1993,2002,910000,5,'Япония','sport','supra'],
-    ['Nissan','GT-R R35','R35',2007,2024,1180000,5,'Япония','sport','gtr'],
-    ['BMW','M5 F90','F90',2017,2024,1280000,5,'Германия','sport','bmw'],
-    ['Mercedes-AMG','GT','C190',2015,2023,1350000,5,'Германия','sport','mercedes'],
-    ['Porsche','911','992',2019,2024,1580000,5,'Германия','sport','porsche']
+    ['Lexus','GS','IV',2011,2020,570000,4,'Япония','sedan','lexus'],
+    ['Range Rover','Sport','L494',2013,2022,910000,4,'Великобритания','suv','range'],
+    ['Porsche','Cayenne','958',2010,2017,880000,4,'Германия','suv','porsche'],
+    ['Audi','R8','I',2006,2015,980000,4,'Германия','sport','audir8'],
+    ['Mercedes-AMG','C63','W205',2015,2021,950000,4,'Германия','sport','mercedes'],
+
+    ['Toyota','Supra A80','A80',1993,2002,1110000,5,'Япония','sport','supra'],
+    ['Toyota','Supra A90','A90',2019,2024,1450000,5,'Япония','sport','supra'],
+    ['Nissan','GT-R R35','R35',2007,2024,1480000,5,'Япония','sport','gtr'],
+    ['BMW','M5 F90','F90',2017,2024,1580000,5,'Германия','sport','bmwf10'],
+    ['Mercedes-AMG','GT','C190',2015,2023,1650000,5,'Германия','sport','mercedes'],
+    ['Porsche','911','992',2019,2024,1880000,5,'Германия','sport','porsche'],
+    ['Audi','RS7','C8',2019,2024,1760000,5,'Германия','sport','audia7'],
+    ['Lamborghini','Huracan','LP610',2014,2024,2450000,5,'Италия','sport','lambo'],
+    ['Ferrari','488','GTB',2015,2019,2650000,5,'Италия','sport','ferrari'],
+    ['McLaren','720S','I',2017,2023,2850000,5,'Великобритания','sport','mclaren']
   ];
-  const st=db.prepare('INSERT INTO vehicle_catalog(brand,model,generation,year_from,year_to,base_price,tier,country,category,image_key) VALUES(?,?,?,?,?,?,?,?,?,?)');
-  for(const r of rows)st.run(...r);
+  const st=db.prepare('INSERT OR IGNORE INTO vehicle_catalog(brand,model,generation,year_from,year_to,base_price,tier,country,category,active,image_key) VALUES(?,?,?,?,?,?,?,?,?,1,?)');
+  const tx=db.transaction?db.transaction((items)=>{for(const r of items)st.run(...r)}):null;
+  if(tx)tx(rows);else for(const r of rows)st.run(...r);
 }
 
 function ensureUser(req){
@@ -306,7 +349,7 @@ async function api(req,res,url){
 function serveStatic(req,res,url){let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-store, max-age=0':'public, max-age=86400','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})}
 
 initDb();
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'5.2.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'6.0.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
-if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP v5.2.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
+if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP v6.0.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
 export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST};
