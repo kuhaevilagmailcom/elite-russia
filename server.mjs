@@ -24,20 +24,20 @@ function roulettePriceForTier(tier){return ROULETTE_PRICES[Math.max(1,Math.min(5
 const regions=[['74','Челябинская область'],['77','Москва'],['116','Республика Татарстан'],['66','Свердловская область'],['163','Самарская область'],['23','Краснодарский край'],['78','Санкт-Петербург'],['54','Новосибирская область'],['51','Мурманская область'],['95','Чеченская Республика']];
 const letters=['А','В','Е','К','М','Н','О','Р','С','Т','У','Х'];
 const tierMeta={
-  1:{name:'АвтоВАЗ',emoji:'🇷🇺',unlock:1,desc:'Стартовые машины'},
-  2:{name:'Иномарки',emoji:'🌍',unlock:3,desc:'Бюджетные иномарки'},
-  3:{name:'Бизнес',emoji:'💼',unlock:6,desc:'Комфорт и бизнес-класс'},
-  4:{name:'Премиум',emoji:'💎',unlock:10,desc:'Мощные и дорогие авто'},
-  5:{name:'Топ-класс',emoji:'🏁',unlock:15,desc:'Спорт и эксклюзив'}
+  1:{name:'АвтоВАЗ',emoji:'',unlock:1,desc:'Стартовые машины'},
+  2:{name:'Иномарки',emoji:'',unlock:3,desc:'Бюджетные иномарки'},
+  3:{name:'Бизнес',emoji:'',unlock:6,desc:'Комфорт и бизнес-класс'},
+  4:{name:'Премиум',emoji:'',unlock:10,desc:'Мощные и дорогие авто'},
+  5:{name:'Топ-класс',emoji:'',unlock:15,desc:'Спорт и эксклюзив'}
 };
 const faultCatalog=[
-  {key:'oil',label:'Требуется большое ТО',emoji:'🛢️',cost:2200,gain:3,valueGain:.035},
-  {key:'brakes',label:'Износ тормозов',emoji:'🛞',cost:3800,gain:5,valueGain:.055},
-  {key:'suspension',label:'Подвеска требует ремонта',emoji:'🔧',cost:5200,gain:7,valueGain:.075},
-  {key:'body',label:'Кузовные дефекты',emoji:'🧰',cost:6500,gain:8,valueGain:.09},
-  {key:'paint',label:'Плохое ЛКП',emoji:'🎨',cost:7200,gain:6,valueGain:.08},
-  {key:'engine',label:'Нестабильная работа двигателя',emoji:'⚙️',cost:9800,gain:12,valueGain:.13},
-  {key:'gearbox',label:'Нужен сервис коробки',emoji:'🧩',cost:8800,gain:10,valueGain:.11}
+  {key:'oil',label:'Требуется большое ТО',emoji:'',cost:2200,gain:3,valueGain:.035},
+  {key:'brakes',label:'Износ тормозов',emoji:'',cost:3800,gain:5,valueGain:.055},
+  {key:'suspension',label:'Подвеска требует ремонта',emoji:'',cost:5200,gain:7,valueGain:.075},
+  {key:'body',label:'Кузовные дефекты',emoji:'',cost:6500,gain:8,valueGain:.09},
+  {key:'paint',label:'Плохое ЛКП',emoji:'',cost:7200,gain:6,valueGain:.08},
+  {key:'engine',label:'Нестабильная работа двигателя',emoji:'',cost:9800,gain:12,valueGain:.13},
+  {key:'gearbox',label:'Нужен сервис коробки',emoji:'',cost:8800,gain:10,valueGain:.11}
 ];
 const dealerNames=['АвтоХаус','Север Авто','Drive Market','Прайм Моторс','Гараж 74','АвтоПрофи'];
 
@@ -81,9 +81,9 @@ function publicWebAppUrl(){
 }
 async function sendStartMessage(chatId,firstName=''){
   const url=publicWebAppUrl();const name=String(firstName||'').trim();
-  const text=(name?`Привет, ${name}! 👋\n\n`:'')+'🚘 <b>ПЕРЕКУП | ИГРА</b>\n\nПокупай машины, проверяй их, ремонтируй и продавай дороже.';
+  const text=(name?`Привет, ${name}! \n\n`:'')+' <b>PEREKUP.RU</b>\n\nПокупай машины, проверяй их, ремонтируй и продавай дороже.';
   const payload={chat_id:chatId,text,parse_mode:'HTML'};
-  if(url)payload.reply_markup={inline_keyboard:[[{text:'🚘 Открыть игру',web_app:{url}}]]};
+  if(url)payload.reply_markup={inline_keyboard:[[{text:' Открыть игру',web_app:{url}}]]};
   return telegramApi('sendMessage',payload);
 }
 async function handleTelegramUpdate(update){
@@ -98,7 +98,7 @@ async function startTelegramPolling(){
   try{
     await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(e=>console.warn('Telegram deleteWebhook:',e.message));
     const url=publicWebAppUrl();
-    if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:'🚘 Играть',web_app:{url}}}).catch(e=>console.warn('Telegram menu button:',e.message));
+    if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:' Играть',web_app:{url}}}).catch(e=>console.warn('Telegram menu button:',e.message));
     await telegramApi('setMyCommands',{commands:[{command:'start',description:'Запустить игру'}]}).catch(()=>{});
     let offset=0;console.log('Telegram bot polling started');
     while(telegramPolling){
@@ -275,7 +275,7 @@ function quickSellValue(v){return money(v.current_value*(.82+Math.min(.08,v.cond
 function currentAuction(a){
   if(!a)return null;const total=30000,start=new Date(a.created_at).getTime(),end=new Date(a.ends_at).getTime(),now=Date.now();const ratio=Math.max(0,Math.min(1,(now-start)/total));
   const steps=Math.min(5,Math.floor(ratio*6));let bid=a.start_value;const bids=[];
-  for(let i=0;i<steps;i++){const p=(i+1)/6;const price=money(a.start_value+(a.target_value-a.start_value)*p);bid=Math.max(bid,price);bids.push({dealer:dealerNames[i%dealerNames.length],amount:price,emoji:['🏢','🚘','🤝','💼','🔑','🏁'][i%6]})}
+  for(let i=0;i<steps;i++){const p=(i+1)/6;const price=money(a.start_value+(a.target_value-a.start_value)*p);bid=Math.max(bid,price);bids.push({dealer:dealerNames[i%dealerNames.length],amount:price,emoji:['','','','','',''][i%6]})}
   return{...a,currentBid:Math.min(bid,a.target_value),bids,timeLeftMs:Math.max(0,end-now),ended:now>=end}
 }
 function settleAuction(a,price=null){const live=currentAuction(a);const vehicle=vehicleRow(a.vehicle_id,a.user_id);if(!vehicle||vehicle.status!=='owned')return live;const sold=money(price??(live.ended?a.target_value:live.currentBid));db.exec('BEGIN IMMEDIATE');try{const u=db.prepare('SELECT * FROM users WHERE id=?').get(a.user_id);db.prepare("UPDATE owned_vehicles SET status='sold' WHERE id=?").run(a.vehicle_id);db.prepare("UPDATE system_auctions SET status='sold',sold_at=?,sold_price=? WHERE id=?").run(nowIso(),sold,a.id);db.prepare('UPDATE users SET balance=balance+?,sales=sales+1,profit=profit+?,xp=xp+?,reputation=reputation+? WHERE id=?').run(sold,sold-vehicle.buy_price-vehicle.service_spent,80,3,a.user_id);db.prepare('INSERT INTO balance_transactions VALUES(?,?,?,?,?,?,?,?)').run(uid(),a.user_id,'system_sale',sold,u.balance,u.balance+sold,JSON.stringify({vehicleId:a.vehicle_id,auctionId:a.id}),nowIso());db.exec('COMMIT')}catch(e){try{db.exec('ROLLBACK')}catch{}throw e}bumpDaily(a.user_id,'sell',1);refreshLevel(a.user_id);return{...live,status:'sold',sold_price:sold,ended:true,timeLeftMs:0}}
@@ -328,9 +328,9 @@ async function api(req,res,url){
     const aa=url.pathname.match(/^\/api\/auction\/([^/]+)\/accept$/);if(req.method==='POST'&&aa){const a=db.prepare("SELECT * FROM system_auctions WHERE id=? AND user_id=? AND status='active'").get(aa[1],user.id);if(!a)return json(res,404,{error:'auction_not_found'});const live=currentAuction(a);const sold=settleAuction(a,live.currentBid);return json(res,200,{auction:sold,user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))})}
     if(req.method==='GET'&&url.pathname==='/api/tasks'){
       const d=todayKey();const defs=[
-        {key:'inspect2',label:'Проверь 2 машины',emoji:'🔍',target:2,current:Math.min(dailyValue(user.id,'inspect'),2),reward:6000},
-        {key:'repair1',label:'Почини машину',emoji:'🔧',target:1,current:Math.min(dailyValue(user.id,'repair'),1),reward:9000},
-        {key:'sell1',label:'Закрой 1 сделку',emoji:'🤝',target:1,current:Math.min(dailyValue(user.id,'sell'),1),reward:12000}
+        {key:'inspect2',label:'Проверь 2 машины',emoji:'',target:2,current:Math.min(dailyValue(user.id,'inspect'),2),reward:6000},
+        {key:'repair1',label:'Почини машину',emoji:'',target:1,current:Math.min(dailyValue(user.id,'repair'),1),reward:9000},
+        {key:'sell1',label:'Закрой 1 сделку',emoji:'',target:1,current:Math.min(dailyValue(user.id,'sell'),1),reward:12000}
       ].map(t=>({...t,claimed:!!db.prepare('SELECT 1 FROM claimed_tasks WHERE user_id=? AND task_key=? AND claim_date=?').get(user.id,t.key,d)}));return json(res,200,{tasks:defs})
     }
     const tc=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&tc){const m={inspect2:{ok:dailyValue(user.id,'inspect')>=2,reward:6000},repair1:{ok:dailyValue(user.id,'repair')>=1,reward:9000},sell1:{ok:dailyValue(user.id,'sell')>=1,reward:12000}},t=m[tc[1]];if(!t||!t.ok)return json(res,409,{error:'task_not_done'});try{db.prepare('INSERT INTO claimed_tasks VALUES(?,?,?)').run(user.id,tc[1],todayKey())}catch{return json(res,409,{error:'already_claimed'})}txBalance(user.id,'task_reward',t.reward,{key:tc[1]});addProgress(user.id,{xp:20,reputation:1});return json(res,200,{reward:t.reward})}
@@ -339,8 +339,8 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/daily/claim'){const r=db.prepare('SELECT * FROM daily_rewards WHERE user_id=?').get(user.id)||{streak:0,last_claim_date:null};if(r.last_claim_date===todayKey())return json(res,409,{error:'already_claimed'});const rewards=[3000,4000,5000,6000,7000,9000,15000],reward=rewards[r.streak%7],streak=(r.streak%7)+1;db.prepare('INSERT INTO daily_rewards(user_id,last_claim_date,streak) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_claim_date=excluded.last_claim_date,streak=excluded.streak').run(user.id,todayKey(),streak);txBalance(user.id,'daily_reward',reward);return json(res,200,{reward,streak})}
     if(req.method==='GET'&&url.pathname==='/api/stats')return json(res,200,{stats:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),transactions:db.prepare('SELECT type,amount,created_at FROM balance_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 20').all(user.id)});
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{user:publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id))});
-    if(req.method==='GET'&&url.pathname==='/api/achievements'){const u=publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id));const items=[['🚘','Первая покупка',u.buys>=1],['🔧','Первый ремонт',u.repairs>=1],['🤝','Первая продажа',u.sales>=1],['💸','100 000 ₽ прибыли',u.profit>=100000],['⭐','5 уровень',u.level>=5],['🏁','Топ-класс открыт',u.unlockedTier>=5]].map(([emoji,name,done])=>({emoji,name,done}));return json(res,200,{items})}
-    if(req.method==='GET'&&url.pathname==='/api/rules')return json(res,200,{items:['🎲 На главной ты покупаешь случайную машину выбранного класса по цене рулетки.','💰 Цена покупки всегда написана на кнопке до запуска рулетки.','🔧 После выпадения машина сразу попадает в гараж — её можно ремонтировать и улучшать.','🔨 На торгах за машину конкурируют системные дилеры.','💸 Можно продать системе сразу дешевле или подождать торги.','⭐ С ростом уровня открываются новые классы машин.']})
+    if(req.method==='GET'&&url.pathname==='/api/achievements'){const u=publicUser(db.prepare('SELECT * FROM users WHERE id=?').get(user.id));const items=[['','Первая покупка',u.buys>=1],['','Первый ремонт',u.repairs>=1],['','Первая продажа',u.sales>=1],['','100 000 ₽ прибыли',u.profit>=100000],['⭐','5 уровень',u.level>=5],['','Топ-класс открыт',u.unlockedTier>=5]].map(([emoji,name,done])=>({emoji,name,done}));return json(res,200,{items})}
+    if(req.method==='GET'&&url.pathname==='/api/rules')return json(res,200,{items:[' На главной ты покупаешь случайную машину выбранного класса по цене рулетки.',' Цена покупки всегда написана на кнопке до запуска рулетки.',' После выпадения машина сразу попадает в гараж — её можно ремонтировать и улучшать.',' На торгах за машину конкурируют системные дилеры.',' Можно продать системе сразу дешевле или подождать торги.','⭐ С ростом уровня открываются новые классы машин.']})
     if(req.method==='GET'&&url.pathname==='/api/dealer-tiers'){const u=publicUser(user);return json(res,200,{tiers:u.tiers,level:u.level,unlockedTier:u.unlockedTier})}
 
     if(url.pathname.startsWith('/api/admin/')){
@@ -365,7 +365,7 @@ async function api(req,res,url){
 function serveStatic(req,res,url){let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-store, max-age=0':'public, max-age=86400','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})}
 
 initDb();
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'7.0.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'8.0.0',botConfigured:!!BOT_TOKEN,webAppConfigured:!!publicWebAppUrl(),telegramPolling});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
-if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP.RU v7.0.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
+if(isMain)server.listen(PORT,()=>{console.log(`PEREKUP.RU v8.0.0 running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
 export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST,ROULETTE_PRICES,roulettePriceForTier};
