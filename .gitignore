@@ -1,6 +1,7 @@
+node_modules/
 .env
-data.sqlite3
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
