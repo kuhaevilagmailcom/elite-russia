@@ -42,7 +42,7 @@ test('generated faults use known keys',()=>assert.ok(makeFaults(3,60).every(x=>f
 test('production dev auth is explicit opt-in',()=>assert.match(serverSrc,/ALLOW_DEV_AUTH=process\.env\.ALLOW_DEV_AUTH==='1'/));
 test('server validates Telegram init data',()=>assert.match(serverSrc,/validateInitData/));
 test('server limits request body size',()=>assert.match(serverSrc,/body_too_large/));
-test('server has CSP',()=>assert.match(serverSrc,/Content-Security-Policy/));
+test('server has CSP',()=>assert.match(serverSrc,/Content-Security-Policy/));\ntest('Telegram Web iframe is not blocked by X-Frame-Options',()=>assert.doesNotMatch(serverSrc,/X-Frame-Options/));\ntest('server exposes health endpoint',()=>assert.match(serverSrc,/\\/healthz/));
 test('repeat service is blocked server-side',()=>assert.match(serverSrc,/service_already_done/));
 test('service history table exists',()=>assert.match(serverSrc,/vehicle_service_history/));
 test('daily progress table exists',()=>assert.match(serverSrc,/daily_task_progress/));

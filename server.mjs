@@ -45,7 +45,7 @@ function uid(){return crypto.randomUUID()}
 function money(n){return Math.max(0,Math.round(Number(n)||0))}
 function randInt(min,max){return crypto.randomInt(min,max+1)}
 function choice(a){return a[crypto.randomInt(0,a.length)]}
-function securityHeaders(){return {'X-Content-Type-Options':'nosniff','X-Frame-Options':'SAMEORIGIN','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
+function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){const body=JSON.stringify(payload);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(body)}
 function readBody(req){return new Promise((resolve,reject)=>{let s='';req.on('data',c=>{s+=c;if(s.length>1e6){reject(new Error('body_too_large'));req.destroy()}});req.on('end',()=>{try{resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});req.on('error',reject)})}
 function isAdminTelegramId(id){return ADMIN_IDS.has(String(id))||(ALLOW_DEV_AUTH&&String(id)==='10001')}
@@ -261,7 +261,7 @@ async function api(req,res,url){
 function serveStatic(req,res,url){let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':ext==='.html'||ext==='.js'||ext==='.css'?'no-store, max-age=0':'public, max-age=86400','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})}
 
 initDb();
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'perekup',version:'5.1.1'});if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
-if(isMain)server.listen(PORT,()=>console.log(`PEREKUP v5 running on http://localhost:${PORT}`));
+if(isMain)server.listen(PORT,()=>console.log(`PEREKUP v5.1.1 running on http://localhost:${PORT}`));
 export {money,levelFromXp,unlockedTier,valueFor,makeFaults,tierMeta,faultCatalog,SEARCH_COST,OFFER_INSPECTION_COST};
