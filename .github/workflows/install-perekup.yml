@@ -57,10 +57,11 @@ jobs:
           mkdir -p data public/assets/cars public/assets/icons
           printf '%s\n' 'node_modules/' '.env' 'data/' '*.sqlite' '*.sqlite-wal' '*.sqlite-shm' '.DS_Store' > .gitignore
 
-      - name: Download local car PNG assets
+      - name: Download available local car PNG assets
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           base=https://raw.githubusercontent.com/tox1n71/streetrace-public/5a850bf690450d11aa80c2a40b87720354ab61b6/frontend/src/assets/cars
           curl -fL "$base/21093.png" -o public/assets/cars/lada-2109.png
           curl -fL "$base/21103.png" -o public/assets/cars/lada-2110.png
@@ -77,17 +78,20 @@ jobs:
           curl -fL "$cbase/skoda.png" -o public/assets/cars/skoda.png
           curl -fL "https://raw.githubusercontent.com/Oussama-hamdi/DriveSync/2d6567205f904111c8b1f6a0fa314d38d62a8fa5/client/src/assets/images/toyotaCamry.png" -o public/assets/cars/toyota-camry.png
           curl -fL "https://raw.githubusercontent.com/katto-1204/RENTO-A-Car-Rental-System/dd4aa2fa25aa3446370615bbd14b91a5c033d3f1/assets/cars/nissan_gtr.png" -o public/assets/cars/nissan-gtr.png
+          true
 
       - name: Download Tabler UI icons
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           ibase=https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline
           for n in search car-garage gavel checklist apps chevron-left tools stethoscope cash trophy gift medal user book shield user-plus; do
             curl -fL "$ibase/$n.svg" -o "public/assets/icons/$n.svg"
           done
           curl -fL "$ibase/stack-2.svg" -o public/assets/icons/layers.svg
           curl -fL "$ibase/chart-bar.svg" -o public/assets/icons/chart.svg
+          true
 
       - name: Record third party sources
         shell: bash
