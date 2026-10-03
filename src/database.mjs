@@ -60,7 +60,6 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_friends_user ON friends(user_id,friend_id);
   CREATE INDEX IF NOT EXISTS idx_transfer_from ON username_transfers(from_user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_wheel_user ON wheel_history(user_id,created_at);
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_upgrade_request ON upgrade_history(user_id,request_id) WHERE request_id IS NOT NULL;
   CREATE INDEX IF NOT EXISTS idx_season_score ON season_stats(season_id,score DESC);
   `);
   const dropCols=new Set(db.prepare('PRAGMA table_info(drop_requests)').all().map(x=>x.name));
@@ -68,6 +67,7 @@ export function createDatabase(dataDir){
   const upgradeCols=new Set(db.prepare('PRAGMA table_info(upgrade_history)').all().map(x=>x.name));
   if(!upgradeCols.has('success'))db.exec("ALTER TABLE upgrade_history ADD COLUMN success INTEGER NOT NULL DEFAULT 1");
   if(!upgradeCols.has('request_id'))db.exec("ALTER TABLE upgrade_history ADD COLUMN request_id TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_upgrade_request ON upgrade_history(user_id,request_id) WHERE request_id IS NOT NULL");
   const now=new Date().toISOString();
   const cfg=db.prepare('INSERT OR IGNORE INTO game_config(key,value) VALUES(?,?)');
   cfg.run('drop_cost',String(GAME.dropCost));cfg.run('market_fee',String(GAME.marketFee));
