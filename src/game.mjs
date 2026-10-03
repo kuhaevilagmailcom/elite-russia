@@ -30,17 +30,17 @@ function weightedTierRarity(tier,rng=randomUnit){
 function pickTemplate(db,tierKey='basic',rng=randomUnit){
   const tier=normalizeTier(tierKey),rarity=weightedTierRarity(tier,rng),now=nowIso();
   if(rng()<.18){
-    const event=db.prepare(`SELECT t.* FROM event_templates et
+    const eventPool=db.prepare(`SELECT t.* FROM event_templates et
       JOIN events e ON e.id=et.event_id
       JOIN username_templates t ON t.id=et.template_id
       WHERE e.active=1 AND e.start_at<=? AND e.end_at>=? AND t.active=1 AND t.rarity=? AND t.current_supply<t.max_supply
-      ORDER BY RANDOM() LIMIT 1`).get(now,now,rarity);
-    if(event)return event;
+      LIMIT 200`).all(now,now,rarity);
+    if(eventPool.length)return eventPool[Math.floor(rng()*eventPool.length)];
   }
   const specialChance={COMMON:.01,RARE:.03,EPIC:.12,LEGEND:.35,ULTRA:.7}[rarity]||0;
   if(rng()<specialChance){
-    const special=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply ORDER BY RANDOM() LIMIT 1').get(rarity);
-    if(special)return special;
+    const specials=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200').all(rarity);
+    if(specials.length)return specials[Math.floor(rng()*specials.length)];
   }
   for(let i=0;i<50;i++){
     const handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle))continue;
