@@ -11,6 +11,7 @@ import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
 import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
+import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from './src/payments.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -21,7 +22,6 @@ const NODE_ENV=process.env.NODE_ENV||'development';
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
 const DEV_ADMIN=process.env.DEV_ADMIN==='1';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
-const PREMIUM_STARS=50;
 const INSTANCE_ID=crypto.randomUUID();
 if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
 const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
@@ -107,30 +107,6 @@ async function sendStartMessage(chatId,firstName='',ref=''){
   const url=publicWebAppUrl(ref),name=String(firstName||'').trim();
   const text=(name?`Привет, ${name}!\n\n`:'')+'<b>USERNAME</b>\n\nКоллекционируй редкие виртуальные usernames, собирай коллекцию и поднимайся в рейтинге.';
   const payload={chat_id:chatId,text,parse_mode:'HTML'};if(url)payload.reply_markup={inline_keyboard:[[{text:'Открыть игру',web_app:{url}}]]};return telegramApi('sendMessage',payload)
-}
-function parsePremiumPayload(payload){
-  const m=String(payload||'').match(/^username_plus:(\d+):([0-9a-f-]{16,})$/i);
-  return m?{telegramId:m[1],nonce:m[2]}:null;
-}
-function validPremiumCheckout(q){
-  const p=parsePremiumPayload(q?.invoice_payload);
-  return !!(p&&String(q?.from?.id||'')===p.telegramId&&q?.currency==='XTR'&&Number(q?.total_amount)===PREMIUM_STARS);
-}
-function applyPremiumPayment(message,payment){
-  const parsed=parsePremiumPayload(payment?.invoice_payload);if(!parsed)return {applied:false,reason:'bad_payload'};
-  if(String(message?.from?.id||'')!==parsed.telegramId||payment.currency!=='XTR'||Number(payment.total_amount)!==PREMIUM_STARS)return {applied:false,reason:'bad_payment'};
-  const charge=String(payment.telegram_payment_charge_id||'');if(!charge)return {applied:false,reason:'missing_charge'};
-  const user=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(parsed.telegramId);if(!user)return {applied:false,reason:'user_not_found'};
-  return db.transaction(()=>{
-    if(db.prepare('SELECT 1 FROM payments WHERE telegram_charge_id=?').get(charge))return {applied:false,duplicate:true,user};
-    const current=user.premium_until?new Date(user.premium_until).getTime():0,base=Math.max(Date.now(),current),until=new Date(base+30*86400000).toISOString(),ts=new Date().toISOString();
-    db.prepare('INSERT INTO payments(telegram_charge_id,provider_charge_id,user_id,payload,currency,total_amount,product,created_at) VALUES(?,?,?,?,?,?,?,?)')
-      .run(charge,String(payment.provider_payment_charge_id||''),user.id,payment.invoice_payload,payment.currency,payment.total_amount,'USERNAME_PLUS_30D',ts);
-    db.prepare('UPDATE users SET premium_until=? WHERE id=?').run(until,user.id);
-    db.prepare('INSERT INTO premium_subscriptions(user_id,active_until,source,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET active_until=excluded.active_until,source=excluded.source,created_at=excluded.created_at')
-      .run(user.id,until,'telegram_stars',ts);
-    return {applied:true,user,until};
-  })();
 }
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
@@ -263,4 +239,4 @@ function serveStatic(req,res,url){
 const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'username',version:GAME.version,botConfigured:!!BOT_TOKEN,telegramPolling});if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(isMain)server.listen(PORT,()=>{console.log(`USERNAME v${GAME.version} running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
-export {validateInitData,validPremiumCheckout,applyPremiumPayment,externalOrigin};
+export {validateInitData,externalOrigin};
