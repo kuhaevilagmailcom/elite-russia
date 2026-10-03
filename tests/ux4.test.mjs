@@ -158,8 +158,10 @@ test('wheel reward weights total 100 and include unique username reward while av
   const st=wheelStatus(db,buyer);assert.equal(st.rewards.reduce((s,x)=>s+x.weight,0),100);assert.ok(st.rewards.some(x=>x.type==='username'));
 });
 test('already-owned wheel usernames are excluded from the remaining pool',()=>{
-  const before=wheelStatus(db,buyer).wheelUsernamesAvailable;
-  ownedIn(user,WHEEL_USERNAMES[0],5000);
+  const before=wheelStatus(db,buyer).wheelUsernamesAvailable,handle=WHEEL_USERNAMES[0],now=new Date().toISOString();
+  const tid=db.prepare("INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,'wheel',1,1,?)").run(handle,'RARE',5000,1,now).lastInsertRowid;
+  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,1,1,?,'owned',?,'wheel')").run('wheel-owned-test',tid,handle,'RARE',5000,user.id,now);
+  db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run('wheel-owned-test',user.id,now);
   const after=wheelStatus(db,buyer).wheelUsernamesAvailable;
   assert.equal(after,before-1);
 });
