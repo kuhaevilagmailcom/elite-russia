@@ -27,6 +27,10 @@ function weightedTierRarity(tier,rng=randomUnit){
   for(const rarity of RARITIES){sum+=Number(tier.weights[rarity]||0);if(x<sum)return rarity}
   return 'COMMON';
 }
+function handleUnavailable(db,handle){
+  if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))return true;
+  return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
+}
 function pickTemplate(db,tierKey='basic',rng=randomUnit){
   const tier=normalizeTier(tierKey),rarity=weightedTierRarity(tier,rng),now=nowIso();
   if(rng()<.18){
@@ -35,23 +39,23 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
       JOIN username_templates t ON t.id=et.template_id
       WHERE e.active=1 AND e.start_at<=? AND e.end_at>=? AND t.active=1 AND t.rarity=? AND t.current_supply<t.max_supply
       LIMIT 200`).all(now,now,rarity);
-    if(eventPool.length)return eventPool[Math.floor(rng()*eventPool.length)];
+    const availableEvents=eventPool.filter(x=>!handleUnavailable(db,x.handle));if(availableEvents.length)return availableEvents[Math.floor(rng()*availableEvents.length)];
   }
   const specialChance={COMMON:.01,RARE:.03,EPIC:.12,LEGEND:.35,ULTRA:.7}[rarity]||0;
   if(rng()<specialChance){
     const specials=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200').all(rarity);
-    if(specials.length)return specials[Math.floor(rng()*specials.length)];
+    const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
   for(let i=0;i<50;i++){
-    const handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle))continue;
+    const handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
-      const supply=generatedSupply(rarity),base=scoreHandle(handle,rarity,1,supply);
+      const supply=1,base=scoreHandle(handle,rarity,1,1);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)')
         .run(handle,rarity,base,supply,'generated',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
-    if(t&&t.active&&t.current_supply<t.max_supply)return t;
+    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle))return t;
   }
   throw new Error('no_username_available');
 }
@@ -92,17 +96,17 @@ export function createDrop(db,user,requestId,tierKey='basic'){
   const made=db.transaction(()=>{
     const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
     if(activeCollectionCount(db,user.id)>=collectionLimit(fresh))throw new Error('collection_full');
-    const tier=normalizeTier(tierKey),effectiveTier=tier.key,template=pickTemplate(db,effectiveTier),instanceNumber=template.current_supply+1;
-    if(instanceNumber>template.max_supply)throw new Error('sold_out');
+    const tier=normalizeTier(tierKey),effectiveTier=tier.key,template=pickTemplate(db,effectiveTier),instanceNumber=1;
+    if(template.current_supply>=1||handleUnavailable(db,template.handle))throw new Error('sold_out');
     const useFree=fresh.free_drops>0&&effectiveTier==='basic',cost=useFree?0:tier.cost;
     if(cost>0)txBalance(db,user.id,'drop',-cost,{requestId,tier:effectiveTier});
     else db.prepare('UPDATE users SET free_drops=free_drops-1 WHERE id=?').run(user.id);
-    const changed=db.prepare('UPDATE username_templates SET current_supply=current_supply+1 WHERE id=? AND current_supply<max_supply').run(template.id).changes;
+    const changed=db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(template.id).changes;
     if(!changed)throw new Error('sold_out');
-    const value=template.special?Math.round(template.base_value*(instanceNumber===1?1.32:instanceNumber<=5?1.14:1)):scoreHandle(template.handle,template.rarity,instanceNumber,template.max_supply);
+    const value=template.special?template.base_value:scoreHandle(template.handle,template.rarity,1,1);
     const instanceId=uid(),season=activeSeason(db);
     db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(instanceId,template.id,template.handle,template.rarity,value,instanceNumber,template.max_supply,user.id,'pending',nowIso(),'drop',season?.id||null);
+      .run(instanceId,template.id,template.handle,template.rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null);
     db.prepare('INSERT INTO drop_requests(request_id,user_id,instance_id,cost,tier,created_at) VALUES(?,?,?,?,?,?)').run(requestId,user.id,instanceId,cost,effectiveTier,nowIso());
     db.prepare('INSERT INTO drop_history(id,user_id,instance_id,handle,rarity,value,action,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,instanceId,template.handle,template.rarity,value,'pending',nowIso());
     db.prepare('UPDATE users SET xp=xp+15 WHERE id=?').run(user.id);
@@ -175,13 +179,13 @@ export function leaderboard(db,mode='collection',period='all'){
 }
 export function tasks(db,user){
   const defs=[
-    {key:'drop3',label:'Получить 3 usernames',target:3,reward:2500,source:'drop'},
-    {key:'rare1',label:'Получить RARE или выше',target:1,reward:3000,source:'rare'},
-    {key:'sell1',label:'Продать username',target:1,reward:1400,source:'sell'},
-    {key:'market1',label:'Купить username на рынке',target:1,reward:2200,source:'market_buy'},
-    {key:'keep2',label:'Оставить 2 usernames',target:2,reward:1600,source:'keep'},
-    {key:'nodigits1',label:'Получить username без цифр',target:1,reward:2400,source:'nodigits'},
-    {key:'invite1',label:'Пригласить друга',target:1,reward:2600,source:'invite'}
+    {key:'drop3',label:'Получить 3 usernames',target:3,reward:600,source:'drop'},
+    {key:'rare1',label:'Получить RARE или выше',target:1,reward:900,source:'rare'},
+    {key:'sell1',label:'Продать username',target:1,reward:300,source:'sell'},
+    {key:'market1',label:'Купить username на рынке',target:1,reward:500,source:'market_buy'},
+    {key:'keep2',label:'Оставить 2 usernames',target:2,reward:350,source:'keep'},
+    {key:'nodigits1',label:'Получить username без цифр',target:1,reward:450,source:'nodigits'},
+    {key:'invite1',label:'Пригласить друга',target:1,reward:700,source:'invite'}
   ];
   return defs.map(t=>{
     const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,todayKey(),t.source)?.value||0;

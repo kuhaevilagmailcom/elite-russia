@@ -102,7 +102,7 @@ export function createDatabase(dataDir){
     VALUES(?,?,?,?,0,?,1,1,NULL,?)
     ON CONFLICT(handle) DO UPDATE SET
       rarity=excluded.rarity,base_value=excluded.base_value,
-      max_supply=CASE WHEN username_templates.current_supply>excluded.max_supply THEN username_templates.current_supply ELSE excluded.max_supply END,
+      max_supply=1,
       category=excluded.category,special=1,active=1`);
   for(const [handle,rarity,value,supply,category] of SPECIALS)specialUpsert.run(handle,rarity,value,supply,category,now);
 
@@ -126,5 +126,46 @@ export function createDatabase(dataDir){
     });
     tx();
   }
+
+  const uniqueV3=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('3.0.0-global-unique');
+  if(!uniqueV3){
+    const tx=db.transaction(()=>{
+      const taken=new Set(db.prepare('SELECT handle FROM username_instances ORDER BY obtained_at,id').all().map(r=>String(r.handle).toLowerCase()));
+      const groups=db.prepare('SELECT handle,COUNT(*) c FROM username_instances GROUP BY handle HAVING COUNT(*)>1').all();
+      for(const g of groups){
+        const rows=db.prepare('SELECT * FROM username_instances WHERE handle=? ORDER BY obtained_at ASC,id ASC').all(g.handle);
+        for(let i=1;i<rows.length;i++){
+          const row=rows[i];
+          let candidate='',n=i+1;
+          do{
+            const suffix='x'+n.toString(36);
+            candidate=(String(g.handle).slice(0,Math.max(4,10-suffix.length))+suffix).slice(0,10);
+            n++;
+          }while(taken.has(candidate)||db.prepare('SELECT 1 FROM username_templates WHERE handle=?').get(candidate));
+          taken.add(candidate);
+          const val=stableScoreHandle(candidate,row.rarity,1,1);
+          const t=db.prepare('INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,?,0,1,?)')
+            .run(candidate,row.rarity,val,1,'legacy_unique',now).lastInsertRowid;
+          db.prepare('UPDATE username_instances SET template_id=?,handle=?,value=?,instance_number=1,max_supply=1 WHERE id=?').run(t,candidate,val,row.id);
+        }
+      }
+      const specials=new Map(SPECIALS.map(x=>[x[0],x]));
+      const all=db.prepare('SELECT id,handle,rarity FROM username_instances').all();
+      for(const r of all){
+        const sp=specials.get(r.handle),val=sp?sp[2]:stableScoreHandle(r.handle,r.rarity,1,1);
+        db.prepare('UPDATE username_instances SET value=?,instance_number=1,max_supply=1 WHERE id=?').run(val,r.id);
+      }
+      const templates=db.prepare('SELECT id,handle,rarity,special FROM username_templates').all();
+      for(const t of templates){
+        const sp=specials.get(t.handle),exists=db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle);
+        const val=sp?sp[2]:stableScoreHandle(t.handle,t.rarity,1,1);
+        db.prepare('UPDATE username_templates SET base_value=?,max_supply=1,current_supply=? WHERE id=?').run(val,exists?1:0,t.id);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('3.0.0-global-unique',now);
+    });
+    tx();
+  }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_instances_handle_unique ON username_instances(handle)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_upgrade_target_active ON upgrade_sessions(target_handle,used_at,expires_at)');
   return db;
 }

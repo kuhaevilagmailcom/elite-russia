@@ -35,14 +35,16 @@ function calculateChance(rows){
 function prepareTarget(db,next,minValue){
   for(let i=0;i<100;i++){
     const handle=buildGeneratedHandle(next);if(!isValidHandle(handle))continue;
+    if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))continue;
+    if(db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso()))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
-      const supply=generatedSupply(next),base=scoreHandle(handle,next,1,supply);
+      const supply=1,base=scoreHandle(handle,next,1,1);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)').run(handle,next,base,supply,'upgrade',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
-    if(!t||!t.active||t.current_supply>=t.max_supply)continue;
-    const n=t.current_supply+1,value=Math.max(scoreHandle(t.handle,next,n,t.max_supply),minValue);
+    if(!t||!t.active||t.current_supply>=1)continue;
+    const n=1,value=Math.max(scoreHandle(t.handle,next,1,1),minValue);
     return {templateId:t.id,handle:t.handle,rarity:next,value,instanceNumber:n,maxSupply:t.max_supply};
   }
   throw new Error('upgrade_unavailable');
@@ -63,11 +65,11 @@ function createSession(db,user,rows,preview){
 }
 function allocateSessionTarget(db,user,session){
   const t=db.prepare('SELECT * FROM username_templates WHERE id=?').get(session.target_template_id);
-  if(!t||!t.active||t.current_supply>=t.max_supply)throw new Error('upgrade_unavailable');
-  const n=t.current_supply+1,id=uid(),value=Math.max(Number(session.target_value)||0,scoreHandle(t.handle,t.rarity,n,t.max_supply));
-  if(!db.prepare('UPDATE username_templates SET current_supply=current_supply+1 WHERE id=? AND current_supply<max_supply').run(t.id).changes)throw new Error('upgrade_unavailable');
+  if(!t||!t.active||t.current_supply>=1||db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle))throw new Error('upgrade_unavailable');
+  const n=1,id=uid(),value=Math.max(Number(session.target_value)||0,scoreHandle(t.handle,t.rarity,1,1));
+  if(!db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(t.id).changes)throw new Error('upgrade_unavailable');
   db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)')
-    .run(id,t.id,t.handle,t.rarity,value,n,t.max_supply,user.id,'owned',nowIso(),'upgrade');
+    .run(id,t.id,t.handle,t.rarity,value,1,1,user.id,'owned',nowIso(),'upgrade');
   db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,nowIso());
   return {id,handle:'@'+t.handle,rarity:t.rarity,value,instanceNumber:n,maxSupply:t.max_supply};
 }
