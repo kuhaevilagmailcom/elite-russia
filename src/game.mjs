@@ -107,7 +107,7 @@ export function collection(db,user,{rarity='ALL',sort='new',page=1}={}){
   const where=["owner_id=?","status='owned'"];const args=[user.id];
   if(rarity!=='ALL'){where.push('rarity=?');args.push(rarity)}
   const order={new:'obtained_at DESC',value:'value DESC',rarity:"CASE rarity WHEN 'ULTRA' THEN 5 WHEN 'LEGEND' THEN 4 WHEN 'EPIC' THEN 3 WHEN 'RARE' THEN 2 ELSE 1 END DESC,value DESC",short:'LENGTH(handle) ASC,value DESC'}[sort]||'obtained_at DESC';
-  const size=12,offset=(Math.max(1,page)-1)*size;
+  const size=6,offset=(Math.max(1,page)-1)*size;
   const rows=db.prepare(`SELECT * FROM username_instances WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args,size,offset).map(shapeInstance);
   const total=db.prepare(`SELECT COUNT(*) c FROM username_instances WHERE ${where.join(' AND ')}`).get(...args).c;
   return {items:rows,total,page:Math.max(1,page),pages:Math.max(1,Math.ceil(total/size))};

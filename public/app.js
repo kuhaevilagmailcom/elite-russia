@@ -1,6 +1,6 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
-const state={page:'home',home:null,collection:null,leaderboard:null,tasks:null,profile:null,filters:{rarity:'ALL',sort:'new',page:1},rankMode:'collection',busy:false};
+const state={page:'home',home:null,collection:null,leaderboard:null,tasks:null,profile:null,filters:{rarity:'ALL',sort:'new',page:1},rankMode:'collection',rankPage:1,busy:false};
 const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' NC';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const errors={unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно NC',pending_drop:'Сначала решите, что делать с текущим username',collection_full:'Коллекция заполнена',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',network:'Нет соединения с сервером',showcase_full:'Витрина заполнена'};
@@ -54,15 +54,16 @@ function collectionView(){
  const c=state.collection;
  return header('Коллекция',c.total+' usernames')+
  '<div class="collection-tools"><div class="chips">'+['ALL','COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-rarity="'+r+'" class="'+(state.filters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div>'+
- '<select id="sortSelect"><option value="new">Новые</option><option value="value">Цена</option><option value="rarity">Редкость</option><option value="short">Короткие</option></select></div>'+
+ '<select id="sortSelect"><option value="new" '+(state.filters.sort==='new'?'selected':'')+'>Новые</option><option value="value" '+(state.filters.sort==='value'?'selected':'')+'>Цена</option><option value="rarity" '+(state.filters.sort==='rarity'?'selected':'')+'>Редкость</option><option value="short" '+(state.filters.sort==='short'?'selected':'')+'>Короткие</option></select></div>'+
  '<div class="collection-grid">'+(c.items.length?c.items.map(x=>'<button class="user-card" data-detail="'+x.id+'"><span>'+x.handle+'</span>'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b><small>#'+x.instanceNumber+' / '+x.maxSupply+'</small></button>').join(''):'<div class="empty">Здесь пока пусто.</div>')+'</div>'+
  (c.pages>1?'<div class="pager"><button data-prev>Назад</button><span>'+c.page+' / '+c.pages+'</span><button data-next>Дальше</button></div>':'');
 }
 function topView(){
- const list=state.leaderboard?.items||[];
+ const all=state.leaderboard?.items||[],size=8,pages=Math.max(1,Math.ceil(all.length/size));state.rankPage=Math.max(1,Math.min(state.rankPage,pages));const list=all.slice((state.rankPage-1)*size,state.rankPage*size);
  return header('Топ','Лучшие коллекции')+
  '<div class="mode-tabs">'+[['collection','Коллекция'],['capital','Капитал'],['best','Лучший username']].map(([m,t])=>'<button data-mode="'+m+'" class="'+(state.rankMode===m?'active':'')+'">'+t+'</button>').join('')+'</div>'+
- '<div class="rank-list">'+list.map(r=>'<button class="rank-row" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'—')+'</small></div><strong>'+fmt(state.rankMode==='capital'?r.capital:state.rankMode==='best'?r.best:r.collection_value)+'</strong></button>').join('')+'</div>';
+ '<div class="rank-list">'+list.map(r=>'<button class="rank-row" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'—')+'</small></div><strong>'+fmt(state.rankMode==='capital'?r.capital:state.rankMode==='best'?r.best:r.collection_value)+'</strong></button>').join('')+'</div>'+
+ (pages>1?'<div class="pager"><button data-rank-prev>Назад</button><span>'+state.rankPage+' / '+pages+'</span><button data-rank-next>Дальше</button></div>':'');
 }
 function tasksView(){
  const list=state.tasks?.items||[];
@@ -90,12 +91,14 @@ async function load(page){
 }
 document.addEventListener('click',async e=>{const el=e.target.closest('button');if(!el)return;try{
  if(el.dataset.page){await load(el.dataset.page);return}
- if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID();const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId})});state.home.user=r.user;await animateDrop(r.instance);state.busy=false;return}
+ if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId})});state.home.user=r.user;await animateDrop(r.instance);state.busy=false;return}
  if(el.dataset.resolve){state.busy=true;const r=await api('/api/drop/'+el.dataset.id+'/resolve',{method:'POST',body:JSON.stringify({action:el.dataset.resolve})});toast(el.dataset.resolve==='keep'?'Добавлено в коллекцию':'Продано за '+fmt(state.home.pending.value));state.busy=false;await load('home');return}
  if(el.dataset.rarity){state.filters.rarity=el.dataset.rarity;state.filters.page=1;await load('collection');return}
  if(el.hasAttribute('data-prev')){state.filters.page=Math.max(1,state.filters.page-1);await load('collection');return}
  if(el.hasAttribute('data-next')){state.filters.page++;await load('collection');return}
- if(el.dataset.mode){state.rankMode=el.dataset.mode;await load('top');return}
+ if(el.dataset.mode){state.rankMode=el.dataset.mode;state.rankPage=1;await load('top');return}
+ if(el.hasAttribute('data-rank-prev')){state.rankPage=Math.max(1,state.rankPage-1);render();return}
+ if(el.hasAttribute('data-rank-next')){state.rankPage++;render();return}
  if(el.dataset.claim){const r=await api('/api/tasks/'+el.dataset.claim+'/claim',{method:'POST'});toast('+'+fmt(r.reward));await load('tasks');return}
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.page='profile';shell(profileView(r.profile));return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.page='detail';app.innerHTML='<div class="shell"><section class="screen">'+detailView(item)+'</section>'+nav()+'</div>'}return}
