@@ -1,4 +1,4 @@
-import {buildGeneratedHandle,generatedSupply,scoreHandle,isValidHandle} from './generator.mjs';
+import {buildGeneratedHandle,scoreHandle,isValidHandle,rarityFromValue} from './generator.mjs';
 import {RARITY_BASE} from './config.mjs';
 import {uid,nowIso,bumpSeasonScore,randomUnit} from './economy.mjs';
 
@@ -33,19 +33,20 @@ function calculateChance(rows){
   return {anchor,rule,chance,totalValue,targetMinValue,from:anchor.rarity,to:rule.next,count:rows.length};
 }
 function prepareTarget(db,next,minValue){
-  for(let i=0;i<100;i++){
+  for(let i=0;i<300;i++){
     const handle=buildGeneratedHandle(next);if(!isValidHandle(handle))continue;
     if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))continue;
     if(db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso()))continue;
+    const raw=scoreHandle(handle),value=Math.max(raw,minValue),rarity=rarityFromValue(value);
+    if(rarity!==next)continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
-      const supply=1,base=scoreHandle(handle,next,1,1);
-      db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)').run(handle,next,base,supply,'upgrade',nowIso());
+      db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)').run(handle,rarity,raw,1,'upgrade',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
     if(!t||!t.active||t.current_supply>=1)continue;
-    const n=1,value=Math.max(scoreHandle(t.handle,next,1,1),minValue);
-    return {templateId:t.id,handle:t.handle,rarity:next,value,instanceNumber:n,maxSupply:t.max_supply};
+    if(t.rarity!==rarity||t.base_value!==raw)db.prepare('UPDATE username_templates SET rarity=?,base_value=?,max_supply=1 WHERE id=?').run(rarity,raw,t.id);
+    return {templateId:t.id,handle:t.handle,rarity,value,instanceNumber:1,maxSupply:1};
   }
   throw new Error('upgrade_unavailable');
 }
@@ -66,12 +67,12 @@ function createSession(db,user,rows,preview){
 function allocateSessionTarget(db,user,session){
   const t=db.prepare('SELECT * FROM username_templates WHERE id=?').get(session.target_template_id);
   if(!t||!t.active||t.current_supply>=1||db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle))throw new Error('upgrade_unavailable');
-  const n=1,id=uid(),value=Math.max(Number(session.target_value)||0,scoreHandle(t.handle,t.rarity,1,1));
+  const n=1,id=uid(),value=Math.max(Number(session.target_value)||0,scoreHandle(t.handle)),rarity=rarityFromValue(value);if(rarity!==session.target_rarity)throw new Error('upgrade_session_mismatch');
   if(!db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(t.id).changes)throw new Error('upgrade_unavailable');
   db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)')
-    .run(id,t.id,t.handle,t.rarity,value,1,1,user.id,'owned',nowIso(),'upgrade');
+    .run(id,t.id,t.handle,rarity,value,1,1,user.id,'owned',nowIso(),'upgrade');
   db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,nowIso());
-  return {id,handle:'@'+t.handle,rarity:t.rarity,value,instanceNumber:n,maxSupply:t.max_supply};
+  return {id,handle:'@'+t.handle,rarity,value,instanceNumber:n,maxSupply:1};
 }
 function replayResult(db,row){
   const ids=JSON.parse(row.source_ids||'[]'),sources=ids.map(id=>shape(db.prepare('SELECT * FROM username_instances WHERE id=?').get(id))).filter(Boolean);
