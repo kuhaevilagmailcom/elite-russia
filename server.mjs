@@ -5,13 +5,14 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {GAME} from './src/config.mjs';
 import {createDatabase} from './src/database.mjs';
-import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,setShowcase,sellOwnedUsername,adminOverview,adminAction} from './src/game.mjs';
+import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,setShowcase,sellOwnedUsername} from './src/game.mjs';
 import {listMarket,createListing,cancelListing,buyListing} from './src/market.mjs';
 import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
 import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from './src/payments.mjs';
+import {adminOverview,adminUserDetail,adminSetBalance,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -24,7 +25,8 @@ const DEV_ADMIN=process.env.DEV_ADMIN==='1';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
 const INSTANCE_ID=crypto.randomUUID();
 if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
-const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
+const DEFAULT_ADMIN_IDS=['8464597898','1141626866'];
+const ADMIN_IDS=new Set([...DEFAULT_ADMIN_IDS,...String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean)]);
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
@@ -162,7 +164,7 @@ async function api(req,res,url){
     const user=auth(req);if(!user)return json(res,401,{error:'unauthorized'});if(user.blocked)return json(res,403,{error:'blocked'});
     ensureSeasonLifecycle(db);
     if(!rateLimit(user.id,'global',120,60000))return json(res,429,{error:'rate_limited'});
-    if(req.method==='GET'&&url.pathname==='/api/home')return json(res,200,homeData(db,user));
+    if(req.method==='GET'&&url.pathname==='/api/home'){const h=homeData(db,user);h.user.isAdmin=isAdmin(user);return json(res,200,h)}
     if(req.method==='POST'&&url.pathname==='/api/story-share'){
       if(!rateLimit(user.id,'story',3,60000))return json(res,429,{error:'rate_limited'});
       const b=await readBody(req),instanceId=String(b.instanceId||''),dataUrl=String(b.dataUrl||'');
@@ -181,7 +183,7 @@ async function api(req,res,url){
       const result=createDrop(db,user,requestId,String(b.tier||'basic'));invalidateLeaderboard();return json(res,200,result);
     }
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req),result=resolveDrop(db,user,resolve[1],b.action);invalidateLeaderboard();return json(res,200,result)}
-    if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',page:Number(url.searchParams.get('page')||1)}));
+    if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',showcase:url.searchParams.get('showcase')||'all',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='GET'&&url.pathname==='/api/leaderboard'){
       const key='capital',cached=leaderboardCache.get(key);
       if(cached&&Date.now()-cached.ts<30000)return json(res,200,{items:cached.items});
@@ -191,13 +193,13 @@ async function api(req,res,url){
     const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim){const result=claimTask(db,user,claim[1]);invalidateLeaderboard();return json(res,200,result)}
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const p=profile(db,Number(other[1]));return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
-    const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){setShowcase(db,user,showcase[1]);return json(res,200,{ok:true})}
+    const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){return json(res,200,setShowcase(db,user,showcase[1]))}
     const collectionSell=url.pathname.match(/^\/api\/collection\/([^/]+)\/sell$/);if(req.method==='POST'&&collectionSell){const result=sellOwnedUsername(db,user,collectionSell[1]);invalidateLeaderboard();return json(res,200,result)}
 
-    if(req.method==='GET'&&url.pathname==='/api/market')return json(res,200,listMarket(db,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1)}));
-    if(req.method==='POST'&&url.pathname==='/api/market'){const b=await readBody(req);return json(res,200,createListing(db,user,String(b.instanceId||''),b.price))}
+    if(req.method==='GET'&&url.pathname==='/api/market')return json(res,200,listMarket(db,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1)}));
+    if(req.method==='POST'&&url.pathname==='/api/market'){const b=await readBody(req),result=createListing(db,user,String(b.instanceId||''),b.price);invalidateLeaderboard();return json(res,200,result)}
     const buy=url.pathname.match(/^\/api\/market\/([^/]+)\/buy$/);if(req.method==='POST'&&buy){const result=buyListing(db,user,buy[1]);invalidateLeaderboard();return json(res,200,result)}
-    const cancel=url.pathname.match(/^\/api\/market\/([^/]+)\/cancel$/);if(req.method==='POST'&&cancel)return json(res,200,cancelListing(db,user,cancel[1]));
+    const cancel=url.pathname.match(/^\/api\/market\/([^/]+)\/cancel$/);if(req.method==='POST'&&cancel){const result=cancelListing(db,user,cancel[1]);invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/friends')return json(res,200,friendsData(db,user,BOT_USERNAME));
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
