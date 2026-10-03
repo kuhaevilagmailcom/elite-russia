@@ -217,12 +217,33 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:50,features:['Коллекция до 300 usernames','6 слотов витрины'],starsEnabled:!!BOT_TOKEN});
     if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней. Не влияет на шансы дропа, колесо или апгрейдер.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:PREMIUM_STARS}]});return json(res,200,{invoice,stars:PREMIUM_STARS})}
 
-    if(url.pathname==='/api/admin/overview'&&req.method==='GET'){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminOverview(db))}
-    const aa=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block)$/);if(req.method==='POST'&&aa){if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);adminAction(db,user,Number(aa[1]),aa[2],b.value);invalidateLeaderboard();return json(res,200,{ok:true})}
+    if(url.pathname==='/api/admin/overview'&&req.method==='GET'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      return json(res,200,adminOverview(db,{q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||20)}));
+    }
+    const adminUser=url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
+    if(req.method==='GET'&&adminUser){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminUserDetail(db,Number(adminUser[1])))}
+    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block|reset|add-username)$/);
+    if(req.method==='POST'&&adminActionRoute){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});const targetId=Number(adminActionRoute[1]),action=adminActionRoute[2],b=await readBody(req);let result;
+      if(action==='balance')result=adminSetBalance(db,user,targetId,b.delta);
+      if(action==='block')result=adminSetBlocked(db,user,targetId,!!b.value);
+      if(action==='reset')result=resetSingleUser(db,user,targetId);
+      if(action==='add-username')result=adminAddUsername(db,user,targetId,b.handle,b.value);
+      invalidateLeaderboard();return json(res,200,result);
+    }
+    const adminUsername=url.pathname.match(/^\/api\/admin\/usernames\/([^/]+)\/(remove|transfer|value)$/);
+    if(req.method==='POST'&&adminUsername){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req),id=adminUsername[1],action=adminUsername[2];let result;
+      if(action==='remove')result=adminRemoveUsername(db,user,id);
+      if(action==='transfer')result=adminTransferUsername(db,user,id,Number(b.targetId));
+      if(action==='value')result=adminSetUsernameValue(db,user,id,b.value);
+      invalidateLeaderboard();return json(res,200,result);
+    }
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,rate_limited:429,recipient_blocked:409}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
