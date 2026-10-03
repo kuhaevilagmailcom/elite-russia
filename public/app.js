@@ -52,12 +52,9 @@ function rarityTone(rarity){
   return {COMMON:'#8f98a3',RARE:'#2aabee',EPIC:'#7257d8',LEGEND:'#d88b22',ULTRA:'#e34850'}[String(rarity||'').toUpperCase()]||'#8f98a3';
 }
 function resultCard(x,pending=false){
- const rarity=String(x.rarity||'COMMON').toUpperCase();
- return '<article class="drop-result-card '+rarity.toLowerCase()+'" style="--result-accent:'+rarityTone(rarity)+'">'+
-   '<div class="drop-result-head"><span>'+(pending?'НОВЫЙ USERNAME':'USERNAME')+'</span>'+badge(rarity)+'</div>'+
-   '<div class="drop-result-main"><small>'+(pending?'Тебе выпал':'Username')+'</small><h1>'+esc(x.handle)+'</h1><strong>'+fmt(x.value)+'</strong></div>'+
-   '<div class="drop-result-info"><div><span>Экземпляр</span><b>#'+x.instanceNumber+' / '+x.maxSupply+'</b></div><div><span>Редкость</span><b>'+rarity+'</b></div></div>'+
-   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b><small>Готовая картинка для Telegram Stories</small></span></button></div>':'')+
+ return '<article class="drop-result-card minimal-result">'+
+   '<div class="drop-result-main minimal"><h1>'+esc(x.handle)+'</h1></div>'+
+   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b></span></button></div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){

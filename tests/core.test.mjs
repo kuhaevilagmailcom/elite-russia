@@ -27,6 +27,8 @@ test('drop price selector is a top sheet and odds are not rendered',()=>{assert.
 test('UI uses virtual dollar formatting',()=>assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/));
 test('daily wheel has six aligned visual sectors and center-stop math',()=>{assert.match(appSrc,/daily-wheel/);assert.match(appSrc,/targetCenter=idx\*segment/);assert.match(cssSrc,/from -30deg/);assert.match(cssSrc,/translateY\(-105px\)/)});
 test('drop result has native Telegram story sharing',()=>{assert.match(appSrc,/data-share-story/);assert.match(appSrc,/shareToStory/);assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/);assert.match(appSrc,/Я ВЫИГРАЛ/);assert.match(cssSrc,/drop-result-card/)});
+test('drop result card only shows username and actions',()=>{const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);assert.match(m[0],/esc\(x\.handle\)/);assert.match(m[0],/Оставить/);assert.match(m[0],/Продать/);assert.match(m[0],/Выложить в историю/);assert.doesNotMatch(m[0],/badge\(/);assert.doesNotMatch(m[0],/Экземпляр|Редкость|НОВЫЙ USERNAME/)});
+
 test('story images are uploaded to an authenticated endpoint and served publicly',()=>{assert.match(serverSrc,/\/api\/story-share/);assert.match(serverSrc,/\/story\//);assert.match(serverSrc,/Content-Type':'image\/jpeg/)});
 test('bottom navigation stays removed and menu has drop return',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/\['home','home','Дроп'/)});
 test('top menu has every requested game section',()=>{for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name))});
