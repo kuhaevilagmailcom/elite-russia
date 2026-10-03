@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'1.0.0',
+  version:'2.0.0',
   startBalance:10000,
   freeDrops:3,
   dropCost:2000,
@@ -10,7 +10,8 @@ export const GAME={
   premiumShowcaseSlots:6,
   marketFee:0.05,
   seasonDays:30,
-  dropRateLimitMs:900
+  dropRateLimitMs:900,
+  wheelCooldownMs:86400000
 };
 export const RARITIES=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
 export const RARITY_WEIGHTS={COMMON:78,RARE:18.5,EPIC:3,LEGEND:.45,ULTRA:.05};
