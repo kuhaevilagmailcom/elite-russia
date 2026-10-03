@@ -86,7 +86,7 @@ export function cleanupUpgradeSessions(db){
   return db.prepare('DELETE FROM upgrade_sessions WHERE (used_at IS NOT NULL AND used_at<?) OR (used_at IS NULL AND expires_at<?)').run(cutoff,now).changes;
 }
 export function upgradeInfo(db,user){
-  const available=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') ORDER BY value DESC LIMIT 150").all(user.id).map(shape);
+  const available=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') ORDER BY value DESC LIMIT 250").all(user.id).map(shape);
   return {rules:UPGRADE_RULES,maxItems:5,available};
 }
 export function previewUpgrade(db,user,ids){
