@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
-import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle} from '../src/generator.mjs';
+import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
 import {ensureUser,createDrop,resolveDrop,leaderboard,sellOwnedUsername} from '../src/game.mjs';
 import {createListing,buyListing} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
@@ -19,11 +19,13 @@ const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8
 const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url),'utf8');
 
 test('candidate universe exceeds 3000 readable combinations',()=>assert.ok(candidateUniverseSize()>3000));
-test('generator never produces numeric-only usernames in 100k samples',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(isValidHandle(h))}});
+test('generator keeps usernames at 10 chars max and never numeric-only in 100k samples',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(h.length<=10);assert.ok(isValidHandle(h))}});
 test('requested clean username roots exist',()=>{for(const h of ['card','loly','mama','sigma'])assert.ok(ROOTS.includes(h));for(const h of ['card','loly','mama','sigma'])assert.ok(SPECIALS.some(x=>x[0]===h))});
-test('score rewards shorter clean usernames',()=>assert.ok(scoreHandle('monk','ULTRA',1,25)>scoreHandle('monk8392','COMMON',1,5000)));
+test('score strongly rewards shorter names at same rarity',()=>{assert.ok(scoreHandle('card','COMMON',20,5000)>scoreHandle('cardzzzzzz','COMMON',20,5000)*3)});
+test('real word costs far more than random letters of same length',()=>{assert.ok(wordQuality('mama')>wordQuality('qzvra'));assert.ok(scoreHandle('mama','COMMON',20,5000)>scoreHandle('qzvr','COMMON',20,5000)*2)});
 test('drop price selector is a top sheet and odds are not rendered',()=>{assert.match(appSrc,/data-drop-picker-open/);assert.match(cssSrc,/drop-cost-sheet/);assert.doesNotMatch(appSrc,/function oddsCells/);assert.match(appSrc,/Стоимость попытки/)});
 test('UI uses virtual dollar formatting',()=>assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/));
+test('daily wheel has six aligned visual sectors and center-stop math',()=>{assert.match(appSrc,/daily-wheel/);assert.match(appSrc,/targetCenter=idx\*segment/);assert.match(cssSrc,/from -30deg/);assert.match(cssSrc,/translateY\(-105px\)/)});
 test('bottom navigation stays removed and menu has drop return',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/\['home','home','Дроп'/)});
 test('top menu has every requested game section',()=>{for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name))});
 test('new sqlite systems exist',()=>{for(const name of ['market_listings','username_transfers','wheel_history','upgrade_history','upgrade_sessions','season_stats'])assert.match(dbSrc,new RegExp(name))});
