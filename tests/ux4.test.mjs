@@ -8,6 +8,7 @@ import {ensureUser,collection,setShowcase} from '../src/game.mjs';
 import {createListing,listMarket} from '../src/market.mjs';
 import {friendsData} from '../src/social.mjs';
 import {wheelStatus,WHEEL_USERNAMES} from '../src/wheel.mjs';
+import {GAME} from '../src/config.mjs';
 
 const appSrc=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const uxCss=fs.readFileSync(new URL('../public/ux4-core.css',import.meta.url),'utf8');
@@ -50,6 +51,22 @@ test('upgrader uses a horizontal slot track, not the old circular roulette',()=>
   assert.match(appSrc,/slot-track/);
   assert.match(uxCss,/\.slot-track/);
 });
+test('upgrader has one screen title and no visible five-item-limit copy',()=>{
+  const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(appSrc,/page==='upgrader'\)shell\('Апгрейдер',upgraderView\(\)\)/);
+  assert.match(view,/Выбери usernames и попробуй получить более дорогой/);
+  assert.doesNotMatch(view,/>Апгрейдер</);
+  assert.doesNotMatch(view,/Выбери до|от 1 до 5|максимум 5|5 usernames/i);
+  assert.doesNotMatch(appSrc,/Лимит выбора достигнут|Можно выбрать максимум 5 usernames/);
+});
+test('upgrader selection cards are compact and footer is sticky',()=>{
+  assert.match(uxCss,/\.upgrade-selected\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(uxCss,/\.upgrade-selected>button\{[^}]*height:44px/);
+  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:54px/);
+  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0/);
+  assert.match(uxCss,/@media\(max-width:370px\)\{\.upgrade-selected\{grid-template-columns:1fr\}/);
+});
+
 test('collection UI removed rarity filter chips',()=>{
   const view=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(view,/data-collection-filter-open/);
@@ -73,6 +90,26 @@ test('wheel is responsive, centered and uses true weight geometry',()=>{
   assert.match(uxCss,/border-radius:50%/);
   assert.match(uxCss,/daily-wheel-pointer/);
 });
+test('wheel hides labels from tiny sectors and lists rare prizes separately',()=>{
+  const view=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(view,/rare=g\.rows\.filter\(x=>x\.span<12\)/);
+  assert.match(view,/visible=g\.rows\.filter\(x=>x\.span>=12\)/);
+  assert.match(view,/visible\.map\(x=>'<span class="daily-wheel-label"/);
+  assert.match(view,/wheel-rare/);
+  assert.match(view,/РЕДКИЕ ПРИЗЫ/);
+});
+test('wheel result persists locally and spin is driven by server reward',()=>{
+  assert.match(appSrc,/wheelLastResult:null/);
+  assert.match(appSrc,/state\.wheelLastResult=r\.reward/);
+  assert.match(appSrc,/target=g\.rows\.find\(x=>x\.key===r\.reward\.key\)/);
+  assert.match(appSrc,/3\.6s cubic-bezier/);
+  assert.match(appSrc,/await new Promise\(x=>setTimeout\(x,3650\)\)/);
+});
+test('wheel disabled CTA is visually distinct',()=>{
+  assert.match(uxCss,/\.wheel-spin-button:disabled\{[^}]*background:#d7eefa!important[^}]*opacity:1/);
+});
+test('new players start with exactly 50000 virtual dollars',()=>assert.equal(GAME.startBalance,50000));
+
 test('referral screen has copy and native Telegram share actions',()=>{
   const view=appSrc.match(/function friendsView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(view,/data-copy-ref/);assert.match(view,/data-share-ref/);
@@ -138,7 +175,7 @@ test('collection supports price date length digits and showcase sorting/filterin
   const short=collection(db,user,{sort:'short'}).items;
   assert.ok(short[0].rawHandle.length<=short.at(-1).rawHandle.length);
   assert.ok(collection(db,user,{digits:'with'}).items.every(x=>/\d/.test(x.rawHandle)));
-  assert.ok(collection(db,user,{digits:'none'}).items.every(x=>!/d/.test(x.rawHandle)));
+  assert.ok(collection(db,user,{digits:'none'}).items.every(x=>!/\d/.test(x.rawHandle)));
   const only=collection(db,user,{showcase:'only'});assert.equal(only.items.length,1);assert.equal(only.items[0].id,expensive);
 });
 test('market sorting and digit filters work without rarity controls',()=>{
@@ -147,7 +184,7 @@ test('market sorting and digit filters work without rarity controls',()=>{
   assert.equal(listMarket(db,{sort:'cheap'}).items[0].price,300);
   assert.equal(listMarket(db,{sort:'expensive'}).items[0].price,1800);
   assert.ok(listMarket(db,{digits:'with'}).items.every(x=>/\d/.test(x.rawHandle)));
-  assert.ok(listMarket(db,{digits:'none'}).items.every(x=>!/d/.test(x.rawHandle)));
+  assert.ok(listMarket(db,{digits:'none'}).items.every(x=>!/\d/.test(x.rawHandle)));
 });
 test('friends data always produces a referral link when bot username is known',()=>{
   const f=friendsData(db,user,'username_test_bot');
