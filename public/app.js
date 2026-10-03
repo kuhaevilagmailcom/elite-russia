@@ -2,20 +2,20 @@ let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,
-  menu:false,busy:false,backPage:'collection',dropTier:'basic',upgradeOutcome:null,
+  menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,upgradeOutcome:null,
   filters:{rarity:'ALL',sort:'new',page:1},
   marketFilters:{rarity:'ALL',sort:'new',q:'',page:1},
   rankMode:'collection',rankPeriod:'all',rankPage:1,
   upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false
 };
-const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' NC';
+const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ERR={
   unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно NC',pending_drop:'Сначала решите, что делать с текущим username',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранные usernames недоступны',upgrade_bad_recipe:'Неверный набор для апгрейда',
-  premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',network:'Нет соединения с сервером'
 };
 function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
@@ -51,18 +51,19 @@ function shell(title,html,opts={}){window.__USERNAME_READY=true;app.innerHTML='<
 function resultCard(x,pending=false){return '<div class="result-card '+String(x.rarity).toLowerCase()+'"><span class="result-kicker">USERNAME</span><h1>'+esc(x.handle)+'</h1><div class="result-meta">'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b></div><div class="result-supply">#'+x.instanceNumber+' / '+x.maxSupply+'</div>'+(pending?'<div class="result-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="ghost" data-resolve="sell" data-id="'+x.id+'">Продать за '+fmt(x.value)+'</button></div>':'')+'</div>'}
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
-  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'2K',cost:2000,weights:{COMMON:88,RARE:10.5,EPIC:1.35,LEGEND:.14,ULTRA:.01}};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$2K',cost:2000};
 }
-function oddsCells(tier){
-  return '<div class="drop-odds">'+['COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<div><span>'+r+'</span><b>'+Number(tier.weights?.[r]||0)+'%</b></div>').join('')+'</div>';
+function dropPricePicker(tiers){
+ if(!state.dropPicker)return '';
+ return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
  const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||2000),cantAfford=!freeBasic&&u.balance<payCost;
- return '<div class="home"><div class="home-metrics">'+metric('Коллекция',fmt(u.collectionValue))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
- '<section class="drop-zone"><div class="drop-label">DROP</div><p>Выберите стоимость попытки</p>'+
- (!p?'<div class="drop-tiers">'+Object.values(tiers).map(t=>'<button data-drop-tier="'+t.key+'" class="'+(state.dropTier===t.key?'active':'')+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost).replace(' NC','')+'</b></button>').join('')+'</div>'+oddsCells(tier):'')+
- (p?resultCard(p,true):'<div class="handle-stage" id="handleStage"><span>@</span><b>username</b></div><button class="drop-btn" id="dropBtn" '+(cantAfford?'disabled':'')+'><span>'+(freeBasic?'Получить бесплатно':'Получить username')+'</span><b>'+(freeBasic?u.freeDrops+' осталось':fmt(payCost))+'</b></button><small class="drop-note">'+(freeBasic?'Бесплатная попытка использует базовый пул 2K':cantAfford?'Недостаточно NC для этого пула':'Чем дороже пул, тем выше шанс редкого username, но COMMON всё ещё возможен')+'</small>')+'</section>'+
+ return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Коллекция',fmt(u.collectionValue))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
+ '<section class="drop-zone"><div class="drop-label">DROP</div><p>Получите случайный username</p>'+
+ (!p?'<button class="drop-cost-trigger" data-drop-picker-open><span>Стоимость попытки</span><b>'+fmt(tier.cost)+' <em>⌄</em></b></button>':'')+
+ (p?resultCard(p,true):'<div class="handle-stage" id="handleStage"><span>@</span><b>username</b></div><button class="drop-btn" id="dropBtn" '+(cantAfford?'disabled':'')+'><span>'+(freeBasic?'Получить бесплатно':'Получить username')+'</span><b>'+(freeBasic?u.freeDrops+' осталось':fmt(payCost))+'</b></button><small class="drop-note">'+(freeBasic?'Базовая попытка сейчас бесплатна':cantAfford?'Недостаточно денег для выбранной стоимости':'Цена влияет на качество пула, проценты скрыты')+'</small>')+'</section>'+
  '<section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b>'+badge(last.rarity)+'<strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
 }
 async function animateDrop(result){const stage=document.querySelector('#handleStage'),btn=document.querySelector('#dropBtn');if(!stage||!btn)return;btn.disabled=true;const samples=['@vision','@storm7','@phantom','@dealer77','@blackout','@master7','@prime','@ghost77','@mister777'];const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,100]:[55,55,60,70,85,110,150,220,330,470];let i=0;for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b>'+samples[i++%samples.length]+'</b>';await new Promise(r=>setTimeout(r,d))}stage.innerHTML='<b>'+esc(result.handle)+'</b>';stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?120:420));state.home.pending=result;render()}
@@ -82,14 +83,14 @@ function upgraderView(){
  const u=state.upgrader||{available:[],maxItems:5},selected=selectedUpgradeItems(),p=state.upgradePreview;
  if(state.upgradeOutcome){
    const r=state.upgradeOutcome,n=r.sources?.length||0,names=(r.sources||[]).slice(0,4).map(x=>x.handle).join(', ');
-   return '<div class="upgrade-result-screen"><div class="upgrade-result-card '+(r.success?'success':'fail')+'"><small>АПГРЕЙД</small><h2>'+(r.success?'Победа':'Проигрыш')+'</h2><div class="upgrade-result-source">'+n+' username'+(n===1?'':'s')+' · '+esc(names)+(n>4?'…':'')+'</div>'+(r.success?'<div class="upgrade-result-target"><span>Получен</span><b>'+esc(r.result.handle)+'</b><strong>'+esc(r.result.rarity)+' · '+fmt(r.result.value)+'</strong></div>':'<div class="upgrade-result-target lost"><span>Сгорело</span><b>'+n+' username'+(n===1?'':'s')+'</b><strong>Новый username не создан</strong></div>')+'<button class="primary" data-upgrade-continue>Продолжить</button></div></div>';
+   return '<div class="upgrade-result-screen"><div class="upgrade-result-card '+(r.success?'success':'fail')+'"><small>АПГРЕЙД</small><h2>'+(r.success?'Победа':'Проигрыш')+'</h2><div class="upgrade-result-source">'+n+' username'+(n===1?'':'s')+' · '+esc(names)+(n>4?'…':'')+'</div>'+(r.success?'<div class="upgrade-result-target"><span>Вы выиграли</span><b>'+esc(r.result.handle)+'</b><strong>'+esc(r.result.rarity)+' · '+fmt(r.result.value)+'</strong></div>':'<div class="upgrade-result-target lost"><span>Сгорело</span><b>'+n+' username'+(n===1?'':'s')+'</b><strong>Приз '+esc(r.target?.handle||'')+' не получен</strong></div>')+'<button class="primary" data-upgrade-continue>Продолжить</button></div></div>';
  }
- const chance=p?Math.round(Number(p.chance||0)*100):0,winDeg=Math.max(1,(Number(p?.chance)||.04)*360),total=selected.reduce((s,x)=>s+Number(x.value||0),0);
+ const chance=p?Math.round(Number(p.chance||0)*100):0,winDeg=Math.max(1,(Number(p?.chance)||.2)*360),total=selected.reduce((s,x)=>s+Number(x.value||0),0);
  return '<div class="upgrade-multi-page"><div class="upgrade-multi-head"><div><small>ВЫБРАНО</small><b>'+selected.length+' / '+(u.maxItems||5)+'</b><span>'+fmt(total)+'</span></div>'+(selected.length?'<button data-up-clear>Очистить</button>':'')+'</div>'+
  '<div class="upgrade-selected-strip">'+(selected.length?selected.map(x=>'<button data-up-remove="'+x.id+'"><span>'+esc(x.handle)+'</span><small>'+x.rarity+'</small><em>×</em></button>').join(''):'<div class="upgrade-empty-slot">Выберите от 1 до 5 usernames ниже</div>')+'</div>'+
- (selected.length?'<div class="upgrade-multi-stage">'+(p?'<div class="upgrade-target-line"><div><span>При успехе</span><b>'+esc(p.to)+'</b></div><div><span>Минимальная оценка</span><b>'+fmt(p.targetMinValue)+'</b></div></div><div class="upgrade-wheel-wrap multi"><div class="upgrade-wheel-pointer"></div><div class="upgrade-roulette" id="upgradeRoulette" style="--win-deg:'+winDeg+'deg"><div class="upgrade-wheel-core"><b>'+chance+'%</b><span>WIN</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i>Победа '+chance+'%</span><span><i class="lose"></i>Проигрыш '+(100-chance)+'%</span></div>':'<div class="upgrade-preview-loading">Считаю шанс…</div>')+'</div>':'')+
- '<div class="upgrade-pool-title"><span>Мои usernames</span><small>Каждый дополнительный username немного повышает шанс</small></div><div class="upgrade-multi-list">'+((u.available||[]).length?(u.available||[]).map(x=>'<button class="upgrade-pick '+(state.upgradeSelectedIds.includes(x.id)?'selected':'')+'" data-up-item="'+x.id+'"><div><b>'+esc(x.handle)+'</b>'+badge(x.rarity)+'</div><span>'+fmt(x.value)+'</span><strong>'+(state.upgradeSelectedIds.includes(x.id)?'Добавлен':'Добавить')+'</strong></button>').join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div>'+
- '<div class="upgrade-multi-footer"><div>'+(selected.length?(p?'Риск: сгорят все '+selected.length+' · шанс '+chance+'%':'Подготовка…'):'Добавьте хотя бы один username')+'</div><button class="primary upgrade-spin-btn" data-upgrade '+(!selected.length||!p||state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится...':'Крутить')+'</button></div></div>';
+ (selected.length?'<div class="upgrade-multi-stage">'+(p?'<div class="upgrade-prize-card"><span>Можно выиграть</span><b>'+esc(p.target.handle)+'</b><strong>'+p.target.rarity+' · '+fmt(p.target.value)+'</strong></div><div class="upgrade-wheel-wrap multi"><div class="upgrade-wheel-pointer" id="upgradePointer"></div><div class="upgrade-roulette" id="upgradeRoulette" style="--win-deg:'+winDeg+'deg"><div class="upgrade-wheel-core"><b>'+chance+'%</b><span>WIN</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i>Победа '+chance+'%</span><span><i class="lose"></i>Проигрыш '+(100-chance)+'%</span></div>':'<div class="upgrade-preview-loading">Подбираю username для выигрыша…</div>')+'</div>':'')+
+ '<div class="upgrade-pool-title"><span>Мои usernames</span><small>Дешёвый основной username даёт выше шанс. Дополнительные повышают его ещё.</small></div><div class="upgrade-multi-list">'+((u.available||[]).length?(u.available||[]).map(x=>'<button class="upgrade-pick '+(state.upgradeSelectedIds.includes(x.id)?'selected':'')+'" data-up-item="'+x.id+'"><div><b>'+esc(x.handle)+'</b>'+badge(x.rarity)+'</div><span>'+fmt(x.value)+'</span><strong>'+(state.upgradeSelectedIds.includes(x.id)?'Добавлен':'Добавить')+'</strong></button>').join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div>'+
+ '<div class="upgrade-multi-footer"><div>'+(selected.length?(p?'При проигрыше сгорят все '+selected.length+' · шанс '+chance+'%':'Подготовка…'):'Добавьте хотя бы один username')+'</div><button class="primary upgrade-spin-btn" data-upgrade '+(!selected.length||!p||state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится...':'Крутить')+'</button></div></div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
@@ -135,7 +136,8 @@ async function refreshUpgradePreview(){
  }catch(e){if(seq===upgradePreviewSeq){state.upgradePreview=null;toast(ERR[e.message]||e.message||'Не удалось рассчитать шанс');render()}}
 }
 async function animateUpgradeWheel(result){
- const disc=document.querySelector('#upgradeRoulette');if(!disc)return;
+ const disc=document.querySelector('#upgradeRoulette'),pointer=document.querySelector('#upgradePointer');if(!disc)return;
+ pointer?.classList.add('spinning');
  const chance=Math.max(.001,Math.min(.999,Number(result.chance)||0)),winDeg=chance*360;
  const margin=Math.max(1,Math.min(5,winDeg*.18));
  let selectedAngle;
@@ -148,15 +150,17 @@ async function animateUpgradeWheel(result){
  const final=6*360+(360-selectedAngle);
  requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});
  await new Promise(r=>setTimeout(r,3300));
+ pointer?.classList.remove('spinning');
  state.upgradeOutcome=result;state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;
  state.upgrader=await api('/api/upgrader');
  render();
 }
-document.addEventListener('click',async e=>{if(e.target.matches('[data-menu-close]')){state.menu=false;render();return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
+document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){state.menu=false;render();return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
  if(el.hasAttribute('data-menu-open')){state.menu=true;render();return}
  if(el.hasAttribute('data-menu-close')){state.menu=false;render();return}
- if(el.dataset.page){await load(el.dataset.page);return}
- if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;render();return}
+ if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
+ if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
+ if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
  if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
  if(el.dataset.resolve){state.busy=true;await api('/api/drop/'+el.dataset.id+'/resolve',{method:'POST',body:JSON.stringify({action:el.dataset.resolve})});toast(el.dataset.resolve==='keep'?'Добавлено в коллекцию':'Username продан');state.busy=false;await load('home');return}
  if(el.dataset.rarity){state.filters.rarity=el.dataset.rarity;state.filters.page=1;await load('collection');return}
@@ -188,10 +192,9 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-menu-clos
  if(el.hasAttribute('data-up-clear')){state.upgradeSelectedIds=[];state.upgradePreview=null;render();return}
  if(el.hasAttribute('data-upgrade-continue')){state.upgradeOutcome=null;state.upgradeSelectedIds=[];state.upgradePreview=null;render();return}
  if(el.hasAttribute('data-upgrade')&&!state.upgradeSpinning){
-   const ids=[...(state.upgradeSelectedIds||[])];if(!ids.length||!state.upgradePreview)return;
+   const ids=[...(state.upgradeSelectedIds||[])],sessionId=state.upgradePreview?.sessionId;if(!ids.length||!sessionId)return;
    state.upgradeSpinning=true;el.disabled=true;
-   const requestId=crypto.randomUUID?.()||('up-'+Date.now()+'-'+Math.random().toString(36).slice(2));
-   const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({ids,requestId})});
+   const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({ids,sessionId})});
    await animateUpgradeWheel(r);return
  }
  if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('premium')}});return}

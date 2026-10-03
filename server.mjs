@@ -122,7 +122,7 @@ async function api(req,res,url){
 
     if(req.method==='GET'&&url.pathname==='/api/upgrader')return json(res,200,upgradeInfo(db,user));
     if(req.method==='POST'&&url.pathname==='/api/upgrader/preview'){const b=await readBody(req);return json(res,200,previewUpgrade(db,user,b.ids))}
-    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,b.ids,String(b.requestId||'')))}
+    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,b.ids,String(b.sessionId||'')))}
 
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
@@ -134,7 +134,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,bad_json:400,bad_request_id:400,premium_unavailable:503}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_json:400,bad_request_id:400,premium_unavailable:503}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
