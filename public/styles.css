@@ -101,3 +101,8 @@ button{min-height:44px}
 .drop-result-main.minimal{flex:1;display:grid;place-items:center;min-height:120px}
 .drop-result-card.minimal-result{transition:none;animation:none}
 @media(max-width:370px){.drop-result-actions.compact-actions{grid-template-columns:.85fr 1.3fr 46px}.drop-result-actions.compact-actions>button{font-size:11px;padding:0 7px}.story-icon-btn{width:46px}}
+
+/* USERNAME 3.0.1 — single total-capital leaderboard */
+.rank-summary{min-height:58px;border:1px solid var(--border);border-radius:14px;background:#fff;padding:11px 13px;margin-bottom:8px;display:flex;flex-direction:column;justify-content:center}
+.rank-summary b{font-size:14px;line-height:1.2}
+.rank-summary span{font-size:11px;color:var(--muted);margin-top:4px}
