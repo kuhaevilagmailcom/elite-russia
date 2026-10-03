@@ -202,7 +202,7 @@ async function api(req,res,url){
     const buy=url.pathname.match(/^\/api\/market\/([^/]+)\/buy$/);if(req.method==='POST'&&buy){const result=buyListing(db,user,buy[1]);invalidateLeaderboard();return json(res,200,result)}
     const cancel=url.pathname.match(/^\/api\/market\/([^/]+)\/cancel$/);if(req.method==='POST'&&cancel){const result=cancelListing(db,user,cancel[1]);invalidateLeaderboard();return json(res,200,result)}
 
-    if(req.method==='GET'&&url.pathname==='/api/friends')return json(res,200,friendsData(db,user,BOT_USERNAME));
+    if(req.method==='GET'&&url.pathname==='/api/friends'){if(!BOT_USERNAME&&BOT_TOKEN)await resolveBotUsername();return json(res,200,friendsData(db,user,BOT_USERNAME))}
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
     if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),Number(b.friendId));invalidateLeaderboard();return json(res,200,result)}
 
