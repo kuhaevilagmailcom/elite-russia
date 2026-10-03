@@ -146,7 +146,7 @@ test('HTTP single-user reset restores gameplay defaults without deleting account
   await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({handle:'resetone',value:7000})});
   await json('/api/admin/users/'+target.id+'/balance',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({delta:12000})});
   const reset=await json('/api/admin/users/'+target.id+'/reset',{method:'POST',headers:headers('8464597898'),body:'{}'});assert.equal(reset.r.status,200);
-  const after=await json('/api/home',{headers:headers(uid)});assert.equal(after.r.status,200);assert.equal(after.body.user.balance,6000);assert.equal(after.body.user.freeDrops,1);assert.equal(after.body.user.collectionCount,0);
+  const after=await json('/api/home',{headers:headers(uid)});assert.equal(after.r.status,200);assert.equal(after.body.user.balance,50000);assert.equal(after.body.user.freeDrops,1);assert.equal(after.body.user.collectionCount,0);
 });
 
 test('HTTP admin block immediately blocks target API access',async()=>{
@@ -181,7 +181,7 @@ test('HTTP full reset requires exact confirmation, makes backup, frees usernames
     assert.equal(check.prepare('SELECT COALESCE(SUM(current_supply),0) s FROM username_templates').get().s,0);
     assert.equal(check.prepare("SELECT COUNT(*) c FROM payments WHERE telegram_charge_id='reset-charge'").get().c,1);
     assert.equal(check.prepare('SELECT COUNT(*) c FROM schema_migrations').get().c,migrationsBefore);
-    const u=check.prepare('SELECT balance,free_drops,premium_until FROM users WHERE id=?').get(target.id);assert.equal(u.balance,6000);assert.equal(u.free_drops,1);assert.equal(u.premium_until,premiumUntil);
+    const u=check.prepare('SELECT balance,free_drops,premium_until FROM users WHERE id=?').get(target.id);assert.equal(u.balance,50000);assert.equal(u.free_drops,1);assert.equal(u.premium_until,premiumUntil);
     assert.equal(String(check.pragma('integrity_check',{simple:true})).toLowerCase(),'ok');
     assert.ok(check.prepare("SELECT COUNT(*) c FROM admin_audit WHERE action='reset_all'").get().c>=1);
   }finally{check.close()}
