@@ -311,7 +311,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem,ids=[...(state.upgradeSelectedIds||[])],i=ids.indexOf(id);
-   if(i>=0)ids.splice(i,1);else{if(ids.length>=(state.upgrader?.maxItems||5)){toast('Лимит выбора достигнут');return}ids.push(id)}
+   if(i>=0)ids.splice(i,1);else{if(ids.length>=(state.upgrader?.maxItems||5)){haptic('light');return}ids.push(id)}
    state.upgradeSelectedIds=ids;state.upgradeOutcome=null;await refreshUpgradePreview();return
  }
  if(el.dataset.upRemove){state.upgradeSelectedIds=(state.upgradeSelectedIds||[]).filter(id=>id!==el.dataset.upRemove);await refreshUpgradePreview();return}
