@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'3.0.1',
+  version:'3.1.0',
   startBalance:6000,
   freeDrops:1,
   dropCost:3000,
@@ -13,17 +13,16 @@ export const GAME={
   dropRateLimitMs:900,
   wheelCooldownMs:86400000,
   dayTimezoneOffsetMinutes:300,
-  systemSellRate:0.18,
   storyTtlMs:86400000
 };
 export const RARITIES=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
 export const RARITY_WEIGHTS={COMMON:91,RARE:7.8,EPIC:1.05,LEGEND:.14,ULTRA:.01};
 export const RARITY_BASE={
-  COMMON:[500,15000],
-  RARE:[15000,100000],
-  EPIC:[100000,500000],
-  LEGEND:[500000,3000000],
-  ULTRA:[3000000,25000000]
+  COMMON:[200,14999],
+  RARE:[15000,99999],
+  EPIC:[100000,499999],
+  LEGEND:[500000,1999999],
+  ULTRA:[2000000,25000000]
 };
 export const DROP_TIERS=Object.freeze({
   basic:{key:'basic',label:'$3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
