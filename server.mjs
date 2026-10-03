@@ -96,7 +96,7 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/drop'){
       const b=await readBody(req),requestId=String(b.requestId||''),replay=db.prepare('SELECT 1 FROM drop_requests WHERE request_id=? AND user_id=?').get(requestId,user.id);
       if(!replay){const t=Date.now(),last=lastDropAt.get(user.id)||0;if(t-last<GAME.dropRateLimitMs)return json(res,429,{error:'too_fast'});lastDropAt.set(user.id,t)}
-      return json(res,200,createDrop(db,user,requestId));
+      return json(res,200,createDrop(db,user,requestId,String(b.tier||'basic')));
     }
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req);return json(res,200,resolveDrop(db,user,resolve[1],b.action))}
     if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',page:Number(url.searchParams.get('page')||1)}));

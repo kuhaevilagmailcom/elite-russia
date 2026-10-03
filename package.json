@@ -1,6 +1,6 @@
 {
   "name":"username-telegram-miniapp",
-  "version":"2.0.0",
+  "version":"2.1.0",
   "private":true,
   "type":"module",
   "scripts":{"start":"node server.mjs","dev":"node --watch server.mjs","test":"node --check server.mjs && node --check public/app.js && node --test tests/*.test.mjs"},
