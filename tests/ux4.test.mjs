@@ -31,11 +31,11 @@ test('drop starts from the central username area and has no separate drop CTA',(
   assert.doesNotMatch(home,/id="dropBtn"|class="drop-btn"/);
   assert.match(appSrc,/hasAttribute\('data-drop-trigger'\)/);
 });
-test('drop animation is about three seconds and lands on server result',()=>{
+test('drop animation is about two and a half seconds and lands on server result',()=>{
   const m=appSrc.match(/const reduced=.*?delays=reduced\?\[[^\]]+\]:\[([^\]]+)\]/);
   assert.ok(m);
   const total=m[1].split(',').map(Number).reduce((a,b)=>a+b,0);
-  assert.ok(total>=2800&&total<=3500,total);
+  assert.ok(total>=2300&&total<=2600,total);
   const fn=appSrc.match(/async function animateDrop\(result\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(fn,/esc\(result\.handle\)/);
 });
