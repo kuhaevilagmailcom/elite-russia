@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
-import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
+import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality,generatedSupply} from '../src/generator.mjs';
 import {ensureUser,createDrop,resolveDrop,leaderboard,sellOwnedUsername,setShowcase} from '../src/game.mjs';
 import {createListing,buyListing,cancelListing,listMarket} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
@@ -24,14 +24,48 @@ const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url)
 test('generator has a large readable universe',()=>assert.ok(candidateUniverseSize()>3000));
 test('generator keeps usernames <=10 chars and never numeric-only',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(h.length<=10);assert.ok(isValidHandle(h))}});
 test('requested word handles exist',()=>{for(const h of ['card','loly','mama','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}});
-test('short real words are worth more than long or junk handles',()=>{assert.ok(scoreHandle('card','COMMON',20,5000)>scoreHandle('cardzzzzzz','COMMON',20,5000)*3);assert.ok(wordQuality('mama')>wordQuality('qzvra'));assert.ok(scoreHandle('mama','COMMON',20,5000)>scoreHandle('qzvr','COMMON',20,5000)*2)});
-test('system sell is deliberately below estimated value',()=>{assert.equal(GAME.systemSellRate,.35);assert.equal(systemSellValue(10000),3500)});
+test('short real words are in a different value class than long or junk handles',()=>{
+  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('sigma','ULTRA')*4);
+  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*8);
+  assert.ok(wordQuality('mama')>wordQuality('qzvra'));
+});
+test('system sale is a low salvage payout, especially for premium assets',()=>{
+  assert.equal(systemSellValue(5000),1000);
+  assert.equal(systemSellValue(50000),5000);
+  assert.equal(systemSellValue(1000000),50000);
+});
 test('max paid drop still has COMMON majority',()=>assert.ok(DROP_TIERS.max.weights.COMMON>50));
+test('v3 economy cannot print several paid drops immediately',()=>{
+  assert.equal(GAME.freeDrops,1);
+  assert.ok(GAME.startBalance<=DROP_TIERS.basic.cost*2);
+  assert.equal(DROP_TIERS.basic.cost,3000);
+  assert.ok(DROP_TIERS.basic.weights.ULTRA<=.001);
+  assert.ok(DROP_TIERS.max.weights.ULTRA<=.1);
+});
+test('every template is globally unique supply 1',()=>{
+  assert.equal(generatedSupply('COMMON'),1);
+  assert.ok(SPECIALS.every(x=>x[3]===1));
+});
+test('four-character generation is reserved for ultra class',()=>{
+  for(let i=0;i<5000;i++){
+    assert.ok(buildGeneratedHandle('COMMON').length>=7);
+    assert.ok(buildGeneratedHandle('RARE').length>=6);
+    assert.ok(buildGeneratedHandle('EPIC').length>=5);
+    assert.ok(buildGeneratedHandle('LEGEND').length>=5);
+    assert.ok(buildGeneratedHandle('ULTRA').length>=4);
+  }
+});
 test('UI uses dollars and weighted wheel geometry',()=>{assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/);assert.match(appSrc,/function wheelGeometry/);assert.match(appSrc,/target\.center/);assert.match(cssSrc,/--wheel-bg/)});
-test('drop card is minimal and story sharing has preview fallback',()=>{const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);assert.match(m[0],/esc\(x\.handle\)/);assert.doesNotMatch(m[0],/badge\(/);assert.match(appSrc,/data-story-native/);assert.match(appSrc,/shareToStory/);assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/)});
+test('drop card is minimal and story share is an icon-only native action',()=>{
+  const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);
+  assert.match(m[0],/esc\(x\.handle\)/);assert.doesNotMatch(m[0],/badge\(/);
+  assert.match(m[0],/story-icon-btn/);assert.match(m[0],/icon\('story'\)/);
+  assert.match(appSrc,/shareToStory/);assert.doesNotMatch(appSrc,/function openStoryFallback/);
+  assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/);
+});
 test('menu remains top-driven and readable',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/menu-group-title/);for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name));assert.match(cssSrc,/\.menu-list b\{font-size:14px/);assert.match(cssSrc,/\.menu-list button\{min-height:62px/)});
 test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
-test('database has payment ledger, migrations, cosmetics and runtime lock',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks'])assert.match(dbSrc,new RegExp(name))});
+test('database has payment ledger, migrations, cosmetics and runtime lock',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','3.0.0-global-unique','idx_instances_handle_unique'])assert.match(dbSrc,new RegExp(name))});
 test('premium does not change drop/upgrader odds',()=>{assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i);assert.doesNotMatch(upgraderSrc,/premium/i)});
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username27-test-')),db=createDatabase(tmp);
@@ -50,6 +84,12 @@ function owned(user,handle='testname',rarity='COMMON',value=1000){
 }
 
 test('new user starts with configured economy',()=>{assert.equal(seller.balance,GAME.startBalance);assert.equal(seller.free_drops,GAME.freeDrops)});
+test('database rejects a second instance with the same username globally',()=>{
+  const id=owned(seller,'globallyunique','COMMON',1000);
+  const row=db.prepare('SELECT * FROM username_instances WHERE id=?').get(id);
+  assert.throws(()=>db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+    .run('duplicate-instance',row.template_id,row.handle,row.rarity,row.value,1,1,buyer.id,'owned',new Date().toISOString(),'test'),/UNIQUE/);
+});
 test('drop request is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
 test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
 test('gift transfer cannot be repeated by old owner',()=>{db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());const id=owned(seller,'giftname');giftUsername(db,seller,id,friend.id);assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/)});
@@ -127,5 +167,12 @@ test('leaderboard includes market assets and capital ignores fake period',()=>{
 });
 test('daily task key uses configured UTC+5 day',()=>{const expected=new Date(Date.now()+300*60000).toISOString().slice(0,10);assert.equal(todayKey(),expected)});
 test('market search is prefix-based',()=>{const u=ensureUser(db,{id:20007,username:'search',first_name:'Search'}),id=owned(u,'prefixfind','RARE',900);createListing(db,u,id,1200);assert.ok(listMarket(db,{q:'prefix'}).items.some(x=>x.handle.includes('prefix')));assert.equal(listMarket(db,{q:'fix'}).items.some(x=>x.handle.includes('prefix')),false)});
+test('username actions update locally instead of reloading screens',()=>{
+  const resolve=appSrc.match(/if\(el\.dataset\.resolve\)\{[\s\S]*?\n \}/)?.[0]||'';
+  const sell=appSrc.match(/if\(el\.dataset\.confirmSystemSell\)\{[\s\S]*?\n \}/)?.[0]||'';
+  const listing=appSrc.match(/if\(el\.dataset\.createListing\)\{[\s\S]*?\n \}/)?.[0]||'';
+  assert.doesNotMatch(resolve,/load\(/);assert.doesNotMatch(sell,/load\(/);assert.doesNotMatch(listing,/load\(/);
+  assert.match(appSrc,/removeCollectionLocal/);
+});
 test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});

@@ -147,6 +147,7 @@ export function createDatabase(dataDir){
           const t=db.prepare('INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,?,0,1,?)')
             .run(candidate,row.rarity,val,1,'legacy_unique',now).lastInsertRowid;
           db.prepare('UPDATE username_instances SET template_id=?,handle=?,value=?,instance_number=1,max_supply=1 WHERE id=?').run(t,candidate,val,row.id);
+          db.prepare('UPDATE drop_history SET handle=?,value=? WHERE instance_id=?').run(candidate,val,row.id);
         }
       }
       const specials=new Map(SPECIALS.map(x=>[x[0],x]));
