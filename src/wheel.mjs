@@ -2,12 +2,12 @@ import crypto from 'node:crypto';
 import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,bumpSeasonScore} from './economy.mjs';
 const rewards=[
-  {key:'nc500',label:'$500',type:'money',amount:500,weight:30},
-  {key:'nc1000',label:'$1 000',type:'money',amount:1000,weight:26},
-  {key:'xp50',label:'50 XP',type:'xp',amount:50,weight:18},
-  {key:'nc2500',label:'$2 500',type:'money',amount:2500,weight:14},
-  {key:'drop1',label:'1 бесплатный дроп',type:'drop',amount:1,weight:9},
-  {key:'nc5000',label:'$5 000',type:'money',amount:5000,weight:3}
+  {key:'cash100',label:'$100',type:'money',amount:100,weight:36},
+  {key:'cash250',label:'$250',type:'money',amount:250,weight:30},
+  {key:'xp25',label:'25 XP',type:'xp',amount:25,weight:18},
+  {key:'cash500',label:'$500',type:'money',amount:500,weight:12},
+  {key:'drop1',label:'1 бесплатный дроп',type:'drop',amount:1,weight:3},
+  {key:'cash1500',label:'$1 500',type:'money',amount:1500,weight:1}
 ];
 function pick(){const total=rewards.reduce((s,x)=>s+x.weight,0),n=crypto.randomInt(0,total);let a=0;for(const r of rewards){a+=r.weight;if(n<a)return r}return rewards[0]}
 export function wheelStatus(db,user){

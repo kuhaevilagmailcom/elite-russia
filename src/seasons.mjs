@@ -12,7 +12,7 @@ function finalizeSeason(db,s){
     ranking.forEach((r,i)=>{
       const pos=i+1;
       db.prepare('INSERT OR REPLACE INTO season_history(user_id,season_id,position,score) VALUES(?,?,?,?)').run(r.user_id,s.id,pos,r.score);
-      let money=0;if(pos<=500)money=3000;else if(pos<=1000)money=1000;
+      let money=0;if(pos<=500)money=1500;else if(pos<=1000)money=500;
       if(money){
         const key='money_'+money;
         if(!db.prepare('SELECT 1 FROM season_rewards WHERE user_id=? AND season_id=? AND reward_key=?').get(r.user_id,s.id,key)){
@@ -47,8 +47,8 @@ export function seasonData(db,user){
   const rank=db.prepare('SELECT COUNT(*)+1 rank FROM season_stats WHERE season_id=? AND score>?').get(s.id,score).rank;
   const days=Math.max(0,Math.ceil((new Date(s.end_at).getTime()-Date.now())/86400000));
   const rewards=[
-    {place:'TOP 1000',reward:'$1,000'},
-    {place:'TOP 500',reward:'$3,000'},
+    {place:'TOP 1000',reward:'$500'},
+    {place:'TOP 500',reward:'$1,500'},
     {place:'TOP 100',reward:'Profile badge'},
     {place:'TOP 10',reward:'Season theme'},
     {place:'TOP 3',reward:'Exclusive profile frame'}

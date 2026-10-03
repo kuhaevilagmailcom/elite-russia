@@ -1,7 +1,7 @@
 import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 
 function rewardThreshold(db,referrerId,count){
-  const rewards=[[1,'money',2000],[3,'money',5000],[5,'drop',1],[10,'money',15000]];
+  const rewards=[[1,'money',500],[3,'money',1500],[5,'drop',1],[10,'money',5000]];
   for(const [need,type,amount] of rewards){
     if(count<need)continue;
     const key=String(need);if(db.prepare('SELECT 1 FROM referral_rewards WHERE user_id=? AND reward_key=?').get(referrerId,key))continue;

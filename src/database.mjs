@@ -165,6 +165,13 @@ export function createDatabase(dataDir){
     });
     tx();
   }
+  const economyV3=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('3.0.0-economy-rebase');
+  if(!economyV3){
+    db.transaction(()=>{
+      db.prepare('UPDATE users SET balance=CASE WHEN balance>100000 THEN 100000 ELSE balance END,free_drops=CASE WHEN free_drops>2 THEN 2 ELSE free_drops END').run();
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('3.0.0-economy-rebase',now);
+    })();
+  }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_instances_handle_unique ON username_instances(handle)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_upgrade_target_active ON upgrade_sessions(target_handle,used_at,expires_at)');
   return db;
