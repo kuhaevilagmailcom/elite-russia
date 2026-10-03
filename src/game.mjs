@@ -43,7 +43,7 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
   }
   const specialChance={COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0;
   if(rng()<specialChance){
-    const specials=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200').all(profile);
+    const specials=db.prepare("SELECT * FROM username_templates WHERE special=1 AND category NOT IN ('wheel','admin') AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200").all(profile);
     const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
   for(let i=0;i<50;i++){
