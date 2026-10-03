@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {RARITY_WEIGHTS,RARITY_BASE} from './config.mjs';
+import {randomUnit} from './economy.mjs';
 
 export const ROOTS=[
 'card','loly','mama','sigma','love','dream','angel','baby','cool','club','news','music','bank','shop','monk','ghost','void','vision','legend','dealer','storm','night','phantom','million','master','mister','king','prime','rocket','shadow','venom','savage','black','white','wolf','tiger','moon','solar','street','drive','speed','turbo','money','rich','diamond','silver','rare','zero','pixel','cloud','wave','nova','silent','unknown','anonymous','alpha','omega','orbit','pulse','frame','motion','vector','signal','matrix','vertex','binary','cipher','static','future','chrome','carbon','graphite','velvet','royal','elite','major','minor','urban','metro','avenue','district','tower','garage','motor','rider','pilot','racer','drift','boost','nitro','gtr','amg','bmw','mclaren','porsche','supra','skyline','viper','cobra','falcon','hawk','raven','lion','panther','shark','orca','fox','bear','eagle','falcon','hunter','chief','boss','owner','founder','leader','winner','champion','hero','icon','famous','classic','vintage','rarely','simple','basic','clean','mono','blank','pure','clear','sharp','swift','quick','rapid','sonic','flash','light','bright','dark','midnight','sunset','dawn','winter','summer','north','south','west','east','ocean','river','stone','steel','iron','gold','platinum','onyx','jade','ruby','sapphire','emerald','luxury','premium','status','credit','cash','market','trade','stock','vault','bank','mint','coin','profit','wealth','capital','business','studio','media','music','audio','beat','bass','vibe','mood','style','fashion','model','design','art','photo','film','camera','scene','screen','game','player','level','score','rank','top','arena','clutch','skill','aim','quest','party','lobby','server','online','digital','cyber','logic','code','byte','data','node','core','link','network','system','device','mobile','phone','apple','telegram','social','viral','trend','daily','global','world','planet','space','cosmos','astro','mars','lunar','star','comet','galaxy','neonless','mystic','secret','hidden','private','public','real','true','only','first','last','young','old','modern','retro','smart','wild','calm','cold','hot','high','low','big','small','great','super','hyper','ultra','max','pro','one','seven','sevenfold','mistery','noble','monarch','duke','baron','saint','ace','zen','echo','flux','frost','blaze','ember','mist','rain','snow','thunder','volt','wavey','crisp','solid','fluid','orbitz','stark','roman','atlas','apollo','mercury','saturn','jupiter','venus','pluto','delta','sigma','lambda','kappa','omegaone','northstar','daylight','nightfall','blackout','whiteout','overdrive','redline','pitlane','roadster','coupe','sedan','touring','classiccar','motors','driver','streetcar','fastlane','highway','cityline','skyway','airline','railway','terminal','station','central','uptown','downtown','midtown','brook','park','garden','forest','valley','mountain','island','harbor','port','bay','coast','beach','desert','canyon','cliff','peak','summit','ridge','field','meadow','green','blue','red','orange','purple','gray','grey','ivory','obsidian','crystal','marble','granite','wood','paper','glass','metal','titanium','cobalt','nickel','copper','bronze','brass'
@@ -39,7 +40,7 @@ export function isValidHandle(handle){return /^[a-z][a-z0-9_]{2,9}$/i.test(Strin
 export function randInt(min,max){return crypto.randomInt(min,max+1)}
 export function choice(arr){return arr[crypto.randomInt(0,arr.length)]}
 
-export function weightedRarity(rng=Math.random){
+export function weightedRarity(rng=randomUnit){
   const x=rng()*100;let sum=0;
   for(const r of ['COMMON','RARE','EPIC','LEGEND','ULTRA']){sum+=RARITY_WEIGHTS[r];if(x<sum)return r}
   return 'COMMON';
@@ -52,7 +53,7 @@ function randomLetters(min=4,max=10){
   const consonants='bcdfghjklmnpqrstvwxyz',vowels='aeiou';
   const len=randInt(min,max);let s='';
   for(let i=0;i<len;i++)s+=i%2===0?choice(consonants.split('')):choice(vowels.split(''));
-  if(Math.random()<.45){
+  if(randomUnit()<.45){
     const arr=s.split(''),i=randInt(0,arr.length-1);arr[i]=choice(consonants.split(''));s=arr.join('');
   }
   return s;
@@ -66,7 +67,7 @@ function normalizeGenerated(handle){
 export function buildGeneratedHandle(rarity='COMMON'){
   const root=choice(ROOTS).slice(0,10);
   let handle=root;
-  const roll=Math.random();
+  const roll=randomUnit();
   if(rarity==='COMMON'){
     if(roll<.22)handle=randomLetters(4,10);
     else if(roll<.48)handle=root;
@@ -98,7 +99,7 @@ export function wordQuality(handle){
   if(!ugly&&vowelRatio>=.25&&vowelRatio<=.6)return .42;
   return .22;
 }
-export function scoreHandle(handle,rarity='COMMON',instanceNumber=1,maxSupply=1000){
+function scoreCore(handle,rarity='COMMON',instanceNumber=1,maxSupply=1000,jitter=.0){
   const h=String(handle).toLowerCase();
   const [min,max]=RARITY_BASE[rarity]||RARITY_BASE.COMMON;
   let score=(min+max)/2;
@@ -107,14 +108,21 @@ export function scoreHandle(handle,rarity='COMMON',instanceNumber=1,maxSupply=10
   score*=lengthFactor;
   const quality=wordQuality(h);
   score*=quality>=1?1.75:quality>=.7?1.18:quality>=.6?1.02:quality>=.4?.72:.38;
-  if(!/\d/.test(h))score*=1.28;
-  else score*=.86;
+  if(!/\d/.test(h))score*=1.28;else score*=.86;
   if(/777$/.test(h))score*=1.38;else if(/77$/.test(h))score*=1.18;else if(/007$/.test(h))score*=1.12;
   if(/(\d)\1{1,}/.test(h))score*=1.08;
   if(instanceNumber===1)score*=1.25;else if(instanceNumber<=5)score*=1.1;
   if(maxSupply<=50)score*=1.15;else if(maxSupply<=150)score*=1.06;
-  const jitter=.96+Math.random()*.08;
-  return Math.max(50,Math.round(score*jitter/50)*50);
+  return Math.max(50,Math.round(score*(1+jitter)/50)*50);
+}
+export function scoreHandle(handle,rarity='COMMON',instanceNumber=1,maxSupply=1000,rng=randomUnit){
+  return scoreCore(handle,rarity,instanceNumber,maxSupply,(rng()-.5)*.08);
+}
+export function stableScoreHandle(handle,rarity='COMMON',instanceNumber=1,maxSupply=1000){
+  const key=`${String(handle).toLowerCase()}:${rarity}:${instanceNumber}:${maxSupply}`;
+  const h=crypto.createHash('sha256').update(key).digest();
+  const unit=h.readUInt32BE(0)/0xffffffff;
+  return scoreCore(handle,rarity,instanceNumber,maxSupply,(unit-.5)*.08);
 }
 export function generatedSupply(rarity){
   return {COMMON:5000,RARE:2500,EPIC:1200,LEGEND:350,ULTRA:80}[rarity]||5000;
