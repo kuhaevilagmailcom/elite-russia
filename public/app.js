@@ -4,7 +4,7 @@ const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
-  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,adminPage:1,adminQuery:'',adminResetStage:0
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -146,12 +146,21 @@ function topView(){
 function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>'<article class="task"><div><b>'+esc(t.label)+'</b><span>'+t.current+' / '+t.target+'</span></div><strong>+'+fmt(t.reward)+'</strong><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><button data-claim="'+t.key+'" '+(t.current<t.target||t.claimed?'disabled':'')+'>'+(t.claimed?'Получено':t.current>=t.target?'Забрать':'В процессе')+'</button></article>').join('')+'</div>'}
 function wheelGeometry(items){
  const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||0),0));let cursor=0;
- const colors=['#ffffff','#eef1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||0);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2}});
+ const colors=['#ffffff','#eef1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||0);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2,span:end-start}});
  return {rows,background:'conic-gradient('+segments.join(',')+')'};
 }
+function wheelShortLabel(x){
+ if(x.type==='username')return '1/1';
+ if(x.type==='drop')return 'DROP';
+ return String(x.label||'').replace('$1 500','$1.5K').replace(' бесплатный дроп',' DROP');
+}
 function wheelView(){
- const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]);
- return '<div class="wheel-page"><div class="wheel-stage"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+g.rows.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(x.type==='username'?'1/1':x.label.replace('бесплатный дроп','DROP'))+'</span>').join('')+'<div class="daily-wheel-core"><b>USERNAME</b><span>DAILY</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Раз в 24 часа · без платных spins':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
+ const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<12),visible=g.rows.filter(x=>x.span>=12),last=state.wheelLastResult;
+ return '<div class="wheel-page"><section class="wheel-card"><div class="wheel-stage"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'<div class="daily-wheel-core"><b>USERNAME</b><span>DAILY</span></div></div></div>'+
+ (rare.length?'<div class="wheel-rare"><span>РЕДКИЕ ПРИЗЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
+ '<div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div>'+
+ '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить колесо':'Возвращайся позже')+'</button>'+
+ '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('Выпало: '+esc(last.label)):'')+'</div></div>';
 }
 function friendsView(){
  const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
@@ -211,7 +220,7 @@ async function spinWheelUi(){
   const req=crypto.randomUUID?.()||('w-'+Date.now()),r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
   if(disc&&target){const final=7*360-target.center;disc.style.transition='transform 3.6s cubic-bezier(.08,.72,.12,1)';requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});await new Promise(x=>setTimeout(x,3650))}
-  if(res)res.textContent='Получено: '+r.reward.label;haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
+  state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
 }
 let upgradePreviewSeq=0;
