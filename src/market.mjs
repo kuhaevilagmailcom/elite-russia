@@ -1,15 +1,16 @@
 import {GAME} from './config.mjs';
-import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit} from './economy.mjs';
+import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount,compactShowcase,configNumber} from './economy.mjs';
 
+function feeRate(db){return Math.max(0,Math.min(.5,configNumber(db,'market_fee',GAME.marketFee)))}
 function shape(r){return {
   id:r.id,instanceId:r.instance_id,handle:'@'+r.handle,rarity:r.rarity,value:r.value,
   instanceNumber:r.instance_number,maxSupply:r.max_supply,price:r.price,sellerId:r.seller_id,
   sellerName:r.seller_name||r.seller_username||'Игрок',createdAt:r.created_at
 }}
 export function listMarket(db,{rarity='ALL',sort='new',q='',page=1}={}){
-  const where=["l.status='active'"],args=[];
+  const where=["l.status='active'","u.blocked=0"],args=[];
   if(rarity!=='ALL'){where.push('i.rarity=?');args.push(rarity)}
-  if(q){where.push('i.handle LIKE ?');args.push('%'+String(q).toLowerCase().replace(/^@/,'').slice(0,30)+'%')}
+  if(q){where.push('i.handle LIKE ?');args.push(String(q).toLowerCase().replace(/^@/,'').slice(0,30)+'%')}
   const order={
     new:'l.created_at DESC',cheap:'l.price ASC',expensive:'l.price DESC',
     rare:"CASE i.rarity WHEN 'ULTRA' THEN 5 WHEN 'LEGEND' THEN 4 WHEN 'EPIC' THEN 3 WHEN 'RARE' THEN 2 ELSE 1 END DESC,l.price DESC",
@@ -19,38 +20,47 @@ export function listMarket(db,{rarity='ALL',sort='new',q='',page=1}={}){
   const base=`FROM market_listings l JOIN username_instances i ON i.id=l.instance_id JOIN users u ON u.id=l.seller_id WHERE ${where.join(' AND ')}`;
   const rows=db.prepare(`SELECT l.id,l.instance_id,l.seller_id,l.price,l.created_at,i.handle,i.rarity,i.value,i.instance_number,i.max_supply,u.first_name seller_name,u.username seller_username ${base} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args,size,off).map(shape);
   const total=db.prepare(`SELECT COUNT(*) c ${base}`).get(...args).c;
-  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size)),fee:GAME.marketFee};
+  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size)),fee:feeRate(db)};
 }
 export function createListing(db,user,instanceId,price){
   price=Math.round(Number(price)||0);if(price<100||price>1000000000)throw new Error('bad_price');
-  const run=db.transaction(()=>{
+  const rate=feeRate(db);
+  const id=db.transaction(()=>{
+    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);if(fresh?.blocked)throw new Error('blocked');
     const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id);if(!inst)throw new Error('not_owned');
     if(db.prepare("SELECT 1 FROM market_listings WHERE instance_id=? AND status='active'").get(instanceId))throw new Error('already_listed');
-    const id=uid();db.prepare('INSERT INTO market_listings(id,instance_id,seller_id,price,status,created_at) VALUES(?,?,?,?,?,?)').run(id,instanceId,user.id,price,'active',nowIso());
+    const listingId=uid();
+    db.prepare('INSERT INTO market_listings(id,instance_id,seller_id,price,status,created_at) VALUES(?,?,?,?,?,?)').run(listingId,instanceId,user.id,price,'active',nowIso());
     db.prepare("UPDATE username_instances SET status='market' WHERE id=?").run(instanceId);
-    db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(instanceId);
-    return id;
-  });
-  return {ok:true,id:run(),price,fee:Math.round(price*GAME.marketFee),net:Math.round(price*(1-GAME.marketFee))};
+    db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(instanceId);compactShowcase(db,user.id);
+    return listingId;
+  })();
+  return {ok:true,id,price,fee:Math.round(price*rate),net:Math.round(price*(1-rate))};
 }
 export function cancelListing(db,user,listingId){
-  const run=db.transaction(()=>{
+  db.transaction(()=>{
     const l=db.prepare("SELECT * FROM market_listings WHERE id=? AND seller_id=? AND status='active'").get(listingId,user.id);if(!l)throw new Error('listing_not_found');
+    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+    if(activeCollectionCount(db,user.id)>collectionLimit(fresh))throw new Error('collection_full');
     db.prepare("UPDATE market_listings SET status='cancelled',closed_at=? WHERE id=?").run(nowIso(),listingId);
     db.prepare("UPDATE username_instances SET status='owned' WHERE id=? AND owner_id=?").run(l.instance_id,user.id);
-  });run();return {ok:true};
+  })();
+  return {ok:true};
 }
 export function buyListing(db,buyer,listingId){
   const result=db.transaction(()=>{
-    const l=db.prepare(`SELECT l.*,i.handle,i.rarity,i.value,i.owner_id FROM market_listings l JOIN username_instances i ON i.id=l.instance_id WHERE l.id=? AND l.status='active'`).get(listingId);
-    if(!l)throw new Error('listing_not_found');if(l.seller_id===buyer.id)throw new Error('own_listing');
+    const l=db.prepare(`SELECT l.*,i.handle,i.rarity,i.value,i.owner_id,u.blocked seller_blocked
+      FROM market_listings l JOIN username_instances i ON i.id=l.instance_id JOIN users u ON u.id=l.seller_id
+      WHERE l.id=? AND l.status='active'`).get(listingId);
+    if(!l)throw new Error('listing_not_found');if(l.seller_id===buyer.id)throw new Error('own_listing');if(l.seller_blocked)throw new Error('listing_not_found');
     const freshBuyer=db.prepare('SELECT * FROM users WHERE id=?').get(buyer.id);
-    const count=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(buyer.id).c;
-    if(count>=collectionLimit(freshBuyer))throw new Error('collection_full');if(freshBuyer.balance<l.price)throw new Error('insufficient_funds');
-    const fee=Math.round(l.price*GAME.marketFee),sellerNet=l.price-fee;
+    if(activeCollectionCount(db,buyer.id)>=collectionLimit(freshBuyer))throw new Error('collection_full');
+    if(freshBuyer.balance<l.price)throw new Error('insufficient_funds');
+    const rate=feeRate(db),fee=Math.round(l.price*rate),sellerNet=l.price-fee;
     txBalance(db,buyer.id,'market_buy',-l.price,{listingId,instanceId:l.instance_id});
     txBalance(db,l.seller_id,'market_sale',sellerNet,{listingId,instanceId:l.instance_id,fee});
-    db.prepare("UPDATE market_listings SET status='sold',buyer_id=?,closed_at=? WHERE id=? AND status='active'").run(buyer.id,nowIso(),listingId);
+    const changed=db.prepare("UPDATE market_listings SET status='sold',buyer_id=?,closed_at=? WHERE id=? AND status='active'").run(buyer.id,nowIso(),listingId).changes;
+    if(!changed)throw new Error('listing_not_found');
     db.prepare("UPDATE username_instances SET owner_id=?,status='owned' WHERE id=? AND owner_id=?").run(buyer.id,l.instance_id,l.seller_id);
     db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(buyer.id,l.instance_id);
     db.prepare('INSERT INTO market_transactions(id,listing_id,instance_id,seller_id,buyer_id,price,fee,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),listingId,l.instance_id,l.seller_id,buyer.id,l.price,fee,nowIso());
