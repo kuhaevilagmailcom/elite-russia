@@ -1,17 +1,9 @@
 {
-  "name": "perekup-telegram-miniapp",
-  "version": "8.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "node server.mjs",
-    "dev": "node --watch server.mjs",
-    "test": "node --check server.mjs && node --check public/app.js && node --test tests/*.test.mjs"
-  },
-  "engines": {
-    "node": ">=20.20.0"
-  },
-  "dependencies": {
-    "better-sqlite3": "^11.10.0"
-  }
+  "name":"username-telegram-miniapp",
+  "version":"1.0.0",
+  "private":true,
+  "type":"module",
+  "scripts":{"start":"node server.mjs","dev":"node --watch server.mjs","test":"node --check server.mjs && node --check public/app.js && node --test tests/*.test.mjs"},
+  "engines":{"node":">=20.20.0"},
+  "dependencies":{"better-sqlite3":"^11.10.0"}
 }
