@@ -26,7 +26,7 @@ export const RARITY_BASE={
 };
 export const DROP_TIERS=Object.freeze({
   basic:{key:'basic',label:'$3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
-  boosted:{key:'boosted',label:'$15K',cost:15000,weights:{COMMON:72,RARE:22,EPIC:5.2,LEGEND:.75,ULTRA:.05}},
-  strong:{key:'strong',label:'$75K',cost:75000,weights:{COMMON:48,RARE:32,EPIC:16,LEGEND:3.6,ULTRA:.4}},
-  max:{key:'max',label:'$300K',cost:300000,weights:{COMMON:32,RARE:33,EPIC:25,LEGEND:9.5,ULTRA:.5}}
+  boosted:{key:'boosted',label:'$15K',cost:15000,weights:{COMMON:72,RARE:22,EPIC:5.25,LEGEND:.745,ULTRA:.005}},
+  strong:{key:'strong',label:'$75K',cost:75000,weights:{COMMON:48,RARE:32,EPIC:16.4,LEGEND:3.58,ULTRA:.02}},
+  max:{key:'max',label:'$300K',cost:300000,weights:{COMMON:32,RARE:33,EPIC:25,LEGEND:9.92,ULTRA:.08}}
 });
