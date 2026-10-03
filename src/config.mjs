@@ -1,11 +1,11 @@
 export const GAME={
   name:'USERNAME',
-  version:'2.7.2',
-  startBalance:10000,
-  freeDrops:3,
-  dropCost:2000,
-  maxCollection:120,
-  premiumMaxCollection:300,
+  version:'3.0.0',
+  startBalance:6000,
+  freeDrops:1,
+  dropCost:3000,
+  maxCollection:100,
+  premiumMaxCollection:250,
   showcaseSlots:3,
   premiumShowcaseSlots:6,
   marketFee:0.05,
@@ -13,21 +13,21 @@ export const GAME={
   dropRateLimitMs:900,
   wheelCooldownMs:86400000,
   dayTimezoneOffsetMinutes:300,
-  systemSellRate:0.35,
+  systemSellRate:0.18,
   storyTtlMs:86400000
 };
 export const RARITIES=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
-export const RARITY_WEIGHTS={COMMON:78,RARE:18.5,EPIC:3,LEGEND:.45,ULTRA:.05};
+export const RARITY_WEIGHTS={COMMON:91,RARE:7.8,EPIC:1.05,LEGEND:.14,ULTRA:.01};
 export const RARITY_BASE={
-  COMMON:[50,1500],
-  RARE:[1800,9000],
-  EPIC:[12000,65000],
-  LEGEND:[90000,750000],
-  ULTRA:[1000000,6000000]
+  COMMON:[500,15000],
+  RARE:[15000,100000],
+  EPIC:[100000,500000],
+  LEGEND:[500000,3000000],
+  ULTRA:[3000000,25000000]
 };
 export const DROP_TIERS=Object.freeze({
-  basic:{key:'basic',label:'$2K',cost:2000,weights:{COMMON:88,RARE:10.5,EPIC:1.35,LEGEND:.14,ULTRA:.01}},
-  boosted:{key:'boosted',label:'$8K',cost:8000,weights:{COMMON:76,RARE:20,EPIC:3.6,LEGEND:.37,ULTRA:.03}},
-  strong:{key:'strong',label:'$35K',cost:35000,weights:{COMMON:62,RARE:27,EPIC:9.5,LEGEND:1.4,ULTRA:.1}},
-  max:{key:'max',label:'$100K',cost:100000,weights:{COMMON:52,RARE:31,EPIC:13.5,LEGEND:3.2,ULTRA:.3}}
+  basic:{key:'basic',label:'$3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
+  boosted:{key:'boosted',label:'$15K',cost:15000,weights:{COMMON:88,RARE:10.5,EPIC:1.4,LEGEND:.095,ULTRA:.005}},
+  strong:{key:'strong',label:'$75K',cost:75000,weights:{COMMON:78,RARE:18,EPIC:3.6,LEGEND:.38,ULTRA:.02}},
+  max:{key:'max',label:'$300K',cost:300000,weights:{COMMON:68,RARE:24,EPIC:6.8,LEGEND:1.1,ULTRA:.1}}
 });

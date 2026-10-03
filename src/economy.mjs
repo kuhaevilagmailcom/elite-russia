@@ -20,8 +20,9 @@ export function assetStats(db,userId){
   return db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('owned','market')").get(userId);
 }
 export function systemSellValue(value){
-  const rate=Number(GAME.systemSellRate||0.35);
-  return Math.max(50,Math.round((Number(value)||0)*rate/50)*50);
+  const v=Math.max(0,Number(value)||0);
+  const rate=v>=1000000?.05:v>=250000?.07:v>=50000?.10:v>=10000?.14:.20;
+  return Math.max(100,Math.round(v*rate/100)*100);
 }
 export function configNumber(db,key,fallback){
   const row=db.prepare('SELECT value FROM game_config WHERE key=?').get(key);
