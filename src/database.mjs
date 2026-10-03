@@ -29,7 +29,7 @@ export function createDatabase(dataDir){
     FOREIGN KEY(template_id) REFERENCES username_templates(id), FOREIGN KEY(owner_id) REFERENCES users(id)
   );
   CREATE TABLE IF NOT EXISTS inventory(instance_id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,created_at TEXT NOT NULL,FOREIGN KEY(instance_id) REFERENCES username_instances(id),FOREIGN KEY(user_id) REFERENCES users(id));
-  CREATE TABLE IF NOT EXISTS drop_requests(request_id TEXT NOT NULL,user_id INTEGER NOT NULL,instance_id TEXT NOT NULL,cost INTEGER NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(request_id,user_id));
+  CREATE TABLE IF NOT EXISTS drop_requests(request_id TEXT NOT NULL,user_id INTEGER NOT NULL,instance_id TEXT NOT NULL,cost INTEGER NOT NULL,tier TEXT NOT NULL DEFAULT 'basic',created_at TEXT NOT NULL,PRIMARY KEY(request_id,user_id));
   CREATE TABLE IF NOT EXISTS drop_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,instance_id TEXT NOT NULL,handle TEXT NOT NULL,rarity TEXT NOT NULL,value INTEGER NOT NULL,action TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS balance_transactions(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,type TEXT NOT NULL,amount INTEGER NOT NULL,balance_before INTEGER NOT NULL,balance_after INTEGER NOT NULL,metadata TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS task_progress(user_id INTEGER NOT NULL,progress_date TEXT NOT NULL,task_key TEXT NOT NULL,value INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,progress_date,task_key));
@@ -47,7 +47,7 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS wheel_claims(user_id INTEGER PRIMARY KEY,last_claim_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS wheel_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,request_id TEXT NOT NULL,reward_key TEXT NOT NULL,reward_label TEXT NOT NULL,reward_type TEXT NOT NULL,reward_amount INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,request_id));
   CREATE TABLE IF NOT EXISTS upgrade_progress(user_id INTEGER PRIMARY KEY,points INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS upgrade_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,source_ids TEXT NOT NULL,target_instance_id TEXT NOT NULL,from_rarity TEXT NOT NULL,to_rarity TEXT NOT NULL,created_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS upgrade_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,source_ids TEXT NOT NULL,target_instance_id TEXT NOT NULL,from_rarity TEXT NOT NULL,to_rarity TEXT NOT NULL,success INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS season_stats(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,score INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(user_id,season_id));
   CREATE TABLE IF NOT EXISTS season_rewards(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,reward_key TEXT NOT NULL,claimed_at TEXT,PRIMARY KEY(user_id,season_id,reward_key));
   CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,start_at TEXT NOT NULL,end_at TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
@@ -62,6 +62,10 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_wheel_user ON wheel_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_season_score ON season_stats(season_id,score DESC);
   `);
+  const dropCols=new Set(db.prepare('PRAGMA table_info(drop_requests)').all().map(x=>x.name));
+  if(!dropCols.has('tier'))db.exec("ALTER TABLE drop_requests ADD COLUMN tier TEXT NOT NULL DEFAULT 'basic'");
+  const upgradeCols=new Set(db.prepare('PRAGMA table_info(upgrade_history)').all().map(x=>x.name));
+  if(!upgradeCols.has('success'))db.exec("ALTER TABLE upgrade_history ADD COLUMN success INTEGER NOT NULL DEFAULT 1");
   const now=new Date().toISOString();
   const cfg=db.prepare('INSERT OR IGNORE INTO game_config(key,value) VALUES(?,?)');
   cfg.run('drop_cost',String(GAME.dropCost));cfg.run('market_fee',String(GAME.marketFee));
