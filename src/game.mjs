@@ -142,13 +142,23 @@ export function resolveDrop(db,user,instanceId,action){
   })();
   return {instance:shapeInstance(db.prepare('SELECT * FROM username_instances WHERE id=?').get(inst.id)),user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id))};
 }
-export function collection(db,user,{rarity='ALL',sort='new',page=1}={}){
-  const where=["owner_id=?","status='owned'"],args=[user.id];if(rarity!=='ALL'){where.push('rarity=?');args.push(rarity)}
-  const order={new:'obtained_at DESC',value:'value DESC',rarity:"CASE rarity WHEN 'ULTRA' THEN 5 WHEN 'LEGEND' THEN 4 WHEN 'EPIC' THEN 3 WHEN 'RARE' THEN 2 ELSE 1 END DESC,value DESC",short:'LENGTH(handle) ASC,value DESC'}[sort]||'obtained_at DESC';
-  const size=6,p=Math.max(1,Number(page)||1),offset=(p-1)*size;
-  const rows=db.prepare(`SELECT * FROM username_instances WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args,size,offset).map(shapeInstance);
-  const total=db.prepare(`SELECT COUNT(*) c FROM username_instances WHERE ${where.join(' AND ')}`).get(...args).c;
-  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size))};
+export function collection(db,user,{sort='new',digits='all',showcase='all',page=1}={}){
+  const where=["i.owner_id=?","i.status='owned'"],args=[user.id];
+  if(digits==='none')where.push("i.handle NOT GLOB '*[0-9]*'");
+  if(digits==='with')where.push("i.handle GLOB '*[0-9]*'");
+  if(showcase==='only')where.push('ps.instance_id IS NOT NULL');
+  const order={
+    new:'i.obtained_at DESC',old:'i.obtained_at ASC',
+    expensive:'i.value DESC,i.obtained_at DESC',cheap:'i.value ASC,i.obtained_at DESC',
+    short:'LENGTH(i.handle) ASC,i.value DESC',long:'LENGTH(i.handle) DESC,i.value DESC'
+  }[sort]||'i.obtained_at DESC';
+  const size=8,p=Math.max(1,Number(page)||1),offset=(p-1)*size;
+  const from='FROM username_instances i LEFT JOIN profile_showcase ps ON ps.instance_id=i.id AND ps.user_id=i.owner_id WHERE '+where.join(' AND ');
+  const rows=db.prepare(`SELECT i.*,CASE WHEN ps.instance_id IS NULL THEN 0 ELSE 1 END in_showcase ${from} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args,size,offset)
+    .map(r=>({...shapeInstance(r),inShowcase:!!r.in_showcase}));
+  const total=db.prepare(`SELECT COUNT(*) c ${from}`).get(...args).c;
+  const summary=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id);
+  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size)),summary,filters:{sort,digits,showcase}};
 }
 export function leaderboard(db){
   const rows=db.prepare(`
@@ -220,12 +230,14 @@ export function sellOwnedUsername(db,user,instanceId){
 }
 export function setShowcase(db,user,instanceId){
   const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id);if(!inst)throw new Error('not_owned');
+  const exists=db.prepare('SELECT 1 FROM profile_showcase WHERE user_id=? AND instance_id=?').get(user.id,instanceId);
+  if(exists){db.prepare('DELETE FROM profile_showcase WHERE user_id=? AND instance_id=?').run(user.id,instanceId);compactShowcase(db,user.id);return {ok:true,active:false}}
   compactShowcase(db,user.id);
   const max=isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots,current=db.prepare('SELECT COUNT(*) c FROM profile_showcase WHERE user_id=?').get(user.id).c;
-  if(db.prepare('SELECT 1 FROM profile_showcase WHERE user_id=? AND instance_id=?').get(user.id,instanceId))return;
   if(current>=max)throw new Error('showcase_full');
   const pos=(db.prepare('SELECT COALESCE(MAX(position),0)+1 p FROM profile_showcase WHERE user_id=?').get(user.id).p)||1;
   db.prepare('INSERT INTO profile_showcase(user_id,instance_id,position) VALUES(?,?,?)').run(user.id,instanceId,pos);
+  return {ok:true,active:true};
 }
 export function adminOverview(db){
   const usersList=db.prepare('SELECT id,telegram_id,username,first_name,balance,xp,blocked,last_seen FROM users ORDER BY last_seen DESC LIMIT 100').all()
