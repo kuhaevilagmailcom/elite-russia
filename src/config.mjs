@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'3.0.0',
+  version:'3.0.1',
   startBalance:6000,
   freeDrops:1,
   dropCost:3000,
