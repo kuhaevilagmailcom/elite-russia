@@ -46,6 +46,15 @@ function auth(req){
   return null;
 }
 function isAdmin(user){return ADMIN_IDS.has(String(user.telegram_id))||(ALLOW_DEV_AUTH&&String(user.telegram_id)==='10001')}
+function externalOrigin(req){
+  const forwardedProto=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase();
+  const forwardedHost=String(req.headers['x-forwarded-host']||'').split(',')[0].trim();
+  const host=forwardedHost||String(req.headers.host||'').trim();
+  if(host&&forwardedProto==='https')return 'https://'+host;
+  try{const configured=new URL(WEBAPP_URL);if(configured.protocol==='https:')return configured.origin}catch{}
+  if(host&&String(req.socket?.encrypted||'')==='true')return 'https://'+host;
+  return '';
+}
 async function telegramApi(method,payload={}){
   if(!BOT_TOKEN)throw new Error('bot_token_missing');
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),35000);
@@ -104,7 +113,7 @@ async function api(req,res,url){
       const token=crypto.randomBytes(18).toString('hex'),filename=token+'.jpg',file=path.join(STORY_DIR,filename);
       fs.writeFileSync(file,bytes);
       try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(Date.now()-st.mtimeMs>24*3600000)fs.unlinkSync(p)}}catch{}
-      let mediaUrl='';try{const base=new URL(WEBAPP_URL);if(base.protocol==='https:')mediaUrl=new URL('/story/'+filename,base.origin).toString()}catch{}
+      const origin=externalOrigin(req),mediaUrl=origin?new URL('/story/'+filename,origin).toString():'';
       if(!mediaUrl){try{fs.unlinkSync(file)}catch{};throw new Error('story_https_required')}
       return json(res,200,{ok:true,mediaUrl});
     }

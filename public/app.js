@@ -86,21 +86,28 @@ function generateStoryImage(item){
   ctx.fillStyle='#79818c';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('telegram mini app',72,1855);
   return canvas.toDataURL('image/jpeg',.92);
 }
+function openStoryFallback(item,mediaUrl){
+ const root=document.createElement('div');root.className='modal-root story-fallback-root';
+ root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal story-fallback-modal"><div class="modal-head"><b>История готова</b><button data-modal-close>'+icon('close')+'</button></div><div class="story-fallback-preview"><img src="'+esc(mediaUrl)+'" alt="USERNAME story"></div><div class="story-fallback-actions"><button class="primary" data-story-open="'+esc(mediaUrl)+'">Открыть картинку</button><button data-story-copy="'+esc(mediaUrl)+'">Скопировать ссылку</button></div><small>Если редактор Telegram Stories не открылся автоматически, открой картинку и добавь её в историю вручную.</small></div>';
+ document.body.appendChild(root);
+}
 async function shareDropStory(item){
   if(!item)return;
   const dataUrl=generateStoryImage(item);
   toast('Готовлю историю…');
   const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
   const caption='Я выиграл '+item.handle+' в USERNAME';
-  if(typeof TG?.shareToStory==='function'){
-    TG.shareToStory(uploaded.mediaUrl,{text:caption});
-    haptic('medium');return;
-  }
-  const blob=await (await fetch(dataUrl)).blob();
-  const file=new File([blob],String(item.handle||'username').replace('@','')+'-username.jpg',{type:'image/jpeg'});
-  if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({files:[file],text:caption,title:'USERNAME'});return}
-  if(typeof TG?.downloadFile==='function'){TG.downloadFile({url:uploaded.mediaUrl,file_name:file.name});toast('Telegram не поддерживает Stories — картинка сохранена');return}
-  window.open(uploaded.mediaUrl,'_blank','noopener');toast('Открываю картинку');
+  let opened=false;
+  try{
+    if(typeof TG?.shareToStory==='function'){
+      TG.shareToStory(uploaded.mediaUrl,{text:caption});
+      opened=true;
+      haptic('medium');
+    }
+  }catch(e){console.warn('shareToStory failed',e)}
+  if(opened){toast('Открываю Telegram Stories…');return}
+  openStoryFallback(item,uploaded.mediaUrl);
+  toast('Открыл запасной вариант');
 }
 
 function selectedDropTier(){
@@ -237,6 +244,8 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
  if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
+ if(el.dataset.storyOpen){TG?.openLink?.(el.dataset.storyOpen,{try_instant_view:false})||window.open(el.dataset.storyOpen,'_blank','noopener');return}
+ if(el.dataset.storyCopy){try{await navigator.clipboard.writeText(el.dataset.storyCopy);toast('Ссылка скопирована')}catch{toast('Не удалось скопировать')}return}
  if(el.dataset.shareStory){
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
    if(!item){toast('Username уже недоступен для истории');return}

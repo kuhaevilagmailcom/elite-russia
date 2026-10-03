@@ -30,6 +30,9 @@ test('drop result has native Telegram story sharing',()=>{assert.match(appSrc,/d
 test('drop result card only shows username and actions',()=>{const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);assert.match(m[0],/esc\(x\.handle\)/);assert.match(m[0],/Оставить/);assert.match(m[0],/Продать/);assert.match(m[0],/Выложить в историю/);assert.doesNotMatch(m[0],/badge\(/);assert.doesNotMatch(m[0],/Экземпляр|Редкость|НОВЫЙ USERNAME/)});
 
 test('story images are uploaded to an authenticated endpoint and served publicly',()=>{assert.match(serverSrc,/\/api\/story-share/);assert.match(serverSrc,/\/story\//);assert.match(serverSrc,/Content-Type':'image\/jpeg/)});
+test('story share derives public HTTPS origin from proxy headers and has fallback UI',()=>{assert.match(serverSrc,/x-forwarded-proto/);assert.match(serverSrc,/x-forwarded-host/);assert.match(appSrc,/openStoryFallback/);assert.match(appSrc,/data-story-open/);assert.match(appSrc,/data-story-copy/)});
+test('menu buttons are readable at normal mobile size',()=>{assert.match(cssSrc,/\.menu-list button\{min-height:62px/);assert.match(cssSrc,/\.menu-list b\{font-size:13px/);assert.match(cssSrc,/\.menu-list small\{font-size:10px/)});
+
 test('bottom navigation stays removed and menu has drop return',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/\['home','home','Дроп'/)});
 test('top menu has every requested game section',()=>{for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name))});
 test('new sqlite systems exist',()=>{for(const name of ['market_listings','username_transfers','wheel_history','upgrade_history','upgrade_sessions','season_stats'])assert.match(dbSrc,new RegExp(name))});
