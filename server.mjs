@@ -46,14 +46,15 @@ function cleanupStoryFiles(){
   const cutoff=Date.now()-Number(GAME.storyTtlMs||86400000);
   try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(st.mtimeMs<cutoff)fs.unlinkSync(p)}}catch(e){console.error('Story cleanup:',e.message)}
 }
-async function backupDatabase(){
+async function backupDatabase(label=''){
   const dir=path.join(DATA_DIR,'backups');fs.mkdirSync(dir,{recursive:true});
-  const day=new Date().toISOString().slice(0,10),target=path.join(dir,'username-'+day+'.sqlite');
+  const day=new Date().toISOString().slice(0,10),safe=String(label||'username-'+day).replace(/[^a-z0-9._-]/gi,'-'),target=path.join(dir,safe+'.sqlite');
   try{
     if(!fs.existsSync(target))await db.backup(target);
-    const files=fs.readdirSync(dir).filter(x=>/^username-\d{4}-\d{2}-\d{2}\.sqlite$/.test(x)).sort().reverse();
-    for(const old of files.slice(7))fs.unlinkSync(path.join(dir,old));
-  }catch(e){console.error('Backup:',e.message)}
+    const files=fs.readdirSync(dir).filter(x=>/\.sqlite$/.test(x)).sort((a,b)=>fs.statSync(path.join(dir,b)).mtimeMs-fs.statSync(path.join(dir,a)).mtimeMs);
+    for(const old of files.slice(12))fs.unlinkSync(path.join(dir,old));
+    return target;
+  }catch(e){console.error('Backup:',e.message);throw e}
 }
 function maintenance(){
   cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
@@ -239,6 +240,14 @@ async function api(req,res,url){
       if(action==='transfer')result=adminTransferUsername(db,user,id,Number(b.targetId));
       if(action==='value')result=adminSetUsernameValue(db,user,id,b.value);
       invalidateLeaderboard();return json(res,200,result);
+    }
+    if(req.method==='POST'&&url.pathname==='/api/admin/reset-all'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);
+      if(String(b.confirmation||'')!=='RESET USERNAME')throw new Error('reset_confirmation_required');
+      const stamp=new Date().toISOString().replace(/[:.]/g,'-');await backupDatabase('pre-full-reset-'+stamp);
+      const result=resetAllUsers(db,user,b.confirmation),integrity=db.pragma('integrity_check',{simple:true});
+      if(String(integrity).toLowerCase()!=='ok')throw new Error('sqlite_integrity_check_failed');
+      invalidateLeaderboard();return json(res,200,{...result,integrity});
     }
     return json(res,404,{error:'not_found'});
   }catch(e){
