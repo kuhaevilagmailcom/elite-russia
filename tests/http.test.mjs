@@ -98,14 +98,14 @@ test('HTTP collection and market support the new non-rarity filters',async()=>{
   const uid='30200';await json('/api/home',{headers:headers(uid)});
   const overview=await json('/api/admin/overview',{headers:headers('10001')});
   const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
-  for(const [handle,value] of [['filtercheap',1000],['filterrich',9000],['filter77',3000]]){
+  for(const [handle,value] of [['fltcheap',1000],['fltrich',9000],['flt77',3000]]){
     const add=await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('10001'),body:JSON.stringify({handle,value})});assert.equal(add.r.status,200);
   }
   const expensive=await json('/api/collection?sort=expensive&digits=all&showcase=all&page=1',{headers:headers(uid)});
   assert.equal(expensive.r.status,200);assert.ok(expensive.body.items[0].value>=expensive.body.items.at(-1).value);
   const digits=await json('/api/collection?sort=new&digits=with&showcase=all&page=1',{headers:headers(uid)});
   assert.equal(digits.r.status,200);assert.ok(digits.body.items.every(x=>/\d/.test(x.rawHandle)));
-  const cheapItem=expensive.body.items.find(x=>x.rawHandle==='filtercheap'),richItem=expensive.body.items.find(x=>x.rawHandle==='filterrich');
+  const cheapItem=expensive.body.items.find(x=>x.rawHandle==='fltcheap'),richItem=expensive.body.items.find(x=>x.rawHandle==='fltrich');
   const l1=await json('/api/market',{method:'POST',headers:headers(uid),body:JSON.stringify({instanceId:cheapItem.id,price:500})});
   const l2=await json('/api/market',{method:'POST',headers:headers(uid),body:JSON.stringify({instanceId:richItem.id,price:5000})});
   assert.equal(l1.r.status,200);assert.equal(l2.r.status,200);
