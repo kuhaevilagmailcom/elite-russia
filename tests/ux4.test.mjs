@@ -61,11 +61,36 @@ test('upgrader has one screen title and no visible five-item-limit copy',()=>{
 });
 test('upgrader selection cards are compact and footer is sticky',()=>{
   assert.match(uxCss,/\.upgrade-selected\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(uxCss,/\.upgrade-selected>button\{[^}]*height:44px/);
-  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:54px/);
-  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0/);
-  assert.match(uxCss,/@media\(max-width:370px\)\{\.upgrade-selected\{grid-template-columns:1fr\}/);
+  assert.match(uxCss,/\.upgrade-selected>button\{[^}]*height:54px/);
+  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:60px/);
+  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:76px/);
+  assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:54px/);
 });
+test('upgrader lazily extends the real inventory without replacing selected usernames',()=>{
+  assert.match(appSrc,/upgradeVisibleCount:30/);
+  assert.match(appSrc,/function appendUpgradeBatch\(\)/);
+  assert.match(appSrc,/from\+18/);
+  assert.match(appSrc,/remaining<310/);
+  assert.match(appSrc,/upgradeScrollTop/);
+  assert.match(appSrc,/list\.scrollTop=state\.upgradeScrollTop/);
+  assert.match(appSrc,/slice\(0,state\.upgradeVisibleCount\|\|30\)/);
+});
+test('drop roll builds fresh unique random usernames instead of cycling a fixed list',()=>{
+  assert.match(appSrc,/const ROLL_BASES=\[/);
+  assert.match(appSrc,/function randomRollUsername/);
+  assert.match(appSrc,/function buildRollSequence/);
+  assert.match(appSrc,/const used=new Set\(\)/);
+  assert.match(appSrc,/samples=buildRollSequence\(delays\.length,result\.handle\)/);
+  assert.doesNotMatch(appSrc,/const samples=\['@vision','@storm7'/);
+});
+test('upgrader result keeps price and chance on one compact line',()=>{
+  const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(view,/upgrade-target-meta/);
+  assert.match(view,/fmt\(p\.target\.value\)/);
+  assert.match(view,/Шанс <b>/);
+  assert.match(uxCss,/\.upgrade-target\{[^}]*min-height:88px/);
+});
+
 
 test('collection UI removed rarity filter chips',()=>{
   const view=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
