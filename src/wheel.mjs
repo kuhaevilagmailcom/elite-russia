@@ -11,8 +11,8 @@ const rewards=[
 ];
 function pick(){const total=rewards.reduce((s,x)=>s+x.weight,0),n=crypto.randomInt(0,total);let a=0;for(const r of rewards){a+=r.weight;if(n<a)return r}return rewards[0]}
 export function wheelStatus(db,user){
-  const last=db.prepare('SELECT * FROM wheel_history WHERE user_id=? ORDER BY created_at DESC LIMIT 1').get(user.id);
-  const nextAt=last?new Date(last.created_at).getTime()+GAME.wheelCooldownMs:0;
+  const claim=db.prepare('SELECT last_claim_at FROM wheel_claims WHERE user_id=?').get(user.id);
+  const nextAt=claim?new Date(claim.last_claim_at).getTime()+GAME.wheelCooldownMs:0;
   return {available:Date.now()>=nextAt,nextAt:nextAt?new Date(nextAt).toISOString():null,rewards:rewards.map(({key,label})=>({key,label}))};
 }
 export function spinWheel(db,user,requestId){
@@ -24,6 +24,7 @@ export function spinWheel(db,user,requestId){
     if(r.type==='nc')txBalance(db,user.id,'wheel',r.amount,{reward:r.key});
     if(r.type==='xp')db.prepare('UPDATE users SET xp=xp+? WHERE id=?').run(r.amount,user.id);
     if(r.type==='drop')db.prepare('UPDATE users SET free_drops=free_drops+? WHERE id=?').run(r.amount,user.id);
+    db.prepare('INSERT INTO wheel_claims(user_id,last_claim_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET last_claim_at=excluded.last_claim_at').run(user.id,nowIso());
     db.prepare('INSERT INTO wheel_history(id,user_id,request_id,reward_key,reward_label,reward_type,reward_amount,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,requestId,r.key,r.label,r.type,r.amount,nowIso());
     bumpSeasonScore(db,user.id,5);
   })();

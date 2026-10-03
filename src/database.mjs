@@ -44,7 +44,9 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS friends(user_id INTEGER NOT NULL,friend_id INTEGER NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(user_id,friend_id));
   CREATE TABLE IF NOT EXISTS referral_rewards(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,reward_key TEXT NOT NULL,reward_type TEXT NOT NULL,reward_amount INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,reward_key));
   CREATE TABLE IF NOT EXISTS username_transfers(id TEXT PRIMARY KEY,instance_id TEXT NOT NULL,from_user_id INTEGER NOT NULL,to_user_id INTEGER NOT NULL,type TEXT NOT NULL,created_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS wheel_claims(user_id INTEGER PRIMARY KEY,last_claim_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS wheel_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,request_id TEXT NOT NULL,reward_key TEXT NOT NULL,reward_label TEXT NOT NULL,reward_type TEXT NOT NULL,reward_amount INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,request_id));
+  CREATE TABLE IF NOT EXISTS upgrade_progress(user_id INTEGER PRIMARY KEY,points INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS upgrade_history(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,source_ids TEXT NOT NULL,target_instance_id TEXT NOT NULL,from_rarity TEXT NOT NULL,to_rarity TEXT NOT NULL,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS season_stats(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,score INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,PRIMARY KEY(user_id,season_id));
   CREATE TABLE IF NOT EXISTS season_rewards(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,reward_key TEXT NOT NULL,claimed_at TEXT,PRIMARY KEY(user_id,season_id,reward_key));

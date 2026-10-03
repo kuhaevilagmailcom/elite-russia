@@ -15,7 +15,7 @@ import {seasonData} from './src/seasons.mjs';
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
 const BOT_TOKEN=process.env.BOT_TOKEN||'';
-const BOT_USERNAME=(process.env.BOT_USERNAME||'UsernameGameBot').replace(/^@/,'');
+const BOT_USERNAME=(process.env.BOT_USERNAME||'perekup_app_bot').replace(/^@/,'');
 const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
 const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));

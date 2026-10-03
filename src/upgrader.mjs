@@ -21,8 +21,9 @@ function createTarget(db,user,next){
 }
 export function upgradeInfo(db,user){
   const groups=db.prepare("SELECT rarity,COUNT(*) count FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') GROUP BY rarity").all(user.id);
+  const progress=db.prepare('SELECT points FROM upgrade_progress WHERE user_id=?').get(user.id)?.points||0;
   const available=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') ORDER BY rarity,value ASC LIMIT 100").all(user.id).map(x=>({...x,handle:'@'+x.handle}));
-  return {rules,groups,available};
+  return {rules,groups,available,progressPoints:progress};
 }
 export function performUpgrade(db,user,ids){
   if(!Array.isArray(ids)||!ids.length)throw new Error('bad_upgrade');
@@ -33,6 +34,8 @@ export function performUpgrade(db,user,ids){
     const rarity=rows[0].rarity,rule=rules[rarity];if(!rule||rows.some(x=>x.rarity!==rarity)||rows.length!==rule.count)throw new Error('upgrade_bad_recipe');
     for(const r of rows){db.prepare("UPDATE username_instances SET status='consumed' WHERE id=?").run(r.id);db.prepare('DELETE FROM inventory WHERE instance_id=?').run(r.id);db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(r.id)}
     const result=createTarget(db,user,rule.next);
+    const points={COMMON:1,RARE:5,EPIC:20,LEGEND:100}[rarity]*rows.length;
+    db.prepare('INSERT INTO upgrade_progress(user_id,points,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET points=points+excluded.points,updated_at=excluded.updated_at').run(user.id,points,nowIso());
     db.prepare('INSERT INTO upgrade_history(id,user_id,source_ids,target_instance_id,from_rarity,to_rarity,created_at) VALUES(?,?,?,?,?,?,?)').run(uid(),user.id,JSON.stringify(ids),result.id,rarity,rule.next,nowIso());
     bumpSeasonScore(db,user.id,50);
     return {ok:true,result};
