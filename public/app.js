@@ -145,32 +145,31 @@ function topView(){
 }
 function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>'<article class="task"><div><b>'+esc(t.label)+'</b><span>'+t.current+' / '+t.target+'</span></div><strong>+'+fmt(t.reward)+'</strong><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><button data-claim="'+t.key+'" '+(t.current<t.target||t.claimed?'disabled':'')+'>'+(t.claimed?'Получено':t.current>=t.target?'Забрать':'В процессе')+'</button></article>').join('')+'</div>'}
 function wheelGeometry(items){
- const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||1),0));let cursor=0;
- const colors=['#ffffff','#edf1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||1);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2}});
+ const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||0),0));let cursor=0;
+ const colors=['#ffffff','#eef1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||0);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2}});
  return {rows,background:'conic-gradient('+segments.join(',')+')'};
 }
 function wheelView(){
- const w=state.wheel,items=(w.rewards||[]),short={'cash100':'$100','cash250':'$250','xp25':'25 XP','cash500':'$500','drop1':'FREE DROP','cash1500':'$1.5K'},g=wheelGeometry(items);
- return '<div class="wheel-page"><div class="daily-wheel-shell"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+g.rows.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(short[x.key]||x.label)+'</span>').join('')+'<div class="daily-wheel-core"><b>DAILY</b><span>USERNAME</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Ежедневное вращение доступно':'Колесо уже использовано')+'</b><span>'+(w.available?'Одно бесплатное вращение каждые 24 часа.':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
+ const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]);
+ return '<div class="wheel-page"><div class="wheel-stage"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+g.rows.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(x.type==='username'?'1/1':x.label.replace('бесплатный дроп','DROP'))+'</span>').join('')+'<div class="daily-wheel-core"><b>USERNAME</b><span>DAILY</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Раз в 24 часа · без платных spins':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
 }
-function friendsView(){const f=state.friends;return '<div class="page-body"><section class="ref-card"><span>Ваша ссылка</span><div><input id="refLink" readonly value="'+esc(f.referralLink||'Ссылка временно недоступна')+'"><button data-copy-ref>Копировать</button></div></section><div class="home-metrics">'+metric('Приглашено',f.invited)+metric('Активных',f.active)+metric('Наград',f.rewards.length)+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласите первого друга.</div>')+'</div></div>'}
+function friendsView(){
+ const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
+ return '<div class="page-body friends-page"><div class="friends-intro"><b>Друзья</b><span>Приглашай друзей и собирай коллекцию вместе.</span></div><section class="ref-card"><small>ТВОЯ ССЫЛКА</small><b>'+esc(link||'Ссылка загружается…')+'</b><div><button class="secondary" data-copy-ref '+(!link?'disabled':'')+'>Скопировать</button><button class="primary" data-share-ref '+(!link?'disabled':'')+'>Отправить другу</button></div></section><div class="friend-stats">'+metric('Приглашено',f.invited)+metric('Наград',f.rewardsCount??f.rewards.length)+metric('До следующей',f.nextReward?f.nextReward.remaining:'—')+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласи первого друга.</div>')+'</div></div>';
+}
 function giftView(){const g=state.gift;return '<div class="gift-page"><div class="form-card"><label>Username<select id="giftInstance"><option value="">Выберите username</option>'+g.items.map(x=>'<option value="'+x.id+'">'+x.handle+' · '+x.rarity+' · '+fmt(x.value)+'</option>').join('')+'</select></label><label>Друг<select id="giftFriend"><option value="">Выберите друга</option>'+g.friends.map(x=>'<option value="'+x.id+'">'+esc(x.first_name||x.username||'Игрок')+'</option>').join('')+'</select></label><div class="notice">Передача необратима. Username должен находиться в вашей коллекции и не быть выставлен на рынке.</div><button class="primary" data-gift>Подарить username</button></div></div>'}
 function selectedUpgradeItems(){
  const list=state.upgrader?.available||[],set=new Set(state.upgradeSelectedIds||[]);
  return list.filter(x=>set.has(x.id));
 }
 function upgraderView(){
- const u=state.upgrader||{available:[],maxItems:5},selected=selectedUpgradeItems(),p=state.upgradePreview;
- if(state.upgradeOutcome){
-   const r=state.upgradeOutcome,n=r.sources?.length||0,names=(r.sources||[]).slice(0,4).map(x=>x.handle).join(', ');
-   return '<div class="upgrade-result-screen"><div class="upgrade-result-card '+(r.success?'success':'fail')+'"><small>АПГРЕЙД</small><h2>'+(r.success?'Победа':'Проигрыш')+'</h2><div class="upgrade-result-source">'+n+' username'+(n===1?'':'s')+' · '+esc(names)+(n>4?'…':'')+'</div>'+(r.success?'<div class="upgrade-result-target"><span>Вы выиграли</span><b>'+esc(r.result.handle)+'</b><strong>'+esc(r.result.rarity)+' · '+fmt(r.result.value)+'</strong></div>':'<div class="upgrade-result-target lost"><span>Сгорело</span><b>'+n+' username'+(n===1?'':'s')+'</b><strong>Приз '+esc(r.target?.handle||'')+' не получен</strong></div>')+'<button class="primary" data-upgrade-continue>Продолжить</button></div></div>';
- }
- const chance=p?Math.round(Number(p.chance||0)*100):0,winDeg=Math.max(1,(Number(p?.chance)||.2)*360),total=selected.reduce((s,x)=>s+Number(x.value||0),0);
- return '<div class="upgrade-multi-page"><div class="upgrade-multi-head"><div><small>ВЫБРАНО</small><b>'+selected.length+' / '+(u.maxItems||5)+'</b><span>'+fmt(total)+'</span></div>'+(selected.length?'<button data-up-clear>Очистить</button>':'')+'</div>'+
- '<div class="upgrade-selected-strip">'+(selected.length?selected.map(x=>'<button data-up-remove="'+x.id+'"><span>'+esc(x.handle)+'</span><small>'+x.rarity+'</small><em>×</em></button>').join(''):'<div class="upgrade-empty-slot">Выберите от 1 до 5 usernames ниже</div>')+'</div>'+
- (selected.length?'<div class="upgrade-multi-stage">'+(p?'<div class="upgrade-prize-card"><span>Можно выиграть</span><b>'+esc(p.target.handle)+'</b><strong>'+p.target.rarity+' · '+fmt(p.target.value)+'</strong></div><div class="upgrade-wheel-wrap multi"><div class="upgrade-wheel-pointer" id="upgradePointer"></div><div class="upgrade-roulette" id="upgradeRoulette" style="--win-deg:'+winDeg+'deg"><div class="upgrade-wheel-core"><b>'+chance+'%</b><span>WIN</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i>Победа '+chance+'%</span><span><i class="lose"></i>Проигрыш '+(100-chance)+'%</span></div>':'<div class="upgrade-preview-loading">Подбираю username для выигрыша…</div>')+'</div>':'')+
- '<div class="upgrade-pool-title"><span>Мои usernames</span><small>Дешёвый основной username даёт выше шанс. Дополнительные повышают его ещё.</small></div><div class="upgrade-multi-list">'+((u.available||[]).length?(u.available||[]).map(x=>'<button class="upgrade-pick '+(state.upgradeSelectedIds.includes(x.id)?'selected':'')+'" data-up-item="'+x.id+'"><div><b>'+esc(x.handle)+'</b>'+badge(x.rarity)+'</div><span>'+fmt(x.value)+'</span><strong>'+(state.upgradeSelectedIds.includes(x.id)?'Добавлен':'Добавить')+'</strong></button>').join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div>'+
- '<div class="upgrade-multi-footer"><div>'+(selected.length?(p?'При проигрыше сгорят все '+selected.length+' · шанс '+chance+'%':'Подготовка…'):'Добавьте хотя бы один username')+'</div><button class="primary upgrade-spin-btn" data-upgrade '+(!selected.length||!p||state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится...':'Крутить')+'</button></div></div>';
+ const u=state.upgrader||{available:[],maxItems:5},selected=selectedUpgradeItems(),p=state.upgradePreview,chance=p?Math.round(Number(p.chance||0)*100):0,total=selected.reduce((s,x)=>s+Number(x.value||0),0);
+ return '<div class="upgrade-page"><div class="upgrade-copy"><b>Апгрейдер</b><span>Выбери usernames и попробуй получить более дорогой</span></div>'+
+ '<section class="upgrade-selection"><div class="upgrade-selection-head"><span>Выбрано: <b>'+selected.length+' username'+(selected.length===1?'':'s')+'</b></span><strong>'+fmt(total)+'</strong></div><div class="upgrade-selected">'+(selected.length?selected.map(x=>'<button data-up-remove="'+x.id+'"><b>'+esc(x.handle)+'</b><span>'+fmt(x.value)+'</span><em>×</em></button>').join(''):'<div class="empty-line">Выбери от 1 до 5 usernames ниже</div>')+'</div></section>'+
+ (selected.length?'<section class="upgrade-target">'+(p?'<small>МОЖНО ПОЛУЧИТЬ</small><b data-fit-username data-max-size="32" data-min-size="20">'+esc(p.target.handle)+'</b><strong>'+fmt(p.target.value)+'</strong><span>Шанс <b>'+chance+'%</b></span>':'<div class="upgrade-preview-loading">Подбираю точный target…</div>')+'</section>':'')+
+ (state.upgradeSpinning?'<section class="slot-viewport" id="upgradeSlotViewport"><div class="slot-selector"></div><div class="slot-track" id="upgradeSlotTrack"></div></section>':'')+
+ (state.upgradeOutcome&&!state.upgradeSpinning?'<section class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><small>РЕЗУЛЬТАТ</small><b>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle):'Не получилось')+'</b><span>'+(state.upgradeOutcome.success?fmt(state.upgradeOutcome.result.value):'Выбранные usernames сгорели')+'</span><button class="secondary" data-upgrade-continue>Продолжить</button></section>':'')+
+ '<div class="upgrade-list-title"><b>Мои usernames</b><span>Выбери до '+(u.maxItems||5)+'</span></div><div class="upgrade-list">'+((u.available||[]).length?(u.available||[]).map(x=>'<button class="upgrade-pick '+(state.upgradeSelectedIds.includes(x.id)?'selected':'')+'" data-up-item="'+x.id+'"><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><i>'+(state.upgradeSelectedIds.includes(x.id)?'✓':'＋')+'</i></button>').join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div><div class="upgrade-footer"><div><span>Шанс</span><b>'+(p?chance+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!selected.length||!p||state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Прокрутка…':'Апгрейд')+'</button></div></div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
@@ -210,12 +209,8 @@ async function spinWheelUi(){
  try{
   const req=crypto.randomUUID?.()||('w-'+Date.now()),r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
-  if(disc&&target){
-    const final=6*360-target.center;disc.classList.add('spinning');requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});
-    await new Promise(x=>setTimeout(x,3200));disc.classList.remove('spinning');
-  }
-  if(res)res.textContent='Получено: '+r.reward.label;haptic('medium');
-  await refreshUser();state.wheel=await api('/api/wheel');setTimeout(()=>render(),800);
+  if(disc&&target){const final=7*360-target.center;disc.style.transition='transform 3.6s cubic-bezier(.08,.72,.12,1)';requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});await new Promise(x=>setTimeout(x,3650))}
+  if(res)res.textContent='Получено: '+r.reward.label;haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
 }
 let upgradePreviewSeq=0;
@@ -223,31 +218,17 @@ async function refreshUpgradePreview(){
  const ids=[...(state.upgradeSelectedIds||[])],seq=++upgradePreviewSeq;
  if(!ids.length){state.upgradePreview=null;render();return}
  state.upgradePreview=null;render();
- try{
-   const p=await api('/api/upgrader/preview',{method:'POST',body:JSON.stringify({ids})});
-   if(seq!==upgradePreviewSeq)return;
-   state.upgradePreview=p;render();
- }catch(e){if(seq===upgradePreviewSeq){state.upgradePreview=null;toast(ERR[e.message]||e.message||'Не удалось рассчитать шанс');render()}}
+ try{const p=await api('/api/upgrader/preview',{method:'POST',body:JSON.stringify({ids})});if(seq!==upgradePreviewSeq)return;state.upgradePreview=p;render()}catch(e){if(seq===upgradePreviewSeq){state.upgradePreview=null;toast(ERR[e.message]||'Не удалось рассчитать шанс');render()}}
 }
 async function animateUpgradeWheel(result){
- const disc=document.querySelector('#upgradeRoulette'),pointer=document.querySelector('#upgradePointer');if(!disc)return;
- pointer?.classList.add('spinning');
- const chance=Math.max(.001,Math.min(.999,Number(result.chance)||0)),winDeg=chance*360;
- const margin=Math.max(1,Math.min(5,winDeg*.18));
- let selectedAngle;
- if(result.success){
-   selectedAngle=margin+Math.random()*Math.max(1,winDeg-margin*2);
- }else{
-   const loseStart=winDeg+4,loseEnd=356;
-   selectedAngle=loseStart+Math.random()*Math.max(1,loseEnd-loseStart);
- }
- const final=6*360+(360-selectedAngle);
- requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});
- await new Promise(r=>setTimeout(r,3300));
- pointer?.classList.remove('spinning');
- state.upgradeOutcome=result;state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;
- state.upgrader=await api('/api/upgrader');
- render();
+ state.upgradeOutcome=result;state.upgradeSpinning=true;render();
+ const viewport=document.querySelector('#upgradeSlotViewport'),track=document.querySelector('#upgradeSlotTrack');if(!viewport||!track){state.upgradeSpinning=false;render();return}
+ const targetLabel=result.success?result.target.handle:'—',pool=['@alpha','@night77','@street','@prime','@storm','@ghost','@vision','@dealer7','@matrix','@lucky'];
+ const items=Array.from({length:15},(_,i)=>i===11?targetLabel:pool[i%pool.length]);track.innerHTML=items.map((x,i)=>'<div class="slot-item '+(i===11?'target':'')+'">'+esc(x)+'</div>').join('');
+ const item=track.querySelector('.slot-item'),step=(item?.offsetWidth||120)+8,targetIndex=11,offset=viewport.clientWidth/2-(targetIndex*step+(item?.offsetWidth||120)/2);
+ track.style.transition='none';track.style.transform='translate3d(0,0,0)';track.getBoundingClientRect();
+ requestAnimationFrame(()=>{track.style.transition='transform 3.15s cubic-bezier(.08,.78,.1,1)';track.style.transform='translate3d('+offset+'px,0,0)'});
+ await new Promise(r=>setTimeout(r,3200));haptic(result.success?'medium':'light');state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgrader=await api('/api/upgrader');render();
 }
 function applyUserLocal(user){
   if(!user)return;state.user=user;if(state.home)state.home.user=user;
@@ -311,7 +292,8 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.hasAttribute('data-modal-close')){closeModal(el);return}
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
- if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка временно недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
+ if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
+ if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem,ids=[...(state.upgradeSelectedIds||[])],i=ids.indexOf(id);
