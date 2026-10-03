@@ -52,6 +52,27 @@ async function sendStartMessage(chatId,firstName=''){
   const text=(name?`Привет, ${name}!\n\n`:'')+'<b>USERNAME</b>\n\nКоллекционируй редкие виртуальные usernames, собирай коллекцию и поднимайся в рейтинге.';
   const payload={chat_id:chatId,text,parse_mode:'HTML'};if(url)payload.reply_markup={inline_keyboard:[[{text:'Открыть игру',web_app:{url}}]]};return telegramApi('sendMessage',payload)
 }
+async function handleTelegramUpdate(u){
+  if(u?.pre_checkout_query){
+    await telegramApi('answerPreCheckoutQuery',{pre_checkout_query_id:u.pre_checkout_query.id,ok:true}).catch(e=>console.error('pre_checkout:',e.message));return;
+  }
+  const m=u?.message;if(!m)return;
+  const payment=m.successful_payment;
+  if(payment?.invoice_payload?.startsWith('username_plus:')){
+    const parts=payment.invoice_payload.split(':'),tgId=String(parts[1]||'');
+    if(String(m.from?.id||'')===tgId){
+      const user=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(tgId);
+      if(user){
+        const current=user.premium_until?new Date(user.premium_until).getTime():0;
+        const base=Math.max(Date.now(),current),until=new Date(base+30*86400000).toISOString(),ts=new Date().toISOString();
+        db.prepare('UPDATE users SET premium_until=? WHERE id=?').run(until,user.id);
+        db.prepare('INSERT INTO premium_subscriptions(user_id,active_until,source,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET active_until=excluded.active_until,source=excluded.source').run(user.id,until,'telegram_stars',ts);
+        await telegramApi('sendMessage',{chat_id:m.chat.id,text:'USERNAME+ активирован на 30 дней.'}).catch(()=>{});
+      }
+    }
+  }
+  if(m.chat?.id&&/^\/start(?:@\w+)?(?:\s|$)/i.test(String(m.text||'')))await sendStartMessage(m.chat.id,m.from?.first_name||'');
+}
 let telegramPolling=false;
 async function startTelegramPolling(){
   if(telegramPolling||!BOT_TOKEN)return;telegramPolling=true;
@@ -59,7 +80,7 @@ async function startTelegramPolling(){
   const url=publicWebAppUrl();if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:'USERNAME',web_app:{url}}}).catch(()=>{});
   await telegramApi('setMyCommands',{commands:[{command:'start',description:'Открыть USERNAME'}]}).catch(()=>{});
   let offset=0;console.log('Telegram bot polling started');
-  while(telegramPolling){try{const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message']});for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);const m=u.message;if(m?.chat?.id&&/^\/start(?:@\w+)?(?:\s|$)/i.test(String(m.text||'')))await sendStartMessage(m.chat.id,m.from?.first_name||'')}}catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}}
+  while(telegramPolling){try{const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}}catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}}
 }
 
 async function api(req,res,url){
@@ -80,11 +101,12 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const p=profile(db,Number(other[1]));return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
     const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){setShowcase(db,user,showcase[1]);return json(res,200,{ok:true})}
-    if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),name:'USERNAME+',features:['Расширенная коллекция','6 слотов витрины','История дропов','Темы профиля','Без рекламы'],starsEnabled:false});
+    if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:50,features:['Расширенная коллекция','6 слотов витрины','История дропов','Темы профиля','Без рекламы'],starsEnabled:!!BOT_TOKEN});
+    if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней: расширенная коллекция и оформление профиля. Шансы дропа не меняются.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:50}]});return json(res,200,{invoice,stars:50})}
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminOverview(db))}
     const aa=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block)$/);if(req.method==='POST'&&aa){if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);adminAction(db,user,Number(aa[1]),aa[2],b.value);return json(res,200,{ok:true})}
     return json(res,404,{error:'not_found'});
-  }catch(e){console.error(e);const code={insufficient_funds:409,pending_drop:409,collection_full:409,sold_out:409,already_claimed:409,task_not_done:409,bad_json:400,bad_request_id:400}[e.message]||500;return json(res,code,{error:e.message||'server_error'})}
+  }catch(e){console.error(e);const code={insufficient_funds:409,pending_drop:409,collection_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,bad_json:400,bad_request_id:400,premium_unavailable:503}[e.message]||500;return json(res,code,{error:e.message||'server_error'})}
 }
 function serveStatic(req,res,url){
   let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');

@@ -19,6 +19,8 @@ test('drop is idempotent',()=>{const a=createDrop(db,u,'same-request');const b=c
 test('pending drop can be kept and appears in collection',()=>{const p=db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status='pending' LIMIT 1").get(u.id);resolveDrop(db,u,p.id,'keep');assert.equal(collection(db,u,{}).total,1)});
 test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
 test('leaderboard includes user',()=>assert.ok(leaderboard(db,'collection').some(x=>x.id===u.id)));
+test('premium invoice endpoint exists',()=>assert.match(fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),/createInvoiceLink/));
+test('premium does not alter rarity weights',()=>assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i));
 test('collection is viewport-paginated',()=>assert.match(fs.readFileSync(new URL('../src/game.mjs',import.meta.url),'utf8'),/const size=6/));
 test('drop API checks replay before rate limit',()=>{const s=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');assert.match(s,/const replay=db\.prepare/)});
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});

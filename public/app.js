@@ -1,9 +1,9 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
-const state={page:'home',home:null,collection:null,leaderboard:null,tasks:null,profile:null,filters:{rarity:'ALL',sort:'new',page:1},rankMode:'collection',rankPage:1,busy:false};
+const state={page:'home',home:null,collection:null,leaderboard:null,tasks:null,profile:null,premium:null,filters:{rarity:'ALL',sort:'new',page:1},rankMode:'collection',rankPage:1,busy:false};
 const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' NC';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const errors={unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно NC',pending_drop:'Сначала решите, что делать с текущим username',collection_full:'Коллекция заполнена',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',network:'Нет соединения с сервером',showcase_full:'Витрина заполнена'};
+const errors={premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно NC',pending_drop:'Сначала решите, что делать с текущим username',collection_full:'Коллекция заполнена',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',network:'Нет соединения с сервером',showcase_full:'Витрина заполнена'};
 function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
 addEventListener('resize',syncViewport);
@@ -22,7 +22,7 @@ more:'<circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="1
 };
 function icon(k){return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(ICON[k]||ICON.more)+'</svg>'}
 function nav(){const items=[['home','home','Главная'],['collection','grid','Коллекция'],['top','rank','Топ'],['tasks','tasks','Задания'],['profile','user','Профиль']];return '<nav class="nav">'+items.map(([p,i,t])=>'<button data-page="'+p+'" class="'+(state.page===p?'active':'')+'">'+icon(i)+'<span>'+t+'</span></button>').join('')+'</nav>'}
-function shell(html){app.innerHTML='<div class="shell"><section class="screen">'+html+'</section>'+nav()+'</div>'}
+function shell(html){window.__USERNAME_READY=true;app.innerHTML='<div class="shell"><section class="screen">'+html+'</section>'+nav()+'</div>'}
 function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
 function header(title,sub=''){return '<header class="page-head"><div><b>'+esc(title)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div></header>'}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
@@ -71,10 +71,12 @@ function tasksView(){
 }
 function profileView(p=state.profile?.profile){
  if(!p)return header('Профиль')+'<div class="empty">Профиль не найден.</div>';
+ const plus=state.premium;
  return header(p.firstName||'Игрок',p.username?'@'+p.username:'')+
  '<div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>Уровень '+p.level+'</b><span>#'+p.rank+' в рейтинге</span></div>'+
  '<div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Тегов',p.collectionCount)+metric('Лучший',p.best?esc(p.best.handle):'—')+metric('USERNAME+',p.premium?'Активен':'Нет')+'</div>'+
- '<section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section>';
+ '<section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section>'+
+ (plus?'<section class="plus-card"><div><span>USERNAME+</span><b>'+(plus.active?'Подписка активна':'Больше места. Больше оформления.')+'</b><small>Не влияет на редкость дропа.</small></div>'+(plus.active?'<strong>до '+new Date(plus.activeUntil).toLocaleDateString('ru-RU')+'</strong>':'<button data-premium '+(!plus.starsEnabled?'disabled':'')+'>Подключить · '+plus.stars+' Stars</button>')+'</section>':'');
 }
 function detailView(x){return '<div class="detail"><button class="back" data-back>'+icon('back')+'</button>'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String(x.rawHandle?.length||x.handle.length-1))+metric('Редкость',x.rarity)+'</div><button class="showcase-btn" data-showcase="'+x.id+'">Добавить на витрину</button></div>'}
 function render(){if(state.page==='home')shell(homeView());else if(state.page==='collection')shell(collectionView());else if(state.page==='top')shell(topView());else if(state.page==='tasks')shell(tasksView());else if(state.page==='profile')shell(profileView())}
@@ -85,7 +87,7 @@ async function load(page){
   if(page==='collection')state.collection=await api('/api/collection?rarity='+state.filters.rarity+'&sort='+state.filters.sort+'&page='+state.filters.page);
   if(page==='top')state.leaderboard=await api('/api/leaderboard?mode='+state.rankMode);
   if(page==='tasks')state.tasks=await api('/api/tasks');
-  if(page==='profile')state.profile=await api('/api/profile');
+  if(page==='profile'){const [p,plus]=await Promise.all([api('/api/profile'),api('/api/premium')]);state.profile=p;state.premium=plus}
   render();
  }catch(e){shell('<div class="error"><b>'+esc(errors[e.message]||e.message)+'</b><button data-page="'+page+'">Повторить</button></div>')}
 }
@@ -103,6 +105,7 @@ document.addEventListener('click',async e=>{const el=e.target.closest('button');
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.page='profile';shell(profileView(r.profile));return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.page='detail';app.innerHTML='<div class="shell"><section class="screen">'+detailView(item)+'</section>'+nav()+'</div>'}return}
  if(el.dataset.showcase){await api('/api/showcase/'+el.dataset.showcase,{method:'POST'});toast('Добавлено на витрину');return}
+ if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('profile')}});return}
  if(el.hasAttribute('data-back')){await load('collection');return}
 }catch(err){state.busy=false;toast(errors[err.message]||err.message||'Ошибка');el.disabled=false}});
 document.addEventListener('change',async e=>{if(e.target.id==='sortSelect'){state.filters.sort=e.target.value;state.filters.page=1;await load('collection')}});
