@@ -97,7 +97,7 @@ async function shareDropStory(item){
 }
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
-  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$2K',cost:2000};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$3K',cost:3000};
 }
 function dropPricePicker(tiers){
  if(!state.dropPicker)return '';
