@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import {GAME} from './config.mjs';
-import {SPECIALS} from './generator.mjs';
+import {SPECIALS,stableScoreHandle} from './generator.mjs';
 
 export function createDatabase(dataDir){
   fs.mkdirSync(dataDir,{recursive:true});
@@ -38,6 +38,16 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS season_history(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,position INTEGER,score INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,season_id));
   CREATE TABLE IF NOT EXISTS premium_subscriptions(user_id INTEGER PRIMARY KEY,active_until TEXT,source TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS admin_audit(id TEXT PRIMARY KEY,admin_id INTEGER NOT NULL,action TEXT NOT NULL,target TEXT,metadata TEXT,created_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS payments(
+    telegram_charge_id TEXT PRIMARY KEY,provider_charge_id TEXT,user_id INTEGER NOT NULL,payload TEXT NOT NULL,
+    currency TEXT NOT NULL,total_amount INTEGER NOT NULL,product TEXT NOT NULL,created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS user_cosmetics(
+    user_id INTEGER NOT NULL,type TEXT NOT NULL,key TEXT NOT NULL,source TEXT NOT NULL,created_at TEXT NOT NULL,
+    PRIMARY KEY(user_id,type,key)
+  );
+  CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY,applied_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS runtime_locks(name TEXT PRIMARY KEY,owner TEXT NOT NULL,expires_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS market_listings(id TEXT PRIMARY KEY,instance_id TEXT NOT NULL,seller_id INTEGER NOT NULL,buyer_id INTEGER,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,closed_at TEXT);
   CREATE TABLE IF NOT EXISTS market_transactions(id TEXT PRIMARY KEY,listing_id TEXT NOT NULL,instance_id TEXT NOT NULL,seller_id INTEGER NOT NULL,buyer_id INTEGER NOT NULL,price INTEGER NOT NULL,fee INTEGER NOT NULL,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS referrals(id TEXT PRIMARY KEY,referrer_id INTEGER NOT NULL,referred_id INTEGER UNIQUE NOT NULL,created_at TEXT NOT NULL,activated_at TEXT);
@@ -61,6 +71,8 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_drop_user ON drop_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_tx_user ON balance_transactions(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_market_status ON market_listings(status,created_at);
+  CREATE INDEX IF NOT EXISTS idx_templates_handle ON username_templates(handle);
+  CREATE INDEX IF NOT EXISTS idx_instances_handle_status ON username_instances(handle,status);
   CREATE INDEX IF NOT EXISTS idx_market_seller ON market_listings(seller_id,status);
   CREATE INDEX IF NOT EXISTS idx_friends_user ON friends(user_id,friend_id);
   CREATE INDEX IF NOT EXISTS idx_transfer_from ON username_transfers(from_user_id,created_at);
@@ -81,7 +93,38 @@ export function createDatabase(dataDir){
     const end=new Date(Date.now()+GAME.seasonDays*86400000).toISOString();
     db.prepare('INSERT INTO seasons(name,start_at,end_at,active) VALUES(?,?,?,1)').run('Season 1',now,end);
   }
-  const ins=db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,season_id,created_at) VALUES(?,?,?,?,0,?,1,1,NULL,?)');
-  for(const [handle,rarity,value,supply,category] of SPECIALS)ins.run(handle,rarity,value,supply,category,now);
+  const cfgUpsert=db.prepare('INSERT INTO game_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
+  cfgUpsert.run('drop_cost',String(GAME.dropCost));
+  cfgUpsert.run('market_fee',String(GAME.marketFee));
+  cfgUpsert.run('system_sell_rate',String(GAME.systemSellRate||0.35));
+
+  const specialUpsert=db.prepare(`INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,season_id,created_at)
+    VALUES(?,?,?,?,0,?,1,1,NULL,?)
+    ON CONFLICT(handle) DO UPDATE SET
+      rarity=excluded.rarity,base_value=excluded.base_value,
+      max_supply=CASE WHEN username_templates.current_supply>excluded.max_supply THEN username_templates.current_supply ELSE excluded.max_supply END,
+      category=excluded.category,special=1,active=1`);
+  for(const [handle,rarity,value,supply,category] of SPECIALS)specialUpsert.run(handle,rarity,value,supply,category,now);
+
+  const migrated=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('2.7.0-revalue');
+  if(!migrated){
+    const specials=new Map(SPECIALS.map(x=>[x[0],x]));
+    const rows=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply,status FROM username_instances WHERE status IN ('pending','owned','market')").all();
+    const upd=db.prepare('UPDATE username_instances SET value=? WHERE id=?');
+    const tx=db.transaction(()=>{
+      for(const r of rows){
+        const sp=specials.get(r.handle);
+        const next=sp
+          ? Math.round(sp[2]*(r.instance_number===1?1.32:r.instance_number<=5?1.14:1))
+          : stableScoreHandle(r.handle,r.rarity,r.instance_number,r.max_supply);
+        upd.run(next,r.id);
+      }
+      const generated=db.prepare('SELECT id,handle,rarity,max_supply FROM username_templates WHERE special=0').all();
+      const updT=db.prepare('UPDATE username_templates SET base_value=? WHERE id=?');
+      for(const t of generated)updT.run(stableScoreHandle(t.handle,t.rarity,1,t.max_supply),t.id);
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('2.7.0-revalue',now);
+    });
+    tx();
+  }
   return db;
 }
