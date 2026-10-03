@@ -183,9 +183,9 @@ async function api(req,res,url){
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req);return json(res,200,resolveDrop(db,user,resolve[1],b.action))}
     if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='GET'&&url.pathname==='/api/leaderboard'){
-      const mode=url.searchParams.get('mode')||'collection',period=url.searchParams.get('period')||'all',key=mode+':'+period,cached=leaderboardCache.get(key);
+      const key='capital',cached=leaderboardCache.get(key);
       if(cached&&Date.now()-cached.ts<30000)return json(res,200,{items:cached.items});
-      const items=leaderboard(db,mode,period);leaderboardCache.set(key,{ts:Date.now(),items});return json(res,200,{items});
+      const items=leaderboard(db);leaderboardCache.set(key,{ts:Date.now(),items});return json(res,200,{items});
     }
     if(req.method==='GET'&&url.pathname==='/api/tasks')return json(res,200,{items:tasks(db,user)});
     const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim)return json(res,200,claimTask(db,user,claim[1]));
