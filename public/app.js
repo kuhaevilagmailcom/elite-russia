@@ -6,7 +6,7 @@ const state={
   filters:{rarity:'ALL',sort:'new',page:1},
   marketFilters:{rarity:'ALL',sort:'new',q:'',page:1},
   rankMode:'collection',rankPeriod:'all',rankPage:1,
-  upgradeRarity:'COMMON',upgradeSelected:[]
+  upgradeSelectedId:null,upgradeSpinning:false
 };
 const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' NC';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -42,7 +42,7 @@ function metric(label,value){return '<div class="metric"><span>'+label+'</span><
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU=[
  ['market','market','Рынок','Покупка и продажа usernames'],['top','rank','Рейтинг','Лучшие коллекции'],['tasks','tasks','Задания','Ежедневные цели'],['wheel','wheel','Колесо','Бесплатная награда'],
- ['friends','friends','Друзья','Приглашения и друзья'],['gift','gift','Подарок','Отправить username другу'],['upgrader','upgrade','Апгрейдер','Гарантированное улучшение'],['seasons','season','Сезоны','Текущий сезон и награды']
+ ['friends','friends','Друзья','Приглашения и друзья'],['gift','gift','Подарок','Отправить username другу'],['upgrader','upgrade','Апгрейдер','Рискнуть одним username'],['seasons','season','Сезоны','Текущий сезон и награды']
 ];
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
 function menuHtml(){return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-list">'+MENU.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b><small>'+s+'</small></span><em>›</em></button>').join('')+'</div><div class="menu-divider"></div><div class="menu-list compact">'+MENU_BOTTOM.map(([p,i,t])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b></span><em>›</em></button>').join('')+'</div></aside></div>'}
@@ -74,11 +74,18 @@ function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.
 function wheelView(){const w=state.wheel;const labels=(w.rewards||[]).map(x=>x.label);return '<div class="wheel-page"><div class="wheel-wrap"><div class="wheel-pointer"></div><div class="wheel" id="wheelDisc">'+labels.map((x,i)=>'<span style="--i:'+i+';--n:'+labels.length+'">'+esc(x)+'</span>').join('')+'<div class="wheel-core">USERNAME</div></div></div><div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение доступно':'Следующее вращение позже')+'</b><span>'+(w.available?'Один раз в 24 часа. Никаких ставок и Stars.':('Доступно: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary" data-wheel '+(!w.available?'disabled':'')+'>Крутить бесплатно</button><div id="wheelResult" class="wheel-result"></div></div>'}
 function friendsView(){const f=state.friends;return '<div class="page-body"><section class="ref-card"><span>Ваша ссылка</span><div><input id="refLink" readonly value="'+esc(f.referralLink)+'"><button data-copy-ref>Копировать</button></div></section><div class="home-metrics">'+metric('Приглашено',f.invited)+metric('Активных',f.active)+metric('Наград',f.rewards.length)+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласите первого друга.</div>')+'</div></div>'}
 function giftView(){const g=state.gift;return '<div class="gift-page"><div class="form-card"><label>Username<select id="giftInstance"><option value="">Выберите username</option>'+g.items.map(x=>'<option value="'+x.id+'">'+x.handle+' · '+x.rarity+' · '+fmt(x.value)+'</option>').join('')+'</select></label><label>Друг<select id="giftFriend"><option value="">Выберите друга</option>'+g.friends.map(x=>'<option value="'+x.id+'">'+esc(x.first_name||x.username||'Игрок')+'</option>').join('')+'</select></label><div class="notice">Передача необратима. Username должен находиться в вашей коллекции и не быть выставлен на рынке.</div><button class="primary" data-gift>Подарить username</button></div></div>'}
-const UPRULE={COMMON:{count:3,next:'RARE',successChance:.70},RARE:{count:3,next:'EPIC',successChance:.55},EPIC:{count:4,next:'LEGEND',successChance:.40},LEGEND:{count:5,next:'ULTRA',successChance:.22}};
 function upgraderView(){
- const u=state.upgrader,serverRule=u?.rules?.[state.upgradeRarity],rule=serverRule||UPRULE[state.upgradeRarity]||UPRULE.COMMON,items=(u.available||[]).filter(x=>x.rarity===state.upgradeRarity),chance=Math.round(Number(rule.successChance||0)*100);
- const outcome=state.upgradeOutcome?'<div class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><b>'+(state.upgradeOutcome.success?'Апгрейд успешен':'Апгрейд не удался')+'</b><span>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle)+' · '+state.upgradeOutcome.result.rarity:'Выбранные usernames сгорели. Новый username не создан.')+'</span></div>':'';
- return '<div class="page-body">'+outcome+'<div class="upgrade-head"><b>'+rule.count+' '+state.upgradeRarity+' → '+rule.next+'</b><span>Шанс успеха '+chance+'%. При провале все выбранные usernames сгорают. Очки прогресса: '+(u.progressPoints||0)+'.</span></div><div class="chips upgrade-rarity">'+Object.keys(UPRULE).map(r=>'<button data-up-rarity="'+r+'" class="'+(state.upgradeRarity===r?'active':'')+'">'+r+'</button>').join('')+'</div><div class="upgrade-list">'+(items.length?items.map(x=>'<button class="upgrade-item '+(state.upgradeSelected.includes(x.id)?'selected':'')+'" data-up-item="'+x.id+'"><span>'+x.handle+'</span>'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b></button>').join(''):'<div class="empty">Недостаточно usernames этой редкости.</div>')+'</div><div class="upgrade-footer"><span>Выбрано '+state.upgradeSelected.length+' / '+rule.count+' · шанс '+chance+'%</span><button class="primary danger-risk" data-upgrade '+(state.upgradeSelected.length!==rule.count?'disabled':'')+'>Попробовать апгрейд</button></div></div>';
+ const u=state.upgrader||{available:[]};
+ if(state.upgradeOutcome){
+   const r=state.upgradeOutcome;
+   return '<div class="upgrade-result-screen"><div class="upgrade-result-card '+(r.success?'success':'fail')+'"><small>АПГРЕЙД</small><h2>'+(r.success?'Победа':'Проигрыш')+'</h2><div class="upgrade-result-source">'+esc(r.source?.handle||'')+' · '+esc(r.from||'')+'</div>'+(r.success?'<div class="upgrade-result-target"><span>Получен</span><b>'+esc(r.result.handle)+'</b><strong>'+esc(r.result.rarity)+' · '+fmt(r.result.value)+'</strong></div>':'<div class="upgrade-result-target lost"><span>Username сгорел</span><b>'+esc(r.source?.handle||'')+'</b><strong>Новый username не создан</strong></div>')+'<button class="primary" data-upgrade-continue>Продолжить</button></div></div>';
+ }
+ const selected=(u.available||[]).find(x=>x.id===state.upgradeSelectedId);
+ if(!selected){
+   return '<div class="page-body"><div class="upgrade-intro"><small>АПГРЕЙДЕР</small><h2>Выберите один username</h2><p>При победе получите username следующей редкости. При проигрыше выбранный username сгорит полностью.</p></div><div class="upgrade-single-list">'+((u.available||[]).length?u.available.map(x=>'<button class="upgrade-pick" data-up-item="'+x.id+'"><div><b>'+esc(x.handle)+'</b>'+badge(x.rarity)+'</div><span>'+fmt(x.value)+'</span><strong>'+Math.round(x.chance*100)+'% → '+x.next+'</strong></button>').join(''):'<div class="empty">Для апгрейда нужны COMMON, RARE, EPIC или LEGEND usernames.</div>')+'</div></div>';
+ }
+ const chance=Math.round(Number(selected.chance||0)*100),winDeg=Math.max(1,Number(selected.chance||0)*360);
+ return '<div class="upgrade-play"><div class="upgrade-source-card"><div><small>ВАШ USERNAME</small><b>'+esc(selected.handle)+'</b><span>'+selected.rarity+' · '+fmt(selected.value)+'</span></div><button data-up-change>Изменить</button></div><div class="upgrade-target-line"><div><span>При успехе</span><b>'+esc(selected.next)+'</b></div><div><span>Минимальная оценка</span><b>'+fmt(selected.targetMinValue)+'</b></div></div><div class="upgrade-wheel-wrap"><div class="upgrade-wheel-pointer"></div><div class="upgrade-roulette" id="upgradeRoulette" style="--win-deg:'+winDeg+'deg"><div class="upgrade-wheel-core"><b>'+chance+'%</b><span>WIN</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i>Победа '+chance+'%</span><span><i class="lose"></i>Проигрыш '+(100-chance)+'%</span></div><div class="upgrade-risk-note">При проигрыше '+esc(selected.handle)+' будет удалён из коллекции без возврата.</div><button class="primary upgrade-spin-btn" data-upgrade '+(state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится...':'Крутить')+'</button></div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
@@ -97,7 +104,7 @@ async function load(page){
   if(page==='wheel')state.wheel=await api('/api/wheel');
   if(page==='friends')state.friends=await api('/api/friends');
   if(page==='gift')state.gift=await api('/api/gift/options');
-  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgradeSelected=[];state.upgradeOutcome=null}
+  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgradeSelectedId=null;state.upgradeOutcome=null;state.upgradeSpinning=false}
   if(page==='seasons')state.season=await api('/api/seasons');
   if(page==='profile')state.profile=await api('/api/profile');
   if(page==='premium')state.premium=await api('/api/premium');
@@ -107,6 +114,24 @@ async function load(page){
 function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function closeModal(el){el?.closest('.modal-root')?.remove()}
 async function spinWheelUi(){if(state.busy)return;state.busy=true;const req=crypto.randomUUID?.()||('w-'+Date.now());const r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});const idx=Math.max(0,(state.wheel.rewards||[]).findIndex(x=>x.key===r.reward.key)),n=state.wheel.rewards.length||6,disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');if(disc){disc.style.transform='rotate('+(1440-(idx*360/n))+'deg)';await new Promise(x=>setTimeout(x,2300))}if(res)res.textContent='Получено: '+r.reward.label;haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');state.busy=false;setTimeout(()=>render(),500)}
+async function animateUpgradeWheel(result){
+ const disc=document.querySelector('#upgradeRoulette');if(!disc)return;
+ const chance=Math.max(.001,Math.min(.999,Number(result.chance)||0)),winDeg=chance*360;
+ const margin=Math.max(1,Math.min(5,winDeg*.18));
+ let selectedAngle;
+ if(result.success){
+   selectedAngle=margin+Math.random()*Math.max(1,winDeg-margin*2);
+ }else{
+   const loseStart=winDeg+4,loseEnd=356;
+   selectedAngle=loseStart+Math.random()*Math.max(1,loseEnd-loseStart);
+ }
+ const final=6*360+(360-selectedAngle);
+ requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});
+ await new Promise(r=>setTimeout(r,3300));
+ state.upgradeOutcome=result;state.upgradeSpinning=false;state.upgradeSelectedId=null;
+ state.upgrader=await api('/api/upgrader');
+ render();
+}
 document.addEventListener('click',async e=>{if(e.target.matches('[data-menu-close]')){state.menu=false;render();return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
  if(el.hasAttribute('data-menu-open')){state.menu=true;render();return}
  if(el.hasAttribute('data-menu-close')){state.menu=false;render();return}
@@ -132,9 +157,16 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-menu-clos
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
  if(el.hasAttribute('data-copy-ref')){await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});toast(r.handle+' отправлен пользователю '+r.recipient);await load('gift');return}
- if(el.dataset.upRarity){state.upgradeRarity=el.dataset.upRarity;state.upgradeSelected=[];render();return}
- if(el.dataset.upItem){const id=el.dataset.upItem,rule=UPRULE[state.upgradeRarity];if(state.upgradeSelected.includes(id))state.upgradeSelected=state.upgradeSelected.filter(x=>x!==id);else if(state.upgradeSelected.length<rule.count)state.upgradeSelected.push(id);render();return}
- if(el.hasAttribute('data-upgrade')){el.disabled=true;const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({ids:state.upgradeSelected})});state.upgradeOutcome=r;if(r.success){toast('Получен '+r.result.handle+' · '+r.result.rarity);haptic('medium')}else{toast('Апгрейд не удался');haptic('heavy')}state.upgrader=await api('/api/upgrader');state.upgradeSelected=[];render();return}
+ if(el.dataset.upItem){state.upgradeSelectedId=el.dataset.upItem;state.upgradeOutcome=null;render();return}
+ if(el.hasAttribute('data-up-change')){state.upgradeSelectedId=null;render();return}
+ if(el.hasAttribute('data-upgrade-continue')){state.upgradeOutcome=null;render();return}
+ if(el.hasAttribute('data-upgrade')&&!state.upgradeSpinning){
+   const instanceId=state.upgradeSelectedId;if(!instanceId)return;
+   state.upgradeSpinning=true;el.disabled=true;
+   const requestId=crypto.randomUUID?.()||('up-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+   const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({instanceId,requestId})});
+   await animateUpgradeWheel(r);return
+ }
  if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('premium')}});return}
  if(el.hasAttribute('data-back')){await load(state.backPage||'collection');return}
 }catch(err){state.busy=false;toast(ERR[err.message]||err.message||'Ошибка');el.disabled=false}});
