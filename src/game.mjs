@@ -1,5 +1,5 @@
-import {GAME} from './config.mjs';
-import {buildGeneratedHandle,generatedSupply,isValidHandle,scoreHandle,weightedRarity} from './generator.mjs';
+import {GAME,DROP_TIERS,RARITIES} from './config.mjs';
+import {buildGeneratedHandle,generatedSupply,isValidHandle,scoreHandle} from './generator.mjs';
 import {uid,nowIso,todayKey,txBalance,bumpTask,bumpSeasonScore,activeSeason,premiumActive,collectionLimit} from './economy.mjs';
 
 export function levelFromXp(xp){return Math.max(1,1+Math.floor(Number(xp||0)/250))}
@@ -18,13 +18,21 @@ export function ensureUser(db,tg){
   return u;
 }
 function findPending(db,userId){return db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status='pending' ORDER BY obtained_at DESC LIMIT 1").get(userId)}
-function pickTemplate(db){
-  if(Math.random()<.018){
-    const special=db.prepare('SELECT * FROM username_templates WHERE special=1 AND active=1 AND current_supply<max_supply ORDER BY RANDOM() LIMIT 1').get();
+function normalizeTier(key){return DROP_TIERS[key]||DROP_TIERS.basic}
+function weightedTierRarity(tier,rng=Math.random){
+  const x=rng()*100;let sum=0;
+  for(const rarity of RARITIES){sum+=Number(tier.weights[rarity]||0);if(x<sum)return rarity}
+  return 'COMMON';
+}
+function pickTemplate(db,tierKey='basic',rng=Math.random){
+  const tier=normalizeTier(tierKey),rarity=weightedTierRarity(tier,rng);
+  const specialChance={COMMON:.01,RARE:.03,EPIC:.12,LEGEND:.35,ULTRA:.7}[rarity]||0;
+  if(rng()<specialChance){
+    const special=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply ORDER BY RANDOM() LIMIT 1').get(rarity);
     if(special)return special;
   }
-  for(let i=0;i<30;i++){
-    const rarity=weightedRarity(),handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle))continue;
+  for(let i=0;i<50;i++){
+    const handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
       const supply=generatedSupply(rarity),base=scoreHandle(handle,rarity,1,supply);
@@ -46,34 +54,35 @@ export function publicUser(db,user){
 export function homeData(db,user){
   const pending=shapeInstance(findPending(db,user.id));
   const last=shapeInstance(db.prepare('SELECT * FROM username_instances WHERE owner_id=? ORDER BY obtained_at DESC LIMIT 1').get(user.id));
-  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,maxCollection:collectionLimit(user),showcaseSlots:isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots}};
+  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots}};
 }
-export function createDrop(db,user,requestId){
+export function createDrop(db,user,requestId,tierKey='basic'){
   if(!requestId||requestId.length>100)throw new Error('bad_request_id');
   const old=db.prepare('SELECT * FROM drop_requests WHERE request_id=? AND user_id=?').get(requestId,user.id);
-  if(old){const inst=db.prepare('SELECT * FROM username_instances WHERE id=?').get(old.instance_id);return {instance:shapeInstance(inst),user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),replayed:true}}
+  if(old){const inst=db.prepare('SELECT * FROM username_instances WHERE id=?').get(old.instance_id);return {instance:shapeInstance(inst),user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id)),replayed:true,tier:old.tier||'basic',cost:old.cost}}
   if(findPending(db,user.id))throw new Error('pending_drop');
   const owned=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id).c;
   if(owned>=collectionLimit(user))throw new Error('collection_full');
   const run=db.transaction(()=>{
-    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id),template=pickTemplate(db),instanceNumber=template.current_supply+1;
+    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id),tier=normalizeTier(tierKey),effectiveTier=tier.key,template=pickTemplate(db,effectiveTier),instanceNumber=template.current_supply+1;
     if(instanceNumber>template.max_supply)throw new Error('sold_out');
-    const cost=fresh.free_drops>0?0:GAME.dropCost;
-    if(cost>0)txBalance(db,user.id,'drop',-cost,{requestId});else db.prepare('UPDATE users SET free_drops=free_drops-1 WHERE id=?').run(user.id);
+    const useFree=fresh.free_drops>0&&effectiveTier==='basic';
+    const cost=useFree?0:tier.cost;
+    if(cost>0)txBalance(db,user.id,'drop',-cost,{requestId,tier:effectiveTier});else db.prepare('UPDATE users SET free_drops=free_drops-1 WHERE id=?').run(user.id);
     const changed=db.prepare('UPDATE username_templates SET current_supply=current_supply+1 WHERE id=? AND current_supply<max_supply').run(template.id).changes;if(!changed)throw new Error('sold_out');
     const value=template.special?Math.round(template.base_value*(instanceNumber===1?1.32:instanceNumber<=5?1.14:1)):scoreHandle(template.handle,template.rarity,instanceNumber,template.max_supply);
     const instanceId=uid(),season=activeSeason(db);
     db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(instanceId,template.id,template.handle,template.rarity,value,instanceNumber,template.max_supply,user.id,'pending',nowIso(),'drop',season?.id||null);
-    db.prepare('INSERT INTO drop_requests(request_id,user_id,instance_id,cost,created_at) VALUES(?,?,?,?,?)').run(requestId,user.id,instanceId,cost,nowIso());
+    db.prepare('INSERT INTO drop_requests(request_id,user_id,instance_id,cost,tier,created_at) VALUES(?,?,?,?,?,?)').run(requestId,user.id,instanceId,cost,effectiveTier,nowIso());
     db.prepare('INSERT INTO drop_history(id,user_id,instance_id,handle,rarity,value,action,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,instanceId,template.handle,template.rarity,value,'pending',nowIso());
     db.prepare('UPDATE users SET xp=xp+15 WHERE id=?').run(user.id);bumpTask(db,user.id,'drop',1);bumpSeasonScore(db,user.id,15);
     if(['RARE','EPIC','LEGEND','ULTRA'].includes(template.rarity))bumpTask(db,user.id,'rare',1);
     if(!/\d/.test(template.handle))bumpTask(db,user.id,'nodigits',1);
-    return instanceId;
+    return {instanceId,effectiveTier,cost};
   });
-  const instanceId=run(),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
-  return {instance:shapeInstance(db.prepare('SELECT * FROM username_instances WHERE id=?').get(instanceId)),user:publicUser(db,fresh),replayed:false};
+  const made=run(),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+  return {instance:shapeInstance(db.prepare('SELECT * FROM username_instances WHERE id=?').get(made.instanceId)),user:publicUser(db,fresh),replayed:false,tier:made.effectiveTier,cost:made.cost};
 }
 export function resolveDrop(db,user,instanceId,action){
   const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='pending'").get(instanceId,user.id);if(!inst)throw new Error('pending_not_found');
