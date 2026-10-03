@@ -59,16 +59,13 @@ test('HTTP story endpoint returns a public HTTPS media URL',async()=>{
 
 test('HTTP admin block immediately blocks target API access',async()=>{
   await json('/api/home',{headers:headers('30002')});
-  const admin=await json('/api/admin/users/2/block',{method:'POST',headers:headers('10001'),body:JSON.stringify({value:true})});
-  // IDs are internal and can differ if setup changes; find target through admin overview if direct id misses.
-  if(admin.r.status!==200){
-    const overview=await json('/api/admin/overview',{headers:headers('10001')});
-    const target=overview.body.usersList.find(x=>String(x.telegram_id)==='30002');assert.ok(target);
-    const retry=await json('/api/admin/users/'+target.id+'/block',{method:'POST',headers:headers('10001'),body:JSON.stringify({value:true})});assert.equal(retry.r.status,200);
-  }
+  const overview=await json('/api/admin/overview',{headers:headers('10001')});
+  const target=overview.body.usersList.find(x=>String(x.telegram_id)==='30002');assert.ok(target);
+  const admin=await json('/api/admin/users/'+target.id+'/block',{method:'POST',headers:headers('10001'),body:JSON.stringify({value:true})});assert.equal(admin.r.status,200);
   const blocked=await json('/api/home',{headers:headers('30002')});assert.equal(blocked.r.status,403);assert.equal(blocked.body.error,'blocked');
 });
 
 test('HTTP premium invoice is unavailable without bot token',async()=>{
-  const p=await json('/api/premium/invoice',{method:'POST',headers:headers(),body:'{}'});assert.equal(p.r.status,503);assert.equal(p.body.error,'premium_unavailable');
+  await json('/api/home',{headers:headers('30003')});
+  const p=await json('/api/premium/invoice',{method:'POST',headers:headers('30003'),body:'{}'});assert.equal(p.r.status,503);assert.equal(p.body.error,'premium_unavailable');
 });

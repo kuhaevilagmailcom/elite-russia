@@ -80,7 +80,8 @@ function auth(req){
     const u=ensureUser(db,tg);registerReferral(db,u,verifiedStart);return u;
   }
   if(ALLOW_DEV_AUTH){
-    const id=String(req.headers['x-dev-user']||'10001'),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
+    const rawDev=req.headers['x-dev-user'];if(!rawDev)return null;
+    const id=String(rawDev),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
     registerReferral(db,u,String(req.headers['x-start-param']||''));return u;
   }
   return null;
