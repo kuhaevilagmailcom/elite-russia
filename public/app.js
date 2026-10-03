@@ -329,5 +329,5 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
 let marketSearchTimer;
 document.addEventListener('input',e=>{if(e.target.id==='marketQuery'){clearTimeout(marketSearchTimer);const q=e.target.value||'';marketSearchTimer=setTimeout(async()=>{state.marketFilters.q=q;state.marketFilters.page=1;try{state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();requestAnimationFrame(()=>{const input=document.querySelector('#marketQuery');if(input){input.focus();input.setSelectionRange(q.length,q.length)}})}catch{}},320)}});
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.0.0').catch(()=>{});
+import('/admin-ui.js?v=4.2.0').catch(()=>{});
 load('home');
