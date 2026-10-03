@@ -5,11 +5,11 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {GAME} from './src/config.mjs';
 import {createDatabase} from './src/database.mjs';
-import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,setShowcase,adminOverview,adminAction} from './src/game.mjs';
+import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,setShowcase,sellOwnedUsername,adminOverview,adminAction} from './src/game.mjs';
 import {listMarket,createListing,cancelListing,buyListing} from './src/market.mjs';
 import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
-import {upgradeInfo,performUpgrade} from './src/upgrader.mjs';
+import {upgradeInfo,previewUpgrade,performUpgrade} from './src/upgrader.mjs';
 import {seasonData} from './src/seasons.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
@@ -106,6 +106,7 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const p=profile(db,Number(other[1]));return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
     const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){setShowcase(db,user,showcase[1]);return json(res,200,{ok:true})}
+    const collectionSell=url.pathname.match(/^\/api\/collection\/([^/]+)\/sell$/);if(req.method==='POST'&&collectionSell)return json(res,200,sellOwnedUsername(db,user,collectionSell[1]));
 
     if(req.method==='GET'&&url.pathname==='/api/market')return json(res,200,listMarket(db,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='POST'&&url.pathname==='/api/market'){const b=await readBody(req);return json(res,200,createListing(db,user,String(b.instanceId||''),b.price))}
@@ -120,7 +121,8 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req);return json(res,200,spinWheel(db,user,String(b.requestId||'')))}
 
     if(req.method==='GET'&&url.pathname==='/api/upgrader')return json(res,200,upgradeInfo(db,user));
-    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,String(b.instanceId||''),String(b.requestId||'')))}
+    if(req.method==='POST'&&url.pathname==='/api/upgrader/preview'){const b=await readBody(req);return json(res,200,previewUpgrade(db,user,b.ids))}
+    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,b.ids,String(b.requestId||'')))}
 
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 

@@ -149,6 +149,19 @@ export function profile(db,userId){
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
   return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null};
 }
+export function sellOwnedUsername(db,user,instanceId){
+  const run=db.transaction(()=>{
+    const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id);
+    if(!inst)throw new Error('not_owned');
+    db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(inst.id);
+    db.prepare('DELETE FROM inventory WHERE instance_id=?').run(inst.id);
+    db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(inst.id);
+    const balance=txBalance(db,user.id,'collection_sale',inst.value,{instanceId:inst.id,handle:inst.handle});
+    bumpTask(db,user.id,'sell',1);bumpSeasonScore(db,user.id,5);
+    return {handle:'@'+inst.handle,value:inst.value,balance};
+  })();
+  return {ok:true,...run,user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id))};
+}
 export function setShowcase(db,user,instanceId){
   const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id);if(!inst)throw new Error('not_owned');
   const max=isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots,current=db.prepare('SELECT COUNT(*) c FROM profile_showcase WHERE user_id=?').get(user.id).c;
