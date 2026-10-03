@@ -4,6 +4,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import Database from 'better-sqlite3';
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username-http-'));
 const port=18765;
@@ -49,12 +50,48 @@ test('HTTP home and drop work through the real server',async()=>{
   assert.equal(replay.r.status,200);assert.equal(replay.body.instance.id,drop.body.instance.id);
 });
 
-test('HTTP story endpoint returns a public HTTPS media URL',async()=>{
+test('HTTP story endpoint returns a public same-origin media path and JPEG without auth',async()=>{
   const home=await json('/api/home',{headers:headers()});const id=home.body.pending?.id;assert.ok(id);
   const bytes=Buffer.alloc(1200,1);bytes[0]=0xff;bytes[1]=0xd8;
   const dataUrl='data:image/jpeg;base64,'+bytes.toString('base64');
   const story=await json('/api/story-share',{method:'POST',headers:headers(),body:JSON.stringify({instanceId:id,dataUrl})});
-  assert.equal(story.r.status,200);assert.match(story.body.mediaUrl,/^https:\/\/username\.example\/story\/[a-f0-9]{36}\.jpg$/);
+  assert.equal(story.r.status,200);
+  assert.match(story.body.mediaPath,/^\/story\/[a-f0-9]{36}\.jpg$/);
+  assert.match(story.body.mediaUrl,/^https:\/\/username\.example\/story\/[a-f0-9]{36}\.jpg$/);
+  const media=await fetch(base+story.body.mediaPath);
+  assert.equal(media.status,200);assert.match(media.headers.get('content-type')||'',/^image\/jpeg/);
+  const body=Buffer.from(await media.arrayBuffer());assert.equal(body[0],0xff);assert.equal(body[1],0xd8);
+});
+
+test('HTTP market flow works and leaderboard returns unified capital',async()=>{
+  const seller='30100',buyer='30101';
+  await json('/api/home',{headers:headers(seller)});
+  const drop=await json('/api/drop',{method:'POST',headers:headers(seller),body:JSON.stringify({requestId:'market-http-drop',tier:'basic'})});
+  assert.equal(drop.r.status,200);
+  const keep=await json('/api/drop/'+drop.body.instance.id+'/resolve',{method:'POST',headers:headers(seller),body:JSON.stringify({action:'keep'})});
+  assert.equal(keep.r.status,200);
+  const listing=await json('/api/market',{method:'POST',headers:headers(seller),body:JSON.stringify({instanceId:drop.body.instance.id,price:500})});
+  assert.equal(listing.r.status,200);assert.ok(listing.body.id);
+  await json('/api/home',{headers:headers(buyer)});
+  const buy=await json('/api/market/'+listing.body.id+'/buy',{method:'POST',headers:headers(buyer),body:'{}'});
+  assert.equal(buy.r.status,200);
+  const board=await json('/api/leaderboard',{headers:headers(buyer)});
+  assert.equal(board.r.status,200);assert.ok(Array.isArray(board.body.items));assert.ok(board.body.items.length>=2);
+  for(let i=0;i<board.body.items.length;i++){
+    const row=board.body.items[i];assert.equal(row.capital,Number(row.balance)+Number(row.username_value));
+    if(i>0)assert.ok(board.body.items[i-1].capital>=row.capital);
+  }
+});
+
+test('running server database enforces global unique username index',async()=>{
+  const check=new Database(path.join(tmp,'username.sqlite'),{readonly:true,fileMustExist:true});
+  try{
+    const indexes=check.prepare("PRAGMA index_list('username_instances')").all();
+    assert.ok(indexes.some(x=>x.name==='idx_instances_handle_unique'&&Number(x.unique)===1));
+    const dup=check.prepare('SELECT handle,COUNT(*) c FROM username_instances GROUP BY handle HAVING c>1 LIMIT 1').get();
+    assert.equal(dup,undefined);
+    assert.equal(String(check.pragma('integrity_check',{simple:true})).toLowerCase(),'ok');
+  }finally{check.close()}
 });
 
 test('HTTP admin block immediately blocks target API access',async()=>{
