@@ -20,14 +20,7 @@ jobs:
           node-version: '20.20.0'
 
       - name: Install dependencies
-        run: npm install
-
-      - name: Emit generated lockfile
-        run: |
-          echo LOCK_BEGIN
-          base64 -w0 package-lock.json
-          echo
-          echo LOCK_END
+        run: npm ci
 
       - name: Run tests
         run: npm test
