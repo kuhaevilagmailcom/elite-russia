@@ -1,3 +1,4 @@
+const {state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR}=window.USERNAME_APP;
 async function refreshAdmin(){
   state.admin=await api('/api/admin/overview?q='+encodeURIComponent(state.adminQuery||'')+'&page='+(state.adminPage||1)+'&size=20');
 }
@@ -43,3 +44,5 @@ document.addEventListener('click',async e=>{
   }catch(err){toast(ERR[err.message]||'Ошибка админки');el.disabled=false}
 });
 document.addEventListener('input',e=>{if(e.target.id==='adminResetPhrase'){const btn=document.querySelector('[data-admin-reset-arm]');if(btn)btn.disabled=e.target.value!=='RESET USERNAME'}});
+
+window.USERNAME_ADMIN={view:adminView,refresh:refreshAdmin};
