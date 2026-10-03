@@ -32,6 +32,7 @@ const db=createDatabase(DATA_DIR);
 const lastDropAt=new Map();
 const rateBuckets=new Map();
 const leaderboardCache=new Map();
+function invalidateLeaderboard(){leaderboardCache.clear()}
 
 function rateLimit(userId,key,limit,windowMs){
   const k=String(userId)+':'+key,now=Date.now(),row=rateBuckets.get(k);
@@ -53,7 +54,7 @@ async function backupDatabase(){
   }catch(e){console.error('Backup:',e.message)}
 }
 function maintenance(){
-  cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);ensureSeasonLifecycle(db);
+  cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
 }
 maintenance();
 setInterval(maintenance,10*60*1000).unref?.();
@@ -77,12 +78,12 @@ function auth(req){
   const raw=String(req.headers['x-telegram-init-data']||''),tg=validateInitData(raw);
   if(tg){
     const verifiedStart=String(new URLSearchParams(raw).get('start_param')||'');
-    const u=ensureUser(db,tg);registerReferral(db,u,verifiedStart);return u;
+    const u=ensureUser(db,tg);registerReferral(db,u,verifiedStart);if(verifiedStart)invalidateLeaderboard();return u;
   }
   if(ALLOW_DEV_AUTH){
     const rawDev=req.headers['x-dev-user'];if(!rawDev)return null;
     const id=String(rawDev),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
-    registerReferral(db,u,String(req.headers['x-start-param']||''));return u;
+    const devStart=String(req.headers['x-start-param']||'');registerReferral(db,u,devStart);if(devStart)invalidateLeaderboard();return u;
   }
   return null;
 }
@@ -171,16 +172,15 @@ async function api(req,res,url){
       const bytes=Buffer.from(match[1],'base64');if(bytes.length<1000||bytes.length>1600000||bytes[0]!==0xff||bytes[1]!==0xd8)throw new Error('bad_story_image');
       const token=crypto.randomBytes(18).toString('hex'),filename=token+'.jpg',file=path.join(STORY_DIR,filename);
       fs.writeFileSync(file,bytes);
-      const origin=externalOrigin(req),mediaUrl=origin?new URL('/story/'+filename,origin).toString():'';
-      if(!mediaUrl){try{fs.unlinkSync(file)}catch{};throw new Error('story_https_required')}
-      return json(res,200,{ok:true,mediaUrl});
+      const mediaPath='/story/'+filename,origin=externalOrigin(req),mediaUrl=origin?new URL(mediaPath,origin).toString():null;
+      return json(res,200,{ok:true,mediaPath,mediaUrl});
     }
     if(req.method==='POST'&&url.pathname==='/api/drop'){
       const b=await readBody(req),requestId=String(b.requestId||''),replay=db.prepare('SELECT 1 FROM drop_requests WHERE request_id=? AND user_id=?').get(requestId,user.id);
       if(!replay){const t=Date.now(),last=lastDropAt.get(user.id)||0;if(t-last<GAME.dropRateLimitMs)return json(res,429,{error:'too_fast'});lastDropAt.set(user.id,t)}
-      return json(res,200,createDrop(db,user,requestId,String(b.tier||'basic')));
+      const result=createDrop(db,user,requestId,String(b.tier||'basic'));invalidateLeaderboard();return json(res,200,result);
     }
-    const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req);return json(res,200,resolveDrop(db,user,resolve[1],b.action))}
+    const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req),result=resolveDrop(db,user,resolve[1],b.action);invalidateLeaderboard();return json(res,200,result)}
     if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='GET'&&url.pathname==='/api/leaderboard'){
       const key='capital',cached=leaderboardCache.get(key);
@@ -188,27 +188,27 @@ async function api(req,res,url){
       const items=leaderboard(db);leaderboardCache.set(key,{ts:Date.now(),items});return json(res,200,{items});
     }
     if(req.method==='GET'&&url.pathname==='/api/tasks')return json(res,200,{items:tasks(db,user)});
-    const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim)return json(res,200,claimTask(db,user,claim[1]));
+    const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim){const result=claimTask(db,user,claim[1]);invalidateLeaderboard();return json(res,200,result)}
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const p=profile(db,Number(other[1]));return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
     const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){setShowcase(db,user,showcase[1]);return json(res,200,{ok:true})}
-    const collectionSell=url.pathname.match(/^\/api\/collection\/([^/]+)\/sell$/);if(req.method==='POST'&&collectionSell)return json(res,200,sellOwnedUsername(db,user,collectionSell[1]));
+    const collectionSell=url.pathname.match(/^\/api\/collection\/([^/]+)\/sell$/);if(req.method==='POST'&&collectionSell){const result=sellOwnedUsername(db,user,collectionSell[1]);invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/market')return json(res,200,listMarket(db,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='POST'&&url.pathname==='/api/market'){const b=await readBody(req);return json(res,200,createListing(db,user,String(b.instanceId||''),b.price))}
-    const buy=url.pathname.match(/^\/api\/market\/([^/]+)\/buy$/);if(req.method==='POST'&&buy)return json(res,200,buyListing(db,user,buy[1]));
+    const buy=url.pathname.match(/^\/api\/market\/([^/]+)\/buy$/);if(req.method==='POST'&&buy){const result=buyListing(db,user,buy[1]);invalidateLeaderboard();return json(res,200,result)}
     const cancel=url.pathname.match(/^\/api\/market\/([^/]+)\/cancel$/);if(req.method==='POST'&&cancel)return json(res,200,cancelListing(db,user,cancel[1]));
 
     if(req.method==='GET'&&url.pathname==='/api/friends')return json(res,200,friendsData(db,user,BOT_USERNAME));
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
-    if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req);return json(res,200,giftUsername(db,user,String(b.instanceId||''),Number(b.friendId)))}
+    if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),Number(b.friendId));invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/wheel')return json(res,200,wheelStatus(db,user));
-    if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req);return json(res,200,spinWheel(db,user,String(b.requestId||'')))}
+    if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req),result=spinWheel(db,user,String(b.requestId||''));invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/upgrader')return json(res,200,upgradeInfo(db,user));
     if(req.method==='POST'&&url.pathname==='/api/upgrader/preview'){if(!rateLimit(user.id,'upgrade_preview',20,60000))return json(res,429,{error:'rate_limited'});const b=await readBody(req);return json(res,200,previewUpgrade(db,user,b.ids))}
-    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,b.ids,String(b.sessionId||'')))}
+    if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req),result=performUpgrade(db,user,b.ids,String(b.sessionId||''));invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
@@ -216,7 +216,7 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней. Не влияет на шансы дропа, колесо или апгрейдер.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:PREMIUM_STARS}]});return json(res,200,{invoice,stars:PREMIUM_STARS})}
 
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminOverview(db))}
-    const aa=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block)$/);if(req.method==='POST'&&aa){if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);adminAction(db,user,Number(aa[1]),aa[2],b.value);return json(res,200,{ok:true})}
+    const aa=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block)$/);if(req.method==='POST'&&aa){if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);adminAction(db,user,Number(aa[1]),aa[2],b.value);invalidateLeaderboard();return json(res,200,{ok:true})}
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
