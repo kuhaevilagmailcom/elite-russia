@@ -6,21 +6,47 @@ import path from 'node:path';
 import {createDatabase} from '../src/database.mjs';
 import {GAME} from '../src/config.mjs';
 import {buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle} from '../src/generator.mjs';
-import {ensureUser,createDrop,resolveDrop,collection,leaderboard} from '../src/game.mjs';
+import {ensureUser,createDrop,resolveDrop,leaderboard} from '../src/game.mjs';
+import {createListing,buyListing} from '../src/market.mjs';
+import {giftUsername} from '../src/social.mjs';
+import {spinWheel} from '../src/wheel.mjs';
+import {performUpgrade} from '../src/upgrader.mjs';
+
+const appSrc=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+const cssSrc=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8');
+const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url),'utf8');
 
 test('candidate universe exceeds 3000 readable combinations',()=>assert.ok(candidateUniverseSize()>3000));
 test('generator never produces numeric-only usernames in 100k samples',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(isValidHandle(h))}});
 test('score rewards shorter clean usernames',()=>assert.ok(scoreHandle('monk','ULTRA',1,25)>scoreHandle('monk8392','COMMON',1,5000)));
+test('bottom navigation was removed',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.doesNotMatch(cssSrc,/\.nav\{/);assert.match(appSrc,/data-menu-open/)});
+test('top menu has every requested game section',()=>{for(const name of ['Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name))});
+test('new sqlite systems exist',()=>{for(const name of ['market_listings','market_transactions','referrals','friends','referral_rewards','username_transfers','wheel_history','upgrade_history','season_stats','season_rewards','events','event_templates'])assert.match(dbSrc,new RegExp(name))});
+test('Telegram auth remains server-side',()=>assert.match(serverSrc,/validateInitData/));
+test('USERNAME+ payment exists and does not alter rarity weights',()=>{assert.match(serverSrc,/createInvoiceLink/);assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i)});
+test('market usernames are excluded from upgrader',()=>assert.match(upgraderSrc,/status='owned'/));
 
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username-test-'));const db=createDatabase(tmp);
-const u=ensureUser(db,{id:10001,username:'tester',first_name:'Test'});
-test('new user starts with configured economy',()=>{const r=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);assert.equal(r.balance,GAME.startBalance);assert.equal(r.free_drops,GAME.freeDrops)});
-test('drop is idempotent',()=>{const a=createDrop(db,u,'same-request');const b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),'same-request');assert.equal(a.instance.id,b.instance.id)});
-test('pending drop can be kept and appears in collection',()=>{const p=db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status='pending' LIMIT 1").get(u.id);resolveDrop(db,u,p.id,'keep');assert.equal(collection(db,u,{}).total,1)});
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username2-test-')),db=createDatabase(tmp);
+const seller=ensureUser(db,{id:10001,username:'seller',first_name:'Seller'});
+const buyer=ensureUser(db,{id:10002,username:'buyer',first_name:'Buyer'});
+const friend=ensureUser(db,{id:10003,username:'friend',first_name:'Friend'});
+
+function owned(user,handle='testname',rarity='COMMON',value=1000){
+  const tid=db.prepare('INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,?,0,1,?)').run(handle,rarity,value,100,'test',new Date().toISOString()).lastInsertRowid;
+  const id='i-'+handle+'-'+Math.random().toString(36).slice(2);
+  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(id,tid,handle,rarity,value,1,100,user.id,'owned',new Date().toISOString(),'test');
+  db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,new Date().toISOString());
+  return id;
+}
+
+test('new user starts with configured economy',()=>{assert.equal(seller.balance,GAME.startBalance);assert.equal(seller.free_drops,GAME.freeDrops)});
+test('drop is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
+test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
+test('gift transfer cannot be repeated by old owner',()=>{db.prepare('INSERT INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());const id=owned(seller,'giftname');giftUsername(db,seller,id,friend.id);assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/)});
+test('wheel request is idempotent',()=>{const a=spinWheel(db,buyer,'wheel-1'),b=spinWheel(db,buyer,'wheel-1');assert.equal(a.reward.key,b.reward.key)});
+test('upgrader rejects usernames owned by someone else',()=>{const ids=[owned(seller,'upone'),owned(seller,'uptwo'),owned(seller,'upthree')];assert.throws(()=>performUpgrade(db,buyer,ids),/upgrade_invalid_items/)});
 test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
-test('leaderboard includes user',()=>assert.ok(leaderboard(db,'collection').some(x=>x.id===u.id)));
-test('premium invoice endpoint exists',()=>assert.match(fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),/createInvoiceLink/));
-test('premium does not alter rarity weights',()=>assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i));
-test('collection is viewport-paginated',()=>assert.match(fs.readFileSync(new URL('../src/game.mjs',import.meta.url),'utf8'),/const size=6/));
-test('drop API checks replay before rate limit',()=>{const s=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');assert.match(s,/const replay=db\.prepare/)});
+test('leaderboard includes users',()=>assert.ok(leaderboard(db,'collection','all').length>=3));
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});

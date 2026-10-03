@@ -54,7 +54,7 @@ export function buyListing(db,buyer,listingId){
     db.prepare("UPDATE username_instances SET owner_id=?,status='owned' WHERE id=? AND owner_id=?").run(buyer.id,l.instance_id,l.seller_id);
     db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(buyer.id,l.instance_id);
     db.prepare('INSERT INTO market_transactions(id,listing_id,instance_id,seller_id,buyer_id,price,fee,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),listingId,l.instance_id,l.seller_id,buyer.id,l.price,fee,nowIso());
-    bumpTask(db,buyer.id,'market_buy',1);bumpSeasonScore(db,buyer.id,20);bumpSeasonScore(db,l.seller_id,12);
+    bumpTask(db,buyer.id,'market_buy',1);bumpTask(db,l.seller_id,'sell',1);bumpSeasonScore(db,buyer.id,20);bumpSeasonScore(db,l.seller_id,12);
     return {handle:'@'+l.handle,price:l.price,fee,sellerNet};
   })();
   return {ok:true,...result};

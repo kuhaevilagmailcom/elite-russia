@@ -26,7 +26,7 @@ export function registerReferral(db,user,startParam){
 export function friendsData(db,user,botUsername){
   const invited=db.prepare('SELECT COUNT(*) c FROM referrals WHERE referrer_id=?').get(user.id).c;
   const active=db.prepare('SELECT COUNT(*) c FROM referrals WHERE referrer_id=? AND activated_at IS NOT NULL').get(user.id).c;
-  const friends=db.prepare(`SELECT u.id,u.username,u.first_name,u.level,u.last_seen FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.last_seen DESC LIMIT 100`).all(user.id);
+  const friends=db.prepare(`SELECT u.id,u.username,u.first_name,u.xp,u.last_seen FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.last_seen DESC LIMIT 100`).all(user.id).map(x=>({...x,level:Math.max(1,1+Math.floor(Number(x.xp||0)/250))}));
   const rewards=db.prepare('SELECT reward_key,reward_type,reward_amount FROM referral_rewards WHERE user_id=? ORDER BY CAST(reward_key AS INTEGER)').all(user.id);
   return {referralLink:`https://t.me/${botUsername}?start=ref_${user.id}`,invited,active,friends,rewards};
 }
