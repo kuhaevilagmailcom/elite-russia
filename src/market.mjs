@@ -3,24 +3,24 @@ import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeColl
 
 function feeRate(db){return Math.max(0,Math.min(.5,configNumber(db,'market_fee',GAME.marketFee)))}
 function shape(r){return {
-  id:r.id,instanceId:r.instance_id,handle:'@'+r.handle,rarity:r.rarity,value:r.value,
+  id:r.id,instanceId:r.instance_id,handle:'@'+r.handle,rawHandle:r.handle,rarity:r.rarity,value:r.value,
   instanceNumber:r.instance_number,maxSupply:r.max_supply,price:r.price,sellerId:r.seller_id,
   sellerName:r.seller_name||r.seller_username||'Игрок',createdAt:r.created_at
 }}
-export function listMarket(db,{rarity='ALL',sort='new',q='',page=1}={}){
+export function listMarket(db,{sort='new',digits='all',q='',page=1}={}){
   const where=["l.status='active'","u.blocked=0"],args=[];
-  if(rarity!=='ALL'){where.push('i.rarity=?');args.push(rarity)}
   if(q){where.push('i.handle LIKE ?');args.push(String(q).toLowerCase().replace(/^@/,'').slice(0,30)+'%')}
+  if(digits==='none')where.push("i.handle NOT GLOB '*[0-9]*'");
+  if(digits==='with')where.push("i.handle GLOB '*[0-9]*'");
   const order={
-    new:'l.created_at DESC',cheap:'l.price ASC',expensive:'l.price DESC',
-    rare:"CASE i.rarity WHEN 'ULTRA' THEN 5 WHEN 'LEGEND' THEN 4 WHEN 'EPIC' THEN 3 WHEN 'RARE' THEN 2 ELSE 1 END DESC,l.price DESC",
-    short:'LENGTH(i.handle) ASC,l.price DESC'
+    new:'l.created_at DESC',cheap:'l.price ASC,l.created_at DESC',expensive:'l.price DESC,l.created_at DESC',
+    short:'LENGTH(i.handle) ASC,l.price DESC',long:'LENGTH(i.handle) DESC,l.price DESC'
   }[sort]||'l.created_at DESC';
-  const size=8,p=Math.max(1,Number(page)||1),off=(p-1)*size;
+  const size=10,p=Math.max(1,Number(page)||1),off=(p-1)*size;
   const base=`FROM market_listings l JOIN username_instances i ON i.id=l.instance_id JOIN users u ON u.id=l.seller_id WHERE ${where.join(' AND ')}`;
   const rows=db.prepare(`SELECT l.id,l.instance_id,l.seller_id,l.price,l.created_at,i.handle,i.rarity,i.value,i.instance_number,i.max_supply,u.first_name seller_name,u.username seller_username ${base} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args,size,off).map(shape);
   const total=db.prepare(`SELECT COUNT(*) c ${base}`).get(...args).c;
-  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size)),fee:feeRate(db)};
+  return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size)),fee:feeRate(db),filters:{sort,digits,q}};
 }
 export function createListing(db,user,instanceId,price){
   price=Math.round(Number(price)||0);if(price<100||price>1000000000)throw new Error('bad_price');
@@ -65,7 +65,7 @@ export function buyListing(db,buyer,listingId){
     db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(buyer.id,l.instance_id);
     db.prepare('INSERT INTO market_transactions(id,listing_id,instance_id,seller_id,buyer_id,price,fee,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),listingId,l.instance_id,l.seller_id,buyer.id,l.price,fee,nowIso());
     bumpTask(db,buyer.id,'market_buy',1);bumpTask(db,l.seller_id,'sell',1);bumpSeasonScore(db,buyer.id,20);bumpSeasonScore(db,l.seller_id,12);
-    return {handle:'@'+l.handle,price:l.price,fee,sellerNet};
+    return {handle:'@'+l.handle,price:l.price,fee,sellerNet,instanceId:l.instance_id};
   })();
   return {ok:true,...result};
 }

@@ -1,8 +1,8 @@
 import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 
+const REFERRAL_REWARDS=[[1,'money',500],[3,'money',1500],[5,'drop',1],[10,'money',5000]];
 function rewardThreshold(db,referrerId,count){
-  const rewards=[[1,'money',500],[3,'money',1500],[5,'drop',1],[10,'money',5000]];
-  for(const [need,type,amount] of rewards){
+  for(const [need,type,amount] of REFERRAL_REWARDS){
     if(count<need)continue;
     const key=String(need);if(db.prepare('SELECT 1 FROM referral_rewards WHERE user_id=? AND reward_key=?').get(referrerId,key))continue;
     db.prepare('INSERT INTO referral_rewards(id,user_id,reward_key,reward_type,reward_amount,created_at) VALUES(?,?,?,?,?,?)').run(uid(),referrerId,key,type,amount,nowIso());
@@ -30,7 +30,13 @@ export function friendsData(db,user,botUsername){
   const friends=db.prepare(`SELECT u.id,u.username,u.first_name,u.xp,u.last_seen FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.last_seen DESC LIMIT 100`).all(user.id)
     .map(x=>({...x,level:Math.max(1,1+Math.floor(Number(x.xp||0)/250))}));
   const rewards=db.prepare('SELECT reward_key,reward_type,reward_amount FROM referral_rewards WHERE user_id=? ORDER BY CAST(reward_key AS INTEGER)').all(user.id);
-  return {referralLink:botUsername?`https://t.me/${botUsername}?start=ref_${user.id}`:null,invited,active,friends,rewards};
+  const next=REFERRAL_REWARDS.find(x=>invited<x[0]);
+  return {
+    referralLink:botUsername?`https://t.me/${botUsername}?start=ref_${user.id}`:null,
+    shareText:'Я играю в USERNAME — тут выпадают уникальные юзернеймы, есть рынок, апгрейдер и колесо. Залетай 👇',
+    invited,active,friends,rewards,rewardsCount:rewards.length,
+    nextReward:next?{need:next[0],type:next[1],amount:next[2],remaining:Math.max(0,next[0]-invited)}:null
+  };
 }
 export function giftUsername(db,user,instanceId,friendId){
   friendId=Number(friendId);
