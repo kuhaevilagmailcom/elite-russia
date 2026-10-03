@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
-import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality,generatedSupply} from '../src/generator.mjs';
-import {ensureUser,createDrop,resolveDrop,leaderboard,sellOwnedUsername,setShowcase} from '../src/game.mjs';
+import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,stableScoreHandle,wordQuality,generatedSupply,rarityFromValue} from '../src/generator.mjs';
+import {ensureUser,createDrop,resolveDrop,leaderboard,publicUser,sellOwnedUsername,setShowcase} from '../src/game.mjs';
 import {createListing,buyListing,cancelListing,listMarket} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
 import {spinWheel,wheelStatus} from '../src/wheel.mjs';
@@ -29,18 +29,34 @@ test('short real words are in a different value class than long or junk handles'
   assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*8);
   assert.ok(wordQuality('mama')>wordQuality('qzvra'));
 });
+test('rarity is derived from value, not from a requested rarity label',()=>{
+  const rng=()=>.5,a=scoreHandle('card','COMMON',1,1,rng),b=scoreHandle('card','ULTRA',1,1,rng);
+  assert.equal(a,b);
+  assert.equal(rarityFromValue(a),'ULTRA');
+  assert.ok(rarityFromValue(scoreHandle('qzvra','COMMON',1,1,()=>.5))!=='ULTRA');
+});
+test('five-character real words beat long junk by a wide margin',()=>{
+  assert.ok(scoreHandle('ghost','COMMON',1,1,()=>.5)>scoreHandle('qzxvbnm123','ULTRA',1,1,()=>.5)*20);
+});
+test('three-character usernames are excluded from ordinary generation',()=>{
+  assert.equal(isValidHandle('abc'),false);
+  for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])for(let i=0;i<1000;i++)assert.ok(buildGeneratedHandle(profile).length>=4);
+});
+test('RARE generation never creates 4 or 5 character handles',()=>{
+  for(let i=0;i<5000;i++)assert.ok(buildGeneratedHandle('RARE').length>=6);
+});
 test('system sale is a low salvage payout, especially for premium assets',()=>{
   assert.equal(systemSellValue(5000),1000);
   assert.equal(systemSellValue(50000),5000);
   assert.equal(systemSellValue(1000000),50000);
 });
-test('max paid drop still has COMMON majority',()=>assert.ok(DROP_TIERS.max.weights.COMMON>50));
+test('max paid drop still allows COMMON but meaningfully improves the profile mix',()=>{assert.ok(DROP_TIERS.max.weights.COMMON>0);assert.ok(DROP_TIERS.max.weights.COMMON<DROP_TIERS.basic.weights.COMMON);assert.ok(DROP_TIERS.max.weights.EPIC>DROP_TIERS.basic.weights.EPIC);assert.ok(DROP_TIERS.max.weights.LEGEND>DROP_TIERS.basic.weights.LEGEND)});
 test('v3 economy cannot print several paid drops immediately',()=>{
   assert.equal(GAME.freeDrops,1);
   assert.ok(GAME.startBalance<=DROP_TIERS.basic.cost*2);
   assert.equal(DROP_TIERS.basic.cost,3000);
   assert.ok(DROP_TIERS.basic.weights.ULTRA<=.001);
-  assert.ok(DROP_TIERS.max.weights.ULTRA<=.1);
+  assert.ok(DROP_TIERS.max.weights.ULTRA<=.5);
 });
 test('every template is globally unique supply 1',()=>{
   assert.equal(generatedSupply('COMMON'),1);
@@ -65,7 +81,7 @@ test('drop card is minimal and story share is an icon-only native action',()=>{
 });
 test('menu remains top-driven and readable',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/menu-group-title/);for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name));assert.match(cssSrc,/\.menu-list b\{font-size:14px/);assert.match(cssSrc,/\.menu-list button\{min-height:62px/)});
 test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
-test('database has payment ledger, migrations, cosmetics and runtime lock',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','3.0.0-global-unique','idx_instances_handle_unique'])assert.match(dbSrc,new RegExp(name))});
+test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','3.0.0-global-unique','3.1.0-value-rarity','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
 test('premium does not change drop/upgrader odds',()=>{assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i);assert.doesNotMatch(upgraderSrc,/premium/i)});
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username27-test-')),db=createDatabase(tmp);
@@ -165,11 +181,16 @@ test('expired season is finalized and a new one starts',()=>{
 test('daily task key uses configured UTC+5 day',()=>{const expected=new Date(Date.now()+300*60000).toISOString().slice(0,10);assert.equal(todayKey(),expected)});
 test('market search is prefix-based',()=>{const u=ensureUser(db,{id:20007,username:'search',first_name:'Search'}),id=owned(u,'prefixfind','RARE',900);createListing(db,u,id,1200);assert.ok(listMarket(db,{q:'prefix'}).items.some(x=>x.handle.includes('prefix')));assert.equal(listMarket(db,{q:'fix'}).items.some(x=>x.handle.includes('prefix')),false)});
 test('username actions update locally instead of reloading screens',()=>{
-  const resolve=appSrc.match(/if\(el\.dataset\.resolve\)\{[\s\S]*?\n \}/)?.[0]||'';
-  const sell=appSrc.match(/if\(el\.dataset\.confirmSystemSell\)\{[\s\S]*?\n \}/)?.[0]||'';
-  const listing=appSrc.match(/if\(el\.dataset\.createListing\)\{[\s\S]*?\n \}/)?.[0]||'';
-  assert.doesNotMatch(resolve,/load\(/);assert.doesNotMatch(sell,/load\(/);assert.doesNotMatch(listing,/load\(/);
-  assert.match(appSrc,/removeCollectionLocal/);
+  const blocks=[
+    appSrc.match(/if\(el\.dataset\.resolve\)\{[\s\S]*?\n \}/)?.[0]||'',
+    appSrc.match(/if\(el\.dataset\.confirmSystemSell\)\{[\s\S]*?\n \}/)?.[0]||'',
+    appSrc.match(/if\(el\.dataset\.createListing\)\{[\s\S]*?\n \}/)?.[0]||'',
+    appSrc.match(/if\(el\.dataset\.marketBuy\)\{[\s\S]*?return\}/)?.[0]||'',
+    appSrc.match(/if\(el\.dataset\.marketCancel\)\{[\s\S]*?return\}/)?.[0]||'',
+    appSrc.match(/if\(el\.hasAttribute\('data-gift'\)\)\{[\s\S]*?return\}/)?.[0]||''
+  ];
+  for(const block of blocks){assert.ok(block);assert.doesNotMatch(block,/load\(/)}
+  assert.match(appSrc,/removeCollectionLocal/);assert.match(appSrc,/removeMarketLocal/);assert.match(appSrc,/removeGiftLocal/);
 });
 test('leaderboard is a single total-capital ranking',()=>{
   const a=ensureUser(db,{id:21001,username:'rankA',first_name:'Rank A'});
@@ -199,6 +220,31 @@ test('leaderboard UI has no separate modes or periods',()=>{
   assert.match(m[0],/Общий капитал/);
   assert.match(m[0],/r\.capital/);
   assert.doesNotMatch(m[0],/mode-tabs|period-tabs|rankMode|rankPeriod/);
+});
+test('sold and consumed usernames do not count toward total capital',()=>{
+  const u=ensureUser(db,{id:21004,username:'rankD',first_name:'Rank D'});
+  db.prepare('UPDATE users SET balance=? WHERE id=?').run(3000,u.id);
+  const sold=owned(u,'ranksold','COMMON',5000),consumed=owned(u,'rankconsumed','COMMON',7000),kept=owned(u,'rankkept','COMMON',2000);
+  db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(sold);
+  db.prepare("UPDATE username_instances SET status='consumed' WHERE id=?").run(consumed);
+  const row=leaderboard(db).find(x=>x.id===u.id);
+  assert.equal(row.capital,5000);
+  assert.equal(row.username_value,2000);
+});
+test('publicUser rank uses exactly the same capital formula as leaderboard',()=>{
+  const u=db.prepare('SELECT * FROM users WHERE telegram_id=?').get('21003');
+  const p=publicUser(db,u),row=leaderboard(db).find(x=>x.id===u.id);
+  assert.equal(p.capital,row.capital);
+  assert.equal(p.rank,row.position);
+});
+test('leaderboard cache is invalidated on capital-changing API actions',()=>{
+  assert.match(serverSrc,/function invalidateLeaderboard\(\)/);
+  for(const token of ['createDrop','resolveDrop','claimTask','sellOwnedUsername','buyListing','giftUsername','spinWheel','performUpgrade'])assert.match(serverSrc,new RegExp(token+'[\\s\\S]{0,220}invalidateLeaderboard'));
+});
+test('story sharing uses same-origin public media path and no modal fallback',()=>{
+  assert.match(appSrc,/new URL\(uploaded\.mediaPath,location\.origin\)/);
+  assert.match(serverSrc,/mediaPath='\/story\/'/);
+  assert.doesNotMatch(appSrc,/function openStoryFallback/);
 });
 test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});
