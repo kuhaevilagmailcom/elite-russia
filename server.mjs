@@ -9,21 +9,56 @@ import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,
 import {listMarket,createListing,cancelListing,buyListing} from './src/market.mjs';
 import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
-import {upgradeInfo,previewUpgrade,performUpgrade} from './src/upgrader.mjs';
-import {seasonData} from './src/seasons.mjs';
+import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
+import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
 const BOT_TOKEN=process.env.BOT_TOKEN||'';
-const BOT_USERNAME=(process.env.BOT_USERNAME||'perekup_app_bot').replace(/^@/,'');
+let BOT_USERNAME=(process.env.BOT_USERNAME||'').replace(/^@/,'');
 const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
+const NODE_ENV=process.env.NODE_ENV||'development';
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
+const DEV_ADMIN=process.env.DEV_ADMIN==='1';
+const TRUST_PROXY=process.env.TRUST_PROXY==='1';
+const PREMIUM_STARS=50;
+const INSTANCE_ID=crypto.randomUUID();
+if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
 const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
 const lastDropAt=new Map();
+const rateBuckets=new Map();
+const leaderboardCache=new Map();
+
+function rateLimit(userId,key,limit,windowMs){
+  const k=String(userId)+':'+key,now=Date.now(),row=rateBuckets.get(k);
+  if(!row||now-row.started>=windowMs){rateBuckets.set(k,{started:now,count:1});return true}
+  if(row.count>=limit)return false;row.count++;return true;
+}
+function cleanupRateBuckets(){const now=Date.now();for(const [k,v] of rateBuckets){if(now-v.started>10*60*1000)rateBuckets.delete(k)}}
+function cleanupStoryFiles(){
+  const cutoff=Date.now()-Number(GAME.storyTtlMs||86400000);
+  try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(st.mtimeMs<cutoff)fs.unlinkSync(p)}}catch(e){console.error('Story cleanup:',e.message)}
+}
+async function backupDatabase(){
+  const dir=path.join(DATA_DIR,'backups');fs.mkdirSync(dir,{recursive:true});
+  const day=new Date().toISOString().slice(0,10),target=path.join(dir,'username-'+day+'.sqlite');
+  try{
+    if(!fs.existsSync(target))await db.backup(target);
+    const files=fs.readdirSync(dir).filter(x=>/^username-\d{4}-\d{2}-\d{2}\.sqlite$/.test(x)).sort().reverse();
+    for(const old of files.slice(7))fs.unlinkSync(path.join(dir,old));
+  }catch(e){console.error('Backup:',e.message)}
+}
+function maintenance(){
+  cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);ensureSeasonLifecycle(db);
+}
+maintenance();
+setInterval(maintenance,10*60*1000).unref?.();
+setInterval(()=>backupDatabase(),24*60*60*1000).unref?.();
+backupDatabase();
 
 function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(JSON.stringify(payload))}
@@ -40,19 +75,26 @@ function validateInitData(initData){
 }
 function auth(req){
   const raw=String(req.headers['x-telegram-init-data']||''),tg=validateInitData(raw);
-  const startParam=String(req.headers['x-start-param']||'');
-  if(tg){const u=ensureUser(db,tg);registerReferral(db,u,startParam);return u}
-  if(ALLOW_DEV_AUTH){const id=String(req.headers['x-dev-user']||'10001'),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});registerReferral(db,u,startParam);return u}
+  if(tg){
+    const verifiedStart=String(new URLSearchParams(raw).get('start_param')||'');
+    const u=ensureUser(db,tg);registerReferral(db,u,verifiedStart);return u;
+  }
+  if(ALLOW_DEV_AUTH){
+    const id=String(req.headers['x-dev-user']||'10001'),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
+    registerReferral(db,u,String(req.headers['x-start-param']||''));return u;
+  }
   return null;
 }
-function isAdmin(user){return ADMIN_IDS.has(String(user.telegram_id))||(ALLOW_DEV_AUTH&&String(user.telegram_id)==='10001')}
+function isAdmin(user){return ADMIN_IDS.has(String(user.telegram_id))||(ALLOW_DEV_AUTH&&DEV_ADMIN&&String(user.telegram_id)==='10001')}
 function externalOrigin(req){
-  const forwardedProto=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase();
-  const forwardedHost=String(req.headers['x-forwarded-host']||'').split(',')[0].trim();
-  const host=forwardedHost||String(req.headers.host||'').trim();
-  if(host&&forwardedProto==='https')return 'https://'+host;
   try{const configured=new URL(WEBAPP_URL);if(configured.protocol==='https:')return configured.origin}catch{}
-  if(host&&String(req.socket?.encrypted||'')==='true')return 'https://'+host;
+  if(TRUST_PROXY){
+    const proto=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase();
+    const host=String(req.headers['x-forwarded-host']||'').split(',')[0].trim();
+    if(proto==='https'&&/^[a-z0-9.-]+(?::\d+)?$/i.test(host))return 'https://'+host;
+  }
+  const host=String(req.headers.host||'').trim();
+  if(req.socket?.encrypted&&/^[a-z0-9.-]+(?::\d+)?$/i.test(host))return 'https://'+host;
   return '';
 }
 async function telegramApi(method,payload={}){
@@ -66,35 +108,72 @@ async function sendStartMessage(chatId,firstName='',ref=''){
   const text=(name?`Привет, ${name}!\n\n`:'')+'<b>USERNAME</b>\n\nКоллекционируй редкие виртуальные usernames, собирай коллекцию и поднимайся в рейтинге.';
   const payload={chat_id:chatId,text,parse_mode:'HTML'};if(url)payload.reply_markup={inline_keyboard:[[{text:'Открыть игру',web_app:{url}}]]};return telegramApi('sendMessage',payload)
 }
+function parsePremiumPayload(payload){
+  const m=String(payload||'').match(/^username_plus:(\d+):([0-9a-f-]{16,})$/i);
+  return m?{telegramId:m[1],nonce:m[2]}:null;
+}
+function validPremiumCheckout(q){
+  const p=parsePremiumPayload(q?.invoice_payload);
+  return !!(p&&String(q?.from?.id||'')===p.telegramId&&q?.currency==='XTR'&&Number(q?.total_amount)===PREMIUM_STARS);
+}
+function applyPremiumPayment(message,payment){
+  const parsed=parsePremiumPayload(payment?.invoice_payload);if(!parsed)return {applied:false,reason:'bad_payload'};
+  if(String(message?.from?.id||'')!==parsed.telegramId||payment.currency!=='XTR'||Number(payment.total_amount)!==PREMIUM_STARS)return {applied:false,reason:'bad_payment'};
+  const charge=String(payment.telegram_payment_charge_id||'');if(!charge)return {applied:false,reason:'missing_charge'};
+  const user=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(parsed.telegramId);if(!user)return {applied:false,reason:'user_not_found'};
+  return db.transaction(()=>{
+    if(db.prepare('SELECT 1 FROM payments WHERE telegram_charge_id=?').get(charge))return {applied:false,duplicate:true,user};
+    const current=user.premium_until?new Date(user.premium_until).getTime():0,base=Math.max(Date.now(),current),until=new Date(base+30*86400000).toISOString(),ts=new Date().toISOString();
+    db.prepare('INSERT INTO payments(telegram_charge_id,provider_charge_id,user_id,payload,currency,total_amount,product,created_at) VALUES(?,?,?,?,?,?,?,?)')
+      .run(charge,String(payment.provider_payment_charge_id||''),user.id,payment.invoice_payload,payment.currency,payment.total_amount,'USERNAME_PLUS_30D',ts);
+    db.prepare('UPDATE users SET premium_until=? WHERE id=?').run(until,user.id);
+    db.prepare('INSERT INTO premium_subscriptions(user_id,active_until,source,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET active_until=excluded.active_until,source=excluded.source,created_at=excluded.created_at')
+      .run(user.id,until,'telegram_stars',ts);
+    return {applied:true,user,until};
+  })();
+}
 async function handleTelegramUpdate(u){
-  if(u?.pre_checkout_query){await telegramApi('answerPreCheckoutQuery',{pre_checkout_query_id:u.pre_checkout_query.id,ok:true}).catch(e=>console.error('pre_checkout:',e.message));return}
+  if(u?.pre_checkout_query){
+    const q=u.pre_checkout_query,ok=validPremiumCheckout(q);
+    await telegramApi('answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok,...(!ok?{error_message:'Платёж не прошёл проверку. Откройте USERNAME и создайте новый счёт.'}:{})}).catch(e=>console.error('pre_checkout:',e.message));
+    return;
+  }
   const m=u?.message;if(!m)return;
   const payment=m.successful_payment;
-  if(payment?.invoice_payload?.startsWith('username_plus:')){
-    const parts=payment.invoice_payload.split(':'),tgId=String(parts[1]||'');
-    if(String(m.from?.id||'')===tgId){
-      const user=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(tgId);
-      if(user){
-        const current=user.premium_until?new Date(user.premium_until).getTime():0,base=Math.max(Date.now(),current),until=new Date(base+30*86400000).toISOString(),ts=new Date().toISOString();
-        db.prepare('UPDATE users SET premium_until=? WHERE id=?').run(until,user.id);
-        db.prepare('INSERT INTO premium_subscriptions(user_id,active_until,source,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET active_until=excluded.active_until,source=excluded.source').run(user.id,until,'telegram_stars',ts);
-        await telegramApi('sendMessage',{chat_id:m.chat.id,text:'USERNAME+ активирован на 30 дней.'}).catch(()=>{});
-      }
-    }
+  if(payment){
+    const result=applyPremiumPayment(m,payment);
+    if(result.applied)await telegramApi('sendMessage',{chat_id:m.chat.id,text:'USERNAME+ активирован на 30 дней.'}).catch(()=>{});
   }
   const text=String(m.text||'').trim(),match=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?/i);
   if(m.chat?.id&&match)await sendStartMessage(m.chat.id,m.from?.first_name||'',match[1]||'');
 }
 let telegramPolling=false;
+function acquirePollLease(){
+  const now=Date.now(),expires=new Date(now+70000).toISOString(),current=db.prepare('SELECT * FROM runtime_locks WHERE name=?').get('telegram_polling');
+  if(current&&current.owner!==INSTANCE_ID&&new Date(current.expires_at).getTime()>now)return false;
+  db.prepare('INSERT INTO runtime_locks(name,owner,expires_at) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at').run('telegram_polling',INSTANCE_ID,expires);
+  return true;
+}
+function refreshPollLease(){db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID)}
+async function resolveBotUsername(){
+  if(BOT_USERNAME||!BOT_TOKEN)return;
+  try{const me=await telegramApi('getMe');BOT_USERNAME=String(me?.username||'').replace(/^@/,'')}catch(e){console.error('Bot username:',e.message)}
+}
 async function startTelegramPolling(){
-  if(telegramPolling||!BOT_TOKEN)return;telegramPolling=true;
+  if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');return}
+  telegramPolling=true;await resolveBotUsername();
   await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
   const url=publicWebAppUrl();if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:'USERNAME',web_app:{url}}}).catch(()=>{});
   await telegramApi('setMyCommands',{commands:[{command:'start',description:'Открыть USERNAME'}]}).catch(()=>{});
-  let offset=0;console.log('Telegram bot polling started');
-  while(telegramPolling){try{const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}}catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}}
+  let offset=0,lastLease=0;console.log('Telegram bot polling started');
+  while(telegramPolling){
+    try{
+      if(Date.now()-lastLease>20000){refreshPollLease();lastLease=Date.now()}
+      const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});
+      for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}
+    }catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}
+  }
 }
-
 function giftOptions(user){
   const items=db.prepare("SELECT id,handle,rarity,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id).map(x=>({...x,handle:'@'+x.handle}));
   const friends=db.prepare('SELECT u.id,u.username,u.first_name FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.first_name,u.username').all(user.id);
@@ -103,8 +182,11 @@ function giftOptions(user){
 async function api(req,res,url){
   try{
     const user=auth(req);if(!user)return json(res,401,{error:'unauthorized'});if(user.blocked)return json(res,403,{error:'blocked'});
+    ensureSeasonLifecycle(db);
+    if(!rateLimit(user.id,'global',120,60000))return json(res,429,{error:'rate_limited'});
     if(req.method==='GET'&&url.pathname==='/api/home')return json(res,200,homeData(db,user));
     if(req.method==='POST'&&url.pathname==='/api/story-share'){
+      if(!rateLimit(user.id,'story',3,60000))return json(res,429,{error:'rate_limited'});
       const b=await readBody(req),instanceId=String(b.instanceId||''),dataUrl=String(b.dataUrl||'');
       const inst=db.prepare('SELECT id,handle,owner_id FROM username_instances WHERE id=? AND owner_id=?').get(instanceId,user.id);
       if(!inst)throw new Error('not_owned');
@@ -112,7 +194,6 @@ async function api(req,res,url){
       const bytes=Buffer.from(match[1],'base64');if(bytes.length<1000||bytes.length>1600000||bytes[0]!==0xff||bytes[1]!==0xd8)throw new Error('bad_story_image');
       const token=crypto.randomBytes(18).toString('hex'),filename=token+'.jpg',file=path.join(STORY_DIR,filename);
       fs.writeFileSync(file,bytes);
-      try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(Date.now()-st.mtimeMs>24*3600000)fs.unlinkSync(p)}}catch{}
       const origin=externalOrigin(req),mediaUrl=origin?new URL('/story/'+filename,origin).toString():'';
       if(!mediaUrl){try{fs.unlinkSync(file)}catch{};throw new Error('story_https_required')}
       return json(res,200,{ok:true,mediaUrl});
@@ -124,7 +205,11 @@ async function api(req,res,url){
     }
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req);return json(res,200,resolveDrop(db,user,resolve[1],b.action))}
     if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{rarity:url.searchParams.get('rarity')||'ALL',sort:url.searchParams.get('sort')||'new',page:Number(url.searchParams.get('page')||1)}));
-    if(req.method==='GET'&&url.pathname==='/api/leaderboard')return json(res,200,{items:leaderboard(db,url.searchParams.get('mode')||'collection',url.searchParams.get('period')||'all')});
+    if(req.method==='GET'&&url.pathname==='/api/leaderboard'){
+      const mode=url.searchParams.get('mode')||'collection',period=url.searchParams.get('period')||'all',key=mode+':'+period,cached=leaderboardCache.get(key);
+      if(cached&&Date.now()-cached.ts<30000)return json(res,200,{items:cached.items});
+      const items=leaderboard(db,mode,period);leaderboardCache.set(key,{ts:Date.now(),items});return json(res,200,{items});
+    }
     if(req.method==='GET'&&url.pathname==='/api/tasks')return json(res,200,{items:tasks(db,user)});
     const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim)return json(res,200,claimTask(db,user,claim[1]));
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
@@ -145,27 +230,27 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req);return json(res,200,spinWheel(db,user,String(b.requestId||'')))}
 
     if(req.method==='GET'&&url.pathname==='/api/upgrader')return json(res,200,upgradeInfo(db,user));
-    if(req.method==='POST'&&url.pathname==='/api/upgrader/preview'){const b=await readBody(req);return json(res,200,previewUpgrade(db,user,b.ids))}
+    if(req.method==='POST'&&url.pathname==='/api/upgrader/preview'){if(!rateLimit(user.id,'upgrade_preview',20,60000))return json(res,429,{error:'rate_limited'});const b=await readBody(req);return json(res,200,previewUpgrade(db,user,b.ids))}
     if(req.method==='POST'&&url.pathname==='/api/upgrader'){const b=await readBody(req);return json(res,200,performUpgrade(db,user,b.ids,String(b.sessionId||'')))}
 
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
-    if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:50,features:['Расширенная коллекция','6 слотов витрины','История дропов','Темы профиля','Дополнительные фильтры рынка','История сделок','Без рекламы'],starsEnabled:!!BOT_TOKEN});
-    if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней. Не влияет на шансы дропа, колесо или апгрейдер.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:50}]});return json(res,200,{invoice,stars:50})}
+    if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:50,features:['Коллекция до 300 usernames','6 слотов витрины'],starsEnabled:!!BOT_TOKEN});
+    if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней. Не влияет на шансы дропа, колесо или апгрейдер.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:PREMIUM_STARS}]});return json(res,200,{invoice,stars:PREMIUM_STARS})}
 
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminOverview(db))}
     const aa=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block)$/);if(req.method==='POST'&&aa){if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);adminAction(db,user,Number(aa[1]),aa[2],b.value);return json(res,200,{ok:true})}
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,rate_limited:429,recipient_blocked:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
 function serveStoryImage(req,res,url){
   const m=url.pathname.match(/^\/story\/([a-f0-9]{36})\.jpg$/);if(!m){res.writeHead(404);return res.end('Not found')}
   const file=path.join(STORY_DIR,m[1]+'.jpg');
-  fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}
+  fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}if(Date.now()-st.mtimeMs>Number(GAME.storyTtlMs||86400000)){try{fs.unlinkSync(file)}catch{};res.writeHead(410);return res.end('Expired')}
     res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':st.size,'Cache-Control':'public, max-age=86400','Access-Control-Allow-Origin':'*','X-Content-Type-Options':'nosniff'});
     fs.createReadStream(file).pipe(res);
   });
@@ -178,4 +263,4 @@ function serveStatic(req,res,url){
 const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'username',version:GAME.version,botConfigured:!!BOT_TOKEN,telegramPolling});if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(isMain)server.listen(PORT,()=>{console.log(`USERNAME v${GAME.version} running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
-export {validateInitData};
+export {validateInitData,validPremiumCheckout,applyPremiumPayment,externalOrigin};
