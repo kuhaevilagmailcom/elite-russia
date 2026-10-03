@@ -135,9 +135,9 @@ function homeView(){
 }
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[110,150]:[45,45,50,55,60,65,75,85,95,110,125,145,170,200,230,260,300,350,420,520],samples=buildRollSequence(delays.length,result.handle);let i=0;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,110]:[32,32,36,40,43,47,54,61,68,79,90,104,122,144,166,187,216,252,302,374],samples=buildRollSequence(delays.length,result.handle);let i=0;
  for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++]+'</b><small>Прокрутка…</small>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
- stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b><small>Выпало</small>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?120:170));state.home.pending=result;render();
+ stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b><small>Выпало</small>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
 }
 function collectionFilterSheet(){
  if(!state.collectionFilterOpen)return '';
