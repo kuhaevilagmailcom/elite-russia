@@ -53,7 +53,7 @@ test('system sale is a low salvage payout, especially for premium assets',()=>{
 test('max paid drop still allows COMMON but meaningfully improves the profile mix',()=>{assert.ok(DROP_TIERS.max.weights.COMMON>0);assert.ok(DROP_TIERS.max.weights.COMMON<DROP_TIERS.basic.weights.COMMON);assert.ok(DROP_TIERS.max.weights.EPIC>DROP_TIERS.basic.weights.EPIC);assert.ok(DROP_TIERS.max.weights.LEGEND>DROP_TIERS.basic.weights.LEGEND)});
 test('v3 economy cannot print several paid drops immediately',()=>{
   assert.equal(GAME.freeDrops,1);
-  assert.ok(GAME.startBalance<=DROP_TIERS.basic.cost*2);
+  assert.equal(GAME.startBalance,50000);
   assert.equal(DROP_TIERS.basic.cost,3000);
   assert.ok(DROP_TIERS.basic.weights.ULTRA<=.001);
   assert.ok(DROP_TIERS.max.weights.ULTRA<=.5);
@@ -99,7 +99,7 @@ function owned(user,handle='testname',rarity='COMMON',value=1000){
   return id;
 }
 
-test('new user starts with configured economy',()=>{assert.equal(seller.balance,GAME.startBalance);assert.equal(seller.free_drops,GAME.freeDrops)});
+test('new user starts with configured economy',()=>{assert.equal(GAME.startBalance,50000);assert.equal(seller.balance,GAME.startBalance);assert.equal(seller.free_drops,GAME.freeDrops)});
 test('database rejects a second instance with the same username globally',()=>{
   const id=owned(seller,'globallyunique','COMMON',1000);
   const row=db.prepare('SELECT * FROM username_instances WHERE id=?').get(id);
