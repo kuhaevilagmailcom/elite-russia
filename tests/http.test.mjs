@@ -27,7 +27,7 @@ async function json(pathname,opts={}){
 test.before(async()=>{
   child=spawn(process.execPath,['server.mjs'],{
     cwd:process.cwd(),
-    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'',BOT_TOKEN:'',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
+    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'',BOT_TOKEN:'',BOT_USERNAME:'test_username_bot',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
     stdio:['ignore','pipe','pipe']
   });
   await waitForServer();
@@ -97,7 +97,7 @@ test('running server database enforces global unique username index',async()=>{
 test('HTTP admin block immediately blocks target API access',async()=>{
   await json('/api/home',{headers:headers('30002')});
   const overview=await json('/api/admin/overview',{headers:headers('10001')});
-  const target=overview.body.usersList.find(x=>String(x.telegram_id)==='30002');assert.ok(target);
+  const target=overview.body.users.find(x=>String(x.telegram_id)==='30002');assert.ok(target);
   const admin=await json('/api/admin/users/'+target.id+'/block',{method:'POST',headers:headers('10001'),body:JSON.stringify({value:true})});assert.equal(admin.r.status,200);
   const blocked=await json('/api/home',{headers:headers('30002')});assert.equal(blocked.r.status,403);assert.equal(blocked.body.error,'blocked');
 });
