@@ -11,7 +11,10 @@ export const GAME={
   marketFee:0.05,
   seasonDays:30,
   dropRateLimitMs:900,
-  wheelCooldownMs:86400000
+  wheelCooldownMs:86400000,
+  dayTimezoneOffsetMinutes:300,
+  systemSellRate:0.35,
+  storyTtlMs:86400000
 };
 export const RARITIES=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
 export const RARITY_WEIGHTS={COMMON:78,RARE:18.5,EPIC:3,LEGEND:.45,ULTRA:.05};
