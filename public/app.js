@@ -89,8 +89,9 @@ async function shareDropStory(item){
   if(typeof TG?.shareToStory!=='function'||(typeof TG?.isVersionAtLeast==='function'&&!TG.isVersionAtLeast('7.8')))throw new Error('story_unsupported');
   const dataUrl=generateStoryImage(item);
   const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
-  if(!/^https:\/\//i.test(uploaded.mediaUrl||''))throw new Error('story_https_required');
-  TG.shareToStory(uploaded.mediaUrl,{text:'Я выиграл '+item.handle+' в USERNAME'});
+  const mediaUrl=uploaded.mediaPath?new URL(uploaded.mediaPath,location.origin).href:uploaded.mediaUrl;
+  if(!/^https:\/\//i.test(mediaUrl||''))throw new Error('story_https_required');
+  TG.shareToStory(mediaUrl,{text:'Я выиграл '+item.handle+' в USERNAME'});
   haptic('medium');
 }
 function selectedDropTier(){
