@@ -5,5 +5,5 @@
   "type":"module",
   "scripts":{"start":"node server.mjs","dev":"node --watch server.mjs","test":"node --check server.mjs && node --check public/app.js && node --test tests/*.test.mjs"},
   "engines":{"node":">=20.20.0"},
-  "dependencies":{"better-sqlite3":"^11.10.0"}
+  "dependencies":{"better-sqlite3":"11.10.0"}
 }
