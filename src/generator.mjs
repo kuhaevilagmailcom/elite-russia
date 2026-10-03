@@ -48,9 +48,8 @@ export function weightedRarity(rng=randomUnit){
 }
 function prettyDigits(rng){return choice(['7','77','777','01','07','007','1','11','21','47','69','88','99'],rng)}
 function randomLetters(min=6,max=10,rng=randomUnit){
-  const consonants='bcdfghjklmnpqrstvwxyz',vowels='aeiou',len=randInt(min,max,rng);let s='';
-  for(let i=0;i<len;i++)s+=i%2===0?choice([...consonants],rng):choice([...vowels],rng);
-  if(rng()<.42){const arr=s.split(''),i=randInt(0,arr.length-1,rng);arr[i]=choice([...consonants],rng);s=arr.join('')}
+  const alphabet='abcdefghijklmnopqrstuvwxyz',len=randInt(min,max,rng);let s='';
+  for(let i=0;i<len;i++)s+=choice([...alphabet],rng);
   return s;
 }
 function normalizeGenerated(handle){
@@ -67,9 +66,9 @@ function rootForProfile(profile,rng){
 export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
   const root=rootForProfile(profile,rng),roll=rng();let handle=root;
   if(profile==='COMMON'){
-    if(roll<.30)handle=randomLetters(7,10,rng);
-    else if(roll<.54)handle=root;
-    else if(roll<.90)handle=root+randInt(1,999,rng);
+    if(roll<.22)handle=randomLetters(7,10,rng);
+    else if(roll<.30)handle=root;
+    else if(roll<.85)handle=root+randInt(1,999,rng);
     else handle=choice(PREFIXES.slice(1),rng)+root;
   }else if(profile==='RARE'){
     if(roll<.12)handle=randomLetters(6,9,rng);
