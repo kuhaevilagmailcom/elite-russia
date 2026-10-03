@@ -48,7 +48,64 @@ const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','
 function menuHtml(){return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-list">'+MENU.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b><small>'+s+'</small></span><em>›</em></button>').join('')+'</div><div class="menu-divider"></div><div class="menu-list compact">'+MENU_BOTTOM.map(([p,i,t])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b></span><em>›</em></button>').join('')+'</div></aside></div>'}
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){window.__USERNAME_READY=true;app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>'}
-function resultCard(x,pending=false){return '<div class="result-card '+String(x.rarity).toLowerCase()+'"><span class="result-kicker">USERNAME</span><h1>'+esc(x.handle)+'</h1><div class="result-meta">'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b></div><div class="result-supply">#'+x.instanceNumber+' / '+x.maxSupply+'</div>'+(pending?'<div class="result-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="ghost" data-resolve="sell" data-id="'+x.id+'">Продать за '+fmt(x.value)+'</button></div>':'')+'</div>'}
+function rarityTone(rarity){
+  return {COMMON:'#8f98a3',RARE:'#2aabee',EPIC:'#7257d8',LEGEND:'#d88b22',ULTRA:'#e34850'}[String(rarity||'').toUpperCase()]||'#8f98a3';
+}
+function resultCard(x,pending=false){
+ const rarity=String(x.rarity||'COMMON').toUpperCase();
+ return '<article class="drop-result-card '+rarity.toLowerCase()+'" style="--result-accent:'+rarityTone(rarity)+'">'+
+   '<div class="drop-result-head"><span>'+(pending?'НОВЫЙ USERNAME':'USERNAME')+'</span>'+badge(rarity)+'</div>'+
+   '<div class="drop-result-main"><small>'+(pending?'Тебе выпал':'Username')+'</small><h1>'+esc(x.handle)+'</h1><strong>'+fmt(x.value)+'</strong></div>'+
+   '<div class="drop-result-info"><div><span>Экземпляр</span><b>#'+x.instanceNumber+' / '+x.maxSupply+'</b></div><div><span>Редкость</span><b>'+rarity+'</b></div></div>'+
+   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b><small>Готовая картинка для Telegram Stories</small></span></button></div>':'')+
+ '</article>';
+}
+function storyRoundRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+}
+function storyFitFont(ctx,text,maxWidth,startSize,minSize=50,weight=800){
+  let size=startSize;while(size>minSize){ctx.font=weight+' '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';if(ctx.measureText(text).width<=maxWidth)break;size-=4}return size;
+}
+function generateStoryImage(item){
+  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;const ctx=canvas.getContext('2d'),accent=rarityTone(item.rarity),handle=String(item.handle||'@username');
+  const bg=ctx.createLinearGradient(0,0,1080,1920);bg.addColorStop(0,'#0b0d11');bg.addColorStop(.58,'#11151b');bg.addColorStop(1,'#090b0f');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);
+  const glow=ctx.createRadialGradient(540,640,40,540,640,700);glow.addColorStop(0,accent+'55');glow.addColorStop(.45,accent+'18');glow.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,1080,1400);
+  ctx.fillStyle='#ffffff';ctx.font='800 46px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,115);
+  ctx.fillStyle='#9299a3';ctx.font='650 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,162);
+  ctx.fillStyle='#ffffff';ctx.font='800 64px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Я ВЫИГРАЛ',72,350);
+  ctx.fillStyle='#b8bec7';ctx.font='550 36px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('новый username',72,405);
+  ctx.fillStyle='rgba(255,255,255,.055)';storyRoundRect(ctx,60,490,960,790,44);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=2;storyRoundRect(ctx,60,490,960,790,44);ctx.stroke();
+  ctx.fillStyle=accent;storyRoundRect(ctx,94,538,150,48,24);ctx.fill();ctx.fillStyle='#ffffff';ctx.font='800 23px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText(String(item.rarity||'COMMON').toUpperCase(),169,570);ctx.textAlign='left';
+  ctx.fillStyle='#ffffff';const handleSize=storyFitFont(ctx,handle,890,126,62,900);ctx.font='900 '+handleSize+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,94,790);
+  ctx.fillStyle='#aab1bb';ctx.font='650 29px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ОЦЕНКА',94,890);
+  ctx.fillStyle='#ffffff';ctx.font='850 72px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(fmt(item.value),94,975);
+  ctx.fillStyle='#737c88';ctx.font='600 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ЭКЗЕМПЛЯР',94,1085);
+  ctx.fillStyle='#d9dde2';ctx.font='750 33px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('#'+item.instanceNumber+' / '+item.maxSupply,94,1132);
+  ctx.fillStyle='rgba(255,255,255,.08)';storyRoundRect(ctx,72,1445,936,184,34);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.font='800 37px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('СМОЖЕШЬ ВЫБИТЬ ЛУЧШЕ?',108,1520);
+  ctx.fillStyle='#9ba3ae';ctx.font='550 29px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Открывай USERNAME и попробуй свой дроп',108,1574);
+  ctx.fillStyle=accent;ctx.fillRect(72,1750,86,6);ctx.fillStyle='#ffffff';ctx.font='750 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1814);
+  ctx.fillStyle='#79818c';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('telegram mini app',72,1855);
+  return canvas.toDataURL('image/jpeg',.92);
+}
+async function shareDropStory(item){
+  if(!item)return;
+  const dataUrl=generateStoryImage(item);
+  toast('Готовлю историю…');
+  const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
+  const caption='Я выиграл '+item.handle+' в USERNAME';
+  if(typeof TG?.shareToStory==='function'){
+    TG.shareToStory(uploaded.mediaUrl,{text:caption});
+    haptic('medium');return;
+  }
+  const blob=await (await fetch(dataUrl)).blob();
+  const file=new File([blob],String(item.handle||'username').replace('@','')+'-username.jpg',{type:'image/jpeg'});
+  if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({files:[file],text:caption,title:'USERNAME'});return}
+  if(typeof TG?.downloadFile==='function'){TG.downloadFile({url:uploaded.mediaUrl,file_name:file.name});toast('Telegram не поддерживает Stories — картинка сохранена');return}
+  window.open(uploaded.mediaUrl,'_blank','noopener');toast('Открываю картинку');
+}
+
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
   return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$2K',cost:2000};
@@ -183,6 +240,13 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
  if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
+ if(el.dataset.shareStory){
+   const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
+   if(!item){toast('Username уже недоступен для истории');return}
+   el.disabled=true;
+   try{await shareDropStory(item)}finally{el.disabled=false}
+   return
+ }
  if(el.dataset.resolve){state.busy=true;await api('/api/drop/'+el.dataset.id+'/resolve',{method:'POST',body:JSON.stringify({action:el.dataset.resolve})});toast(el.dataset.resolve==='keep'?'Добавлено в коллекцию':'Username продан');state.busy=false;await load('home');return}
  if(el.dataset.rarity){state.filters.rarity=el.dataset.rarity;state.filters.page=1;await load('collection');return}
  if(el.dataset.marketRarity){state.marketFilters.rarity=el.dataset.marketRarity;state.marketFilters.page=1;await load('market');return}
