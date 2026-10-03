@@ -15,7 +15,7 @@ const ERR={
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранные usernames недоступны',upgrade_bad_recipe:'Неверный набор для апгрейда',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',network:'Нет соединения с сервером'
 };
 function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
@@ -34,7 +34,7 @@ friends:'<circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.4"/><path d="
 gift:'<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M12 9v11M4 13h16"/><path d="M12 9c-4-1-5-3-3-4 1.7-.8 3 1 3 4Zm0 0c4-1 5-3 3-4-1.7-.8-3 1-3 4Z"/>',
 upgrade:'<path d="M12 20V7M7 12l5-5 5 5"/><path d="M5 4h14"/>',season:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M12 13v5M8 21h8"/>',
 collection:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
-profile:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',premium:'<path d="m12 3 3 5 6 1-4 4 .8 6L12 16l-5.8 3L7 13 3 9l6-1 3-5Z"/>'
+profile:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',premium:'<path d="m12 3 3 5 6 1-4 4 .8 6L12 16l-5.8 3L7 13 3 9l6-1 3-5Z"/>',story:'<path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M5 12v7h14v-7"/>'
 };
 function icon(k){return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(ICON[k]||ICON.menu)+'</svg>'}
 function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
@@ -58,7 +58,7 @@ function rarityTone(rarity){
 function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result">'+
    '<div class="drop-result-main minimal"><h1>'+esc(x.handle)+'</h1></div>'+
-   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.sellValue??x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b></span></button></div>':'')+
+   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.sellValue??x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){
@@ -68,38 +68,30 @@ function storyFitFont(ctx,text,maxWidth,startSize,minSize=50,weight=800){
   let size=startSize;while(size>minSize){ctx.font=weight+' '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';if(ctx.measureText(text).width<=maxWidth)break;size-=4}return size;
 }
 function generateStoryImage(item){
-  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;const ctx=canvas.getContext('2d'),accent=rarityTone(item.rarity),handle=String(item.handle||'@username');
-  const bg=ctx.createLinearGradient(0,0,1080,1920);bg.addColorStop(0,'#0b0d11');bg.addColorStop(.58,'#11151b');bg.addColorStop(1,'#090b0f');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);
-  const glow=ctx.createRadialGradient(540,640,40,540,640,700);glow.addColorStop(0,accent+'55');glow.addColorStop(.45,accent+'18');glow.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,1080,1400);
-  ctx.fillStyle='#ffffff';ctx.font='800 46px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,115);
-  ctx.fillStyle='#9299a3';ctx.font='650 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,162);
-  ctx.fillStyle='#ffffff';ctx.font='800 64px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Я ВЫИГРАЛ',72,350);
-  ctx.fillStyle='#b8bec7';ctx.font='550 36px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('новый username',72,405);
-  ctx.fillStyle='rgba(255,255,255,.055)';storyRoundRect(ctx,60,490,960,790,44);ctx.fill();
-  ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=2;storyRoundRect(ctx,60,490,960,790,44);ctx.stroke();
-  ctx.fillStyle=accent;storyRoundRect(ctx,94,538,150,48,24);ctx.fill();ctx.fillStyle='#ffffff';ctx.font='800 23px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText(String(item.rarity||'COMMON').toUpperCase(),169,570);ctx.textAlign='left';
-  ctx.fillStyle='#ffffff';const handleSize=storyFitFont(ctx,handle,890,126,62,900);ctx.font='900 '+handleSize+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,94,790);
-  ctx.fillStyle='#aab1bb';ctx.font='650 29px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ОЦЕНКА',94,890);
-  ctx.fillStyle='#ffffff';ctx.font='850 72px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(fmt(item.value),94,975);
-  ctx.fillStyle='#737c88';ctx.font='600 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ЭКЗЕМПЛЯР',94,1085);
-  ctx.fillStyle='#d9dde2';ctx.font='750 33px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('#'+item.instanceNumber+' / '+item.maxSupply,94,1132);
-  ctx.fillStyle='rgba(255,255,255,.08)';storyRoundRect(ctx,72,1445,936,184,34);ctx.fill();
-  ctx.fillStyle='#ffffff';ctx.font='800 37px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('СМОЖЕШЬ ВЫБИТЬ ЛУЧШЕ?',108,1520);
-  ctx.fillStyle='#9ba3ae';ctx.font='550 29px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Открывай USERNAME и попробуй свой дроп',108,1574);
-  ctx.fillStyle=accent;ctx.fillRect(72,1750,86,6);ctx.fillStyle='#ffffff';ctx.font='750 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1814);
-  ctx.fillStyle='#79818c';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('telegram mini app',72,1855);
+  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;
+  const ctx=canvas.getContext('2d'),handle=String(item.handle||'@username');
+  const bg=ctx.createLinearGradient(0,0,0,1920);bg.addColorStop(0,'#f4f5f7');bg.addColorStop(1,'#e8ebef');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);
+  ctx.fillStyle='#111318';ctx.font='900 52px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,118);
+  ctx.fillStyle='#68717d';ctx.font='600 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,166);
+  ctx.fillStyle='#ffffff';storyRoundRect(ctx,60,280,960,1120,44);ctx.fill();
+  ctx.strokeStyle='#dde1e5';ctx.lineWidth=2;storyRoundRect(ctx,60,280,960,1120,44);ctx.stroke();
+  ctx.fillStyle='#68717d';ctx.font='750 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('Я ВЫИГРАЛ USERNAME',540,455);
+  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,820);
+  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,205,1010,670,100,28);ctx.fill();
+  ctx.fillStyle='#111318';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ЗАХОДИ В USERNAME',540,1073);
+  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Попробуй выбить свой уникальный username',540,1170);
+  ctx.textAlign='left';ctx.fillStyle='#111318';ctx.font='800 34px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1770);
+  ctx.fillStyle='#69727d';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Каждый username существует в игре только один раз',72,1815);
   return canvas.toDataURL('image/jpeg',.92);
-}
-function openStoryFallback(item,mediaUrl){
- const root=document.createElement('div');root.className='modal-root story-fallback-root';
- root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal story-fallback-modal"><div class="modal-head"><b>История готова</b><button data-modal-close>'+icon('close')+'</button></div><div class="story-fallback-preview"><img src="'+esc(mediaUrl)+'" alt="USERNAME story"></div><div class="story-fallback-actions"><button class="primary" data-story-native="'+esc(mediaUrl)+'" data-story-caption="'+esc('Я выиграл '+item.handle+' в USERNAME')+'">В Telegram Stories</button><button data-story-open="'+esc(mediaUrl)+'">Открыть картинку</button></div><small>Сначала показываем превью. Если Telegram Stories недоступны на устройстве, открой картинку и добавь её вручную.</small></div>';
- document.body.appendChild(root);
 }
 async function shareDropStory(item){
   if(!item)return;
-  const dataUrl=generateStoryImage(item);toast('Готовлю историю…');
+  if(typeof TG?.shareToStory!=='function'||(typeof TG?.isVersionAtLeast==='function'&&!TG.isVersionAtLeast('7.8')))throw new Error('story_unsupported');
+  const dataUrl=generateStoryImage(item);
   const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
-  openStoryFallback(item,uploaded.mediaUrl);haptic('light');
+  if(!/^https:\/\//i.test(uploaded.mediaUrl||''))throw new Error('story_https_required');
+  TG.shareToStory(uploaded.mediaUrl,{text:'Я выиграл '+item.handle+' в USERNAME'});
+  haptic('medium');
 }
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
@@ -135,7 +127,7 @@ function wheelGeometry(items){
  return {rows,background:'conic-gradient('+segments.join(',')+')'};
 }
 function wheelView(){
- const w=state.wheel,items=(w.rewards||[]),short={'nc500':'$500','nc1000':'$1K','xp50':'50 XP','nc2500':'$2.5K','drop1':'FREE DROP','nc5000':'$5K'},g=wheelGeometry(items);
+ const w=state.wheel,items=(w.rewards||[]),short={'cash100':'$100','cash250':'$250','xp25':'25 XP','cash500':'$500','drop1':'FREE DROP','cash1500':'$1.5K'},g=wheelGeometry(items);
  return '<div class="wheel-page"><div class="daily-wheel-shell"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+g.rows.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(short[x.key]||x.label)+'</span>').join('')+'<div class="daily-wheel-core"><b>DAILY</b><span>USERNAME</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Ежедневное вращение доступно':'Колесо уже использовано')+'</b><span>'+(w.available?'Одно бесплатное вращение каждые 24 часа.':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
 }
 function friendsView(){const f=state.friends;return '<div class="page-body"><section class="ref-card"><span>Ваша ссылка</span><div><input id="refLink" readonly value="'+esc(f.referralLink||'Ссылка временно недоступна')+'"><button data-copy-ref>Копировать</button></div></section><div class="home-metrics">'+metric('Приглашено',f.invited)+metric('Активных',f.active)+metric('Наград',f.rewards.length)+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласите первого друга.</div>')+'</div></div>'}
@@ -234,6 +226,22 @@ async function animateUpgradeWheel(result){
  state.upgrader=await api('/api/upgrader');
  render();
 }
+function applyUserLocal(user){
+  if(!user)return;state.user=user;if(state.home)state.home.user=user;
+}
+function removeCollectionLocal(id){
+  if(!state.collection)return;
+  const before=state.collection.items.length;state.collection.items=state.collection.items.filter(x=>String(x.id)!==String(id));
+  if(state.collection.items.length!==before)state.collection.total=Math.max(0,(state.collection.total||0)-1);
+}
+function removeGiftLocal(id){
+  if(state.gift?.items)state.gift.items=state.gift.items.filter(x=>String(x.id)!==String(id));
+}
+function removeMarketLocal(id){
+  if(!state.market)return;
+  const before=state.market.items.length;state.market.items=state.market.items.filter(x=>String(x.id)!==String(id));
+  if(state.market.items.length!==before)state.market.total=Math.max(0,(state.market.total||0)-1);
+}
 document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){state.menu=false;render();return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
  if(el.hasAttribute('data-menu-open')){state.menu=true;render();return}
  if(el.hasAttribute('data-menu-close')){state.menu=false;render();return}
@@ -241,11 +249,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
  if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
- if(el.dataset.storyNative){
-   try{if(typeof TG?.shareToStory==='function'){TG.shareToStory(el.dataset.storyNative,{text:el.dataset.storyCaption||''});haptic('medium');return}}catch{}
-   if(typeof TG?.openLink==='function')TG.openLink(el.dataset.storyNative,{try_instant_view:false});else window.open(el.dataset.storyNative,'_blank','noopener');return
- }
- if(el.dataset.storyOpen){if(typeof TG?.openLink==='function')TG.openLink(el.dataset.storyOpen,{try_instant_view:false});else window.open(el.dataset.storyOpen,'_blank','noopener');return}
  if(el.dataset.storyCopy){try{await navigator.clipboard.writeText(el.dataset.storyCopy);toast('Ссылка скопирована')}catch{toast('Не удалось скопировать')}return}
  if(el.dataset.shareStory){
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
@@ -254,13 +257,17 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    try{await shareDropStory(item)}finally{el.disabled=false}
    return
  }
- if(el.dataset.resolve){state.busy=true;await api('/api/drop/'+el.dataset.id+'/resolve',{method:'POST',body:JSON.stringify({action:el.dataset.resolve})});toast(el.dataset.resolve==='keep'?'Добавлено в коллекцию':'Username продан');state.busy=false;await load('home');return}
+ if(el.dataset.resolve){
+   state.busy=true;const action=el.dataset.resolve,r=await api('/api/drop/'+el.dataset.id+'/resolve',{method:'POST',body:JSON.stringify({action})});
+   applyUserLocal(r.user);if(state.home){state.home.pending=null;state.home.last=r.instance}
+   toast(action==='keep'?'Добавлено в коллекцию':'Username продан');state.busy=false;render();return
+ }
  if(el.dataset.rarity){state.filters.rarity=el.dataset.rarity;state.filters.page=1;await load('collection');return}
  if(el.dataset.marketRarity){state.marketFilters.rarity=el.dataset.marketRarity;state.marketFilters.page=1;await load('market');return}
  if(el.dataset.pager){const d=Number(el.dataset.dir);if(el.dataset.pager==='collection'){state.filters.page+=d;await load('collection')}if(el.dataset.pager==='market'){state.marketFilters.page+=d;await load('market')}if(el.dataset.pager==='rank'){state.rankPage+=d;render()}return}
  if(el.hasAttribute('data-market-search')){state.marketFilters.q=document.querySelector('#marketQuery')?.value||'';state.marketFilters.page=1;await load('market');return}
- if(el.dataset.marketBuy){const r=await api('/api/market/'+el.dataset.marketBuy+'/buy',{method:'POST'});toast('Куплено '+r.handle);await refreshUser();await load('market');return}
- if(el.dataset.marketCancel){await api('/api/market/'+el.dataset.marketCancel+'/cancel',{method:'POST'});toast('Лот снят');await load('market');return}
+ if(el.dataset.marketBuy){const id=el.dataset.marketBuy,r=await api('/api/market/'+id+'/buy',{method:'POST'});removeMarketLocal(id);toast('Куплено '+r.handle);await refreshUser();render();return}
+ if(el.dataset.marketCancel){const id=el.dataset.marketCancel;await api('/api/market/'+id+'/cancel',{method:'POST'});removeMarketLocal(id);toast('Лот снят');render();return}
  if(el.dataset.mode){state.rankMode=el.dataset.mode;if(state.rankMode==='capital')state.rankPeriod='all';state.rankPage=1;await load('top');return}
  if(el.dataset.period){state.rankPeriod=el.dataset.period;state.rankPage=1;await load('top');return}
  if(el.dataset.claim){const r=await api('/api/tasks/'+el.dataset.claim+'/claim',{method:'POST'});toast('+'+fmt(r.reward));await refreshUser();await load('tasks');return}
@@ -268,13 +275,21 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
  if(el.dataset.showcase){await api('/api/showcase/'+el.dataset.showcase,{method:'POST'});toast('Добавлено на витрину');return}
  if(el.dataset.sellSystem){openSystemSellModal(el.dataset.sellSystem,el.dataset.handle,Number(el.dataset.value));return}
- if(el.dataset.confirmSystemSell){const r=await api('/api/collection/'+el.dataset.confirmSystemSell+'/sell',{method:'POST'});closeModal(el);state.user=r.user;toast(r.handle+' продан за '+fmt(r.sellValue??r.value));await load('collection');return}
+ if(el.dataset.confirmSystemSell){
+   const id=el.dataset.confirmSystemSell,r=await api('/api/collection/'+id+'/sell',{method:'POST'});
+   closeModal(el);applyUserLocal(r.user);removeCollectionLocal(id);removeGiftLocal(id);toast(r.handle+' продан за '+fmt(r.sellValue??r.value));
+   if(state.page==='detail'){state.page='collection';state.detail=null}render();return
+ }
  if(el.dataset.listMarket){openMarketModal(el.dataset.listMarket,el.dataset.handle,Number(el.dataset.value));return}
- if(el.dataset.createListing){const root=el.closest('.modal-root'),price=Number(root.querySelector('#listingPrice').value);await api('/api/market',{method:'POST',body:JSON.stringify({instanceId:el.dataset.createListing,price})});closeModal(el);toast('Лот опубликован');await load('collection');return}
+ if(el.dataset.createListing){
+   const id=el.dataset.createListing,root=el.closest('.modal-root'),price=Number(root.querySelector('#listingPrice').value);
+   await api('/api/market',{method:'POST',body:JSON.stringify({instanceId:id,price})});closeModal(el);removeCollectionLocal(id);removeGiftLocal(id);toast('Лот опубликован');
+   if(state.page==='detail'){state.page='collection';state.detail=null}render();return
+ }
  if(el.hasAttribute('data-modal-close')){closeModal(el);return}
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
  if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка временно недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
- if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});toast(r.handle+' отправлен пользователю '+r.recipient);await load('gift');return}
+ if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem,ids=[...(state.upgradeSelectedIds||[])],i=ids.indexOf(id);
    if(i>=0)ids.splice(i,1);else{if(ids.length>=(state.upgrader?.maxItems||5)){toast('Можно выбрать максимум 5 usernames');return}ids.push(id)}

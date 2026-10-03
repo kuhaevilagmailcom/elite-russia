@@ -89,3 +89,15 @@ button{min-height:44px}
 .top-actions button,.top-back,.menu-head button{min-width:44px;min-height:44px}
 .chips button,.mode-tabs button,.period-tabs button{min-height:44px}
 .market-card button,.task button,.pager button,.friend-row button,.detail-actions button,.story-fallback-actions button{min-height:44px}
+
+/* USERNAME 3.0 — compact result actions and zero-flash interactions */
+.drop-result-actions.compact-actions{display:grid;grid-template-columns:1fr 1.35fr 48px;gap:7px;margin-top:0}
+.drop-result-actions.compact-actions>button{height:48px;min-height:48px;border-radius:12px;font-size:12px;font-weight:700}
+.drop-result-actions.compact-actions>button:not(.secondary):not(.story-icon-btn){background:#111318;color:#fff}
+.drop-result-actions.compact-actions .secondary{background:#eef0f2;color:#181b20}
+.story-icon-btn{width:48px;padding:0;background:#eaf6fd;color:#168fc9;border:1px solid rgba(42,171,238,.17);display:grid;place-items:center}
+.story-icon-btn .ico{width:22px;height:22px}
+.story-icon-btn:disabled{opacity:.5}
+.drop-result-main.minimal{flex:1;display:grid;place-items:center;min-height:120px}
+.drop-result-card.minimal-result{transition:none;animation:none}
+@media(max-width:370px){.drop-result-actions.compact-actions{grid-template-columns:.85fr 1.3fr 46px}.drop-result-actions.compact-actions>button{font-size:11px;padding:0 7px}.story-icon-btn{width:46px}}
