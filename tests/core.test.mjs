@@ -162,9 +162,6 @@ test('expired season is finalized and a new one starts',()=>{
   assert.ok(db.prepare('SELECT COUNT(*) c FROM season_rewards WHERE user_id=? AND season_id=?').get(seller.id,old.id).c>0);
 });
 
-test('leaderboard includes market assets and capital ignores fake period',()=>{
-  const rows=leaderboard(db,'capital','week');assert.ok(rows.length>=3);
-});
 test('daily task key uses configured UTC+5 day',()=>{const expected=new Date(Date.now()+300*60000).toISOString().slice(0,10);assert.equal(todayKey(),expected)});
 test('market search is prefix-based',()=>{const u=ensureUser(db,{id:20007,username:'search',first_name:'Search'}),id=owned(u,'prefixfind','RARE',900);createListing(db,u,id,1200);assert.ok(listMarket(db,{q:'prefix'}).items.some(x=>x.handle.includes('prefix')));assert.equal(listMarket(db,{q:'fix'}).items.some(x=>x.handle.includes('prefix')),false)});
 test('username actions update locally instead of reloading screens',()=>{
@@ -173,6 +170,35 @@ test('username actions update locally instead of reloading screens',()=>{
   const listing=appSrc.match(/if\(el\.dataset\.createListing\)\{[\s\S]*?\n \}/)?.[0]||'';
   assert.doesNotMatch(resolve,/load\(/);assert.doesNotMatch(sell,/load\(/);assert.doesNotMatch(listing,/load\(/);
   assert.match(appSrc,/removeCollectionLocal/);
+});
+test('leaderboard is a single total-capital ranking',()=>{
+  const a=ensureUser(db,{id:21001,username:'rankA',first_name:'Rank A'});
+  const b=ensureUser(db,{id:21002,username:'rankB',first_name:'Rank B'});
+  db.prepare('UPDATE users SET balance=? WHERE id=?').run(5000,a.id);
+  db.prepare('UPDATE users SET balance=? WHERE id=?').run(1000,b.id);
+  owned(a,'rankassetA','COMMON',1000);
+  owned(b,'rankassetB','COMMON',9000);
+  const rows=leaderboard(db),ra=rows.find(x=>x.id===a.id),rb=rows.find(x=>x.id===b.id);
+  assert.equal(ra.capital,6000);
+  assert.equal(rb.capital,10000);
+  assert.ok(rb.position<ra.position);
+});
+test('leaderboard counts pending and market usernames as assets',()=>{
+  const u=ensureUser(db,{id:21003,username:'rankC',first_name:'Rank C'});
+  db.prepare('UPDATE users SET balance=? WHERE id=?').run(2000,u.id);
+  const pending=owned(u,'rankpending','COMMON',3000);
+  db.prepare("UPDATE username_instances SET status='pending' WHERE id=?").run(pending);
+  const market=owned(u,'rankmarket','COMMON',4000);
+  db.prepare("UPDATE username_instances SET status='market' WHERE id=?").run(market);
+  const row=leaderboard(db).find(x=>x.id===u.id);
+  assert.equal(row.capital,9000);
+  assert.equal(row.username_value,7000);
+});
+test('leaderboard UI has no separate modes or periods',()=>{
+  const m=appSrc.match(/function topView\(\)\{[\s\S]*?\n\}/);assert.ok(m);
+  assert.match(m[0],/Общий капитал/);
+  assert.match(m[0],/r\.capital/);
+  assert.doesNotMatch(m[0],/mode-tabs|period-tabs|rankMode|rankPeriod/);
 });
 test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});
