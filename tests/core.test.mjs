@@ -217,7 +217,7 @@ test('leaderboard counts pending and market usernames as assets',()=>{
 });
 test('leaderboard UI has no separate modes or periods',()=>{
   const m=appSrc.match(/function topView\(\)\{[\s\S]*?\n\}/);assert.ok(m);
-  assert.match(m[0],/Общий капитал/);
+  assert.match(m[0],/ОБЩИЙ КАПИТАЛ/i);
   assert.match(m[0],/r\.capital/);
   assert.doesNotMatch(m[0],/mode-tabs|period-tabs|rankMode|rankPeriod/);
 });
