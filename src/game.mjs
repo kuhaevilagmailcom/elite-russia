@@ -1,5 +1,5 @@
 import {GAME,DROP_TIERS,RARITIES} from './config.mjs';
-import {buildGeneratedHandle,generatedSupply,isValidHandle,scoreHandle} from './generator.mjs';
+import {buildGeneratedHandle,isValidHandle,scoreHandle,rarityFromValue} from './generator.mjs';
 import {
   uid,nowIso,todayKey,txBalance,bumpTask,bumpSeasonScore,activeSeason,premiumActive,collectionLimit,
   activeCollectionCount,assetStats,systemSellValue,compactShowcase,randomUnit
@@ -22,9 +22,9 @@ export function ensureUser(db,tg){
 }
 function findPending(db,userId){return db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status='pending' ORDER BY obtained_at DESC LIMIT 1").get(userId)}
 function normalizeTier(key){return DROP_TIERS[key]||DROP_TIERS.basic}
-function weightedTierRarity(tier,rng=randomUnit){
+function weightedTierProfile(tier,rng=randomUnit){
   const x=rng()*100;let sum=0;
-  for(const rarity of RARITIES){sum+=Number(tier.weights[rarity]||0);if(x<sum)return rarity}
+  for(const profile of RARITIES){sum+=Number(tier.weights[profile]||0);if(x<sum)return profile}
   return 'COMMON';
 }
 function handleUnavailable(db,handle){
@@ -32,30 +32,34 @@ function handleUnavailable(db,handle){
   return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
 }
 function pickTemplate(db,tierKey='basic',rng=randomUnit){
-  const tier=normalizeTier(tierKey),rarity=weightedTierRarity(tier,rng),now=nowIso();
+  const tier=normalizeTier(tierKey),profile=weightedTierProfile(tier,rng),now=nowIso();
   if(rng()<.18){
     const eventPool=db.prepare(`SELECT t.* FROM event_templates et
       JOIN events e ON e.id=et.event_id
       JOIN username_templates t ON t.id=et.template_id
       WHERE e.active=1 AND e.start_at<=? AND e.end_at>=? AND t.active=1 AND t.rarity=? AND t.current_supply<t.max_supply
-      LIMIT 200`).all(now,now,rarity);
+      LIMIT 200`).all(now,now,profile);
     const availableEvents=eventPool.filter(x=>!handleUnavailable(db,x.handle));if(availableEvents.length)return availableEvents[Math.floor(rng()*availableEvents.length)];
   }
-  const specialChance={COMMON:.01,RARE:.03,EPIC:.12,LEGEND:.35,ULTRA:.7}[rarity]||0;
+  const specialChance={COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0;
   if(rng()<specialChance){
-    const specials=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200').all(rarity);
+    const specials=db.prepare('SELECT * FROM username_templates WHERE special=1 AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200').all(profile);
     const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
   for(let i=0;i<50;i++){
-    const handle=buildGeneratedHandle(rarity);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
+    const handle=buildGeneratedHandle(profile,rng);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
-      const supply=1,base=scoreHandle(handle,rarity,1,1);
+      const supply=1,base=scoreHandle(handle),rarity=rarityFromValue(base);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)')
         .run(handle,rarity,base,supply,'generated',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
-    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle))return t;
+    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle)){
+      const base=t.special?t.base_value:scoreHandle(t.handle),rarity=rarityFromValue(base);
+      if(t.base_value!==base||t.rarity!==rarity){db.prepare('UPDATE username_templates SET base_value=?,rarity=?,max_supply=1 WHERE id=?').run(base,rarity,t.id);t={...t,base_value:base,rarity,max_supply:1}}
+      return t;
+    }
   }
   throw new Error('no_username_available');
 }
@@ -104,15 +108,16 @@ export function createDrop(db,user,requestId,tierKey='basic'){
     else db.prepare('UPDATE users SET free_drops=free_drops-1 WHERE id=?').run(user.id);
     const changed=db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(template.id).changes;
     if(!changed)throw new Error('sold_out');
-    const value=template.special?template.base_value:scoreHandle(template.handle,template.rarity,1,1);
+    const value=template.special?template.base_value:scoreHandle(template.handle),rarity=rarityFromValue(value);
+    if(template.rarity!==rarity||template.base_value!==value)db.prepare('UPDATE username_templates SET rarity=?,base_value=?,max_supply=1 WHERE id=?').run(rarity,value,template.id);
     const instanceId=uid(),season=activeSeason(db);
     db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(instanceId,template.id,template.handle,template.rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null);
+      .run(instanceId,template.id,template.handle,rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null);
     db.prepare('INSERT INTO drop_requests(request_id,user_id,instance_id,cost,tier,created_at) VALUES(?,?,?,?,?,?)').run(requestId,user.id,instanceId,cost,effectiveTier,nowIso());
-    db.prepare('INSERT INTO drop_history(id,user_id,instance_id,handle,rarity,value,action,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,instanceId,template.handle,template.rarity,value,'pending',nowIso());
+    db.prepare('INSERT INTO drop_history(id,user_id,instance_id,handle,rarity,value,action,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,instanceId,template.handle,rarity,value,'pending',nowIso());
     db.prepare('UPDATE users SET xp=xp+15 WHERE id=?').run(user.id);
     bumpTask(db,user.id,'drop',1);bumpSeasonScore(db,user.id,15);
-    if(['RARE','EPIC','LEGEND','ULTRA'].includes(template.rarity))bumpTask(db,user.id,'rare',1);
+    if(['RARE','EPIC','LEGEND','ULTRA'].includes(rarity))bumpTask(db,user.id,'rare',1);
     if(!/\d/.test(template.handle))bumpTask(db,user.id,'nodigits',1);
     return {instanceId,effectiveTier,cost};
   })();
