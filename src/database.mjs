@@ -2,12 +2,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import {GAME} from './config.mjs';
-import {SPECIALS,stableScoreHandle} from './generator.mjs';
+import {SPECIALS,stableScoreHandle,rarityFromValue} from './generator.mjs';
 
 export function createDatabase(dataDir){
   fs.mkdirSync(dataDir,{recursive:true});
-  const db=new Database(path.join(dataDir,'username.sqlite'));
+  const dbPath=path.join(dataDir,'username.sqlite'),existed=fs.existsSync(dbPath);
+  const db=new Database(dbPath);
   db.pragma('journal_mode = WAL');db.pragma('foreign_keys = ON');db.pragma('busy_timeout = 3000');
+  if(existed){
+    const backupDir=path.join(dataDir,'backups');fs.mkdirSync(backupDir,{recursive:true});
+    const stamp=new Date().toISOString().slice(0,10),backupPath=path.join(backupDir,'pre-migration-'+stamp+'.sqlite');
+    if(!fs.existsSync(backupPath)){
+      const escaped=backupPath.replace(/'/g,"''");
+      db.exec("VACUUM INTO '"+escaped+"'");
+    }
+  }
   db.exec(`
   CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id TEXT UNIQUE NOT NULL, username TEXT, first_name TEXT,
@@ -68,6 +77,7 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,start_at TEXT NOT NULL,end_at TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
   CREATE TABLE IF NOT EXISTS event_templates(event_id INTEGER NOT NULL,template_id INTEGER NOT NULL,PRIMARY KEY(event_id,template_id));
   CREATE INDEX IF NOT EXISTS idx_instances_owner ON username_instances(owner_id,status,obtained_at);
+  CREATE INDEX IF NOT EXISTS idx_instances_owner_status_value ON username_instances(owner_id,status,value DESC);
   CREATE INDEX IF NOT EXISTS idx_drop_user ON drop_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_tx_user ON balance_transactions(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_market_status ON market_listings(status,created_at);
@@ -175,5 +185,31 @@ export function createDatabase(dataDir){
   }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_instances_handle_unique ON username_instances(handle)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_upgrade_target_active ON upgrade_sessions(target_handle,used_at,expires_at)');
+
+  const valueRarityV31=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('3.1.0-value-rarity');
+  if(!valueRarityV31){
+    const specials=new Map(SPECIALS.map(x=>[x[0],x]));
+    db.transaction(()=>{
+      const templates=db.prepare('SELECT id,handle,special FROM username_templates').all();
+      const updTemplate=db.prepare('UPDATE username_templates SET rarity=?,base_value=?,max_supply=1,current_supply=? WHERE id=?');
+      for(const t of templates){
+        const sp=specials.get(t.handle),value=sp?Number(sp[2]):stableScoreHandle(t.handle),rarity=rarityFromValue(value);
+        const exists=db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle);
+        updTemplate.run(rarity,value,exists?1:0,t.id);
+      }
+      const instances=db.prepare('SELECT id,handle FROM username_instances').all();
+      const updInstance=db.prepare('UPDATE username_instances SET rarity=?,value=?,instance_number=1,max_supply=1 WHERE id=?');
+      const updHistory=db.prepare('UPDATE drop_history SET rarity=?,value=?,handle=? WHERE instance_id=?');
+      for(const row of instances){
+        const sp=specials.get(row.handle),value=sp?Number(sp[2]):stableScoreHandle(row.handle),rarity=rarityFromValue(value);
+        updInstance.run(rarity,value,row.id);
+        updHistory.run(rarity,value,row.handle,row.id);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('3.1.0-value-rarity',now);
+    })();
+  }
+
+  const integrity=db.pragma('integrity_check',{simple:true});
+  if(String(integrity).toLowerCase()!=='ok')throw new Error('sqlite_integrity_check_failed:'+integrity);
   return db;
 }
