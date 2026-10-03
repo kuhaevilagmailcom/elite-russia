@@ -52,6 +52,15 @@ function randomLetters(min=6,max=10,rng=randomUnit){
   for(let i=0;i<len;i++)s+=choice([...alphabet],rng);
   return s;
 }
+function randomPronounceable(min=4,max=8,rng=randomUnit){
+  const consonants='bcdfghjklmnpqrstvwxyz',vowels='aeiou',len=randInt(min,max,rng);let s='';
+  const startsWithConsonant=rng()<.72;
+  for(let i=0;i<len;i++){
+    const consonant=(i%2===0)===startsWithConsonant;
+    s+=choice([...(consonant?consonants:vowels)],rng);
+  }
+  return s;
+}
 function normalizeGenerated(handle){
   let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,10);
   if(h.length<4)h=(h+'name').slice(0,4);
@@ -71,20 +80,23 @@ export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
     else if(roll<.85)handle=root+randInt(1,999,rng);
     else handle=choice(PREFIXES.slice(1),rng)+root;
   }else if(profile==='RARE'){
-    if(roll<.12)handle=randomLetters(6,9,rng);
-    else if(roll<.64)handle=root;
-    else if(roll<.88)handle=root+prettyDigits(rng);
+    if(roll<.24)handle=randomPronounceable(7,8,rng);
+    else if(roll<.54)handle=root;
+    else if(roll<.88)handle=root+randInt(1,99,rng);
     else handle=choice(PREFIXES.slice(1,3),rng)+root;
   }else if(profile==='EPIC'){
-    handle=roll<.80?root:(roll<.95?root+choice(['7','77','x'],rng):choice(PREFIXES.slice(1,3),rng)+root);
+    if(roll<.38)handle=randomPronounceable(6,6,rng);
+    else if(roll<.86)handle=root;
+    else handle=root+choice(['7','77','x'],rng);
   }else if(profile==='LEGEND'){
-    handle=roll<.94?root:root+choice(['7','x'],rng);
+    if(roll<.48)handle=randomPronounceable(5,5,rng);
+    else if(roll<.95)handle=root;
+    else handle=root+'7';
   }else{
-    handle=root;
+    handle=roll<.52?randomPronounceable(4,4,rng):root;
   }
   return normalizeGenerated(handle);
 }
-
 const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,10}$/.test(x)));
 export function wordQuality(handle){
   const h=String(handle||'').toLowerCase(),letters=h.replace(/[^a-z]/g,'');
@@ -92,6 +104,7 @@ export function wordQuality(handle){
   if(WORD_SET.has(letters)&&/^[a-z]+\d{1,3}$/.test(h))return .72;
   if(WORD_SET.has(letters))return .62;
   const vowelRatio=(letters.match(/[aeiou]/g)||[]).length/Math.max(1,letters.length),ugly=/[bcdfghjklmnpqrstvwxyz]{4,}|[aeiou]{4,}/.test(letters);
+  if(!ugly&&vowelRatio>=.25&&vowelRatio<=.6&&letters.length<=6)return .56;
   if(!ugly&&vowelRatio>=.25&&vowelRatio<=.6)return .42;
   return .22;
 }
@@ -106,7 +119,7 @@ export function rarityFromValue(value){
 }
 function scoreCore(handle,jitter=0){
   const h=String(handle||'').toLowerCase(),len=h.length,quality=wordQuality(h);
-  const q=quality>=1?1:quality>=.7?.46:quality>=.6?.30:quality>=.4?.15:.055;
+  const q=quality>=1?1:quality>=.7?.46:quality>=.6?.34:quality>=.55?.39:quality>=.4?.15:.055;
   let score=lengthBase(len)*q;
   if(/_/.test(h))score*=.48;
   if(/\d/.test(h)){
