@@ -1,12 +1,10 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,
-  menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,upgradeOutcome:null,
-  filters:{rarity:'ALL',sort:'new',page:1},
-  marketFilters:{rarity:'ALL',sort:'new',q:'',page:1},
-  rankPage:1,
-  upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
+  menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
+  filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,adminPage:1,adminQuery:'',adminResetStage:0
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,24 +32,27 @@ friends:'<circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.4"/><path d="
 gift:'<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M12 9v11M4 13h16"/><path d="M12 9c-4-1-5-3-3-4 1.7-.8 3 1 3 4Zm0 0c4-1 5-3 3-4-1.7-.8-3 1-3 4Z"/>',
 upgrade:'<path d="M12 20V7M7 12l5-5 5 5"/><path d="M5 4h14"/>',season:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M12 13v5M8 21h8"/>',
 collection:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
-profile:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',premium:'<path d="m12 3 3 5 6 1-4 4 .8 6L12 16l-5.8 3L7 13 3 9l6-1 3-5Z"/>',story:'<path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M5 12v7h14v-7"/>'
+profile:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',premium:'<path d="m12 3 3 5 6 1-4 4 .8 6L12 16l-5.8 3L7 13 3 9l6-1 3-5Z"/>',filter:'<path d="M4 6h16M7 12h10M10 18h4"/>',search:'<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',admin:'<path d="M12 3 4 6v6c0 4.7 3.2 7.7 8 9 4.8-1.3 8-4.3 8-9V6l-8-3Z"/><path d="M9 12h6M12 9v6"/>',story:'<path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M5 12v7h14v-7"/>'
 };
 function icon(k){return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(ICON[k]||ICON.menu)+'</svg>'}
 function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU=[
- ['home','home','Дроп','Прокрутка usernames'],['market','market','Рынок','Покупка и продажа usernames'],['top','rank','Рейтинг','Лучшие коллекции'],['tasks','tasks','Задания','Ежедневные цели'],['wheel','wheel','Колесо','Бесплатная награда'],
- ['friends','friends','Друзья','Приглашения и друзья'],['gift','gift','Подарок','Отправить username другу'],['upgrader','upgrade','Апгрейдер','До 5 usernames · общий риск'],['seasons','season','Сезоны','Текущий сезон и награды']
+ ['home','home','Дроп','Нажми на username и испытай удачу'],['market','market','Рынок','Покупай и продавай'],['top','rank','Рейтинг','Кто богаче'],['tasks','tasks','Задания','Ежедневные цели'],['wheel','wheel','Колесо','Бесплатно раз в 24 часа'],
+ ['friends','friends','Друзья','Приглашения и награды'],['gift','gift','Подарок','Передать username'],['upgrader','upgrade','Апгрейдер','Рискнуть коллекцией'],['seasons','season','Сезоны','Рейтинг сезона']
 ];
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
 function menuHtml(){
- const play=MENU.slice(0,5),social=MENU.slice(5);
- const rows=list=>list.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b><small>'+s+'</small></span><em>›</em></button>').join('');
- return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-group-title">ИГРАТЬ</div><div class="menu-list">'+rows(play)+'</div><div class="menu-group-title">СОЦИАЛЬНОЕ</div><div class="menu-list">'+rows(social)+'</div><div class="menu-divider"></div><div class="menu-list compact">'+MENU_BOTTOM.map(([p,i,t])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b></span><em>›</em></button>').join('')+'</div></aside></div>'
+ const play=MENU.slice(0,5),social=MENU.slice(5),bottom=[...MENU_BOTTOM];
+ if(state.user?.isAdmin)bottom.push(['admin','admin','Админка']);
+ const rows=list=>list.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b>'+(s?'<small>'+s+'</small>':'')+'</span><em>›</em></button>').join('');
+ return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-group-title">ИГРАТЬ</div><div class="menu-list">'+rows(play)+'</div><div class="menu-group-title">СОЦИАЛЬНОЕ</div><div class="menu-list">'+rows(social)+'</div><div class="menu-divider"></div><div class="menu-list compact">'+rows(bottom)+'</div></aside></div>'
 }
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
-function shell(title,html,opts={}){window.__USERNAME_READY=true;app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>'}
+function shell(title,html,opts={}){window.__USERNAME_READY=true;app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';requestAnimationFrame(fitAllUsernames)}
+function fitUsername(el,max=48,min=20){if(!el)return;el.style.fontSize='';let size=Math.min(max,parseFloat(getComputedStyle(el).fontSize)||max);const room=Math.max(1,el.parentElement?.clientWidth||el.clientWidth);while(size>min&&el.scrollWidth>room-8){size-=1;el.style.fontSize=size+'px'}}
+function fitAllUsernames(){document.querySelectorAll('[data-fit-username]').forEach(el=>fitUsername(el,Number(el.dataset.maxSize||48),Number(el.dataset.minSize||20)))}
 function rarityTone(rarity){
   return {COMMON:'#8f98a3',RARE:'#2aabee',EPIC:'#7257d8',LEGEND:'#d88b22',ULTRA:'#e34850'}[String(rarity||'').toUpperCase()]||'#8f98a3';
 }
@@ -104,14 +105,19 @@ function dropPricePicker(tiers){
 }
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
- const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||2000),cantAfford=!freeBasic&&u.balance<payCost;
- return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Коллекция',fmt(u.collectionValue))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
- '<section class="drop-zone"><div class="drop-label">DROP</div><p>Получите случайный username</p>'+
- (!p?'<button class="drop-cost-trigger" data-drop-picker-open><span>Стоимость попытки</span><b>'+fmt(tier.cost)+' <em>⌄</em></b></button>':'')+
- (p?resultCard(p,true):'<div class="handle-stage" id="handleStage"><span>@</span><b>username</b></div><button class="drop-btn" id="dropBtn" '+(cantAfford?'disabled':'')+'><span>'+(freeBasic?'Получить бесплатно':'Получить username')+'</span><b>'+(freeBasic?u.freeDrops+' осталось':fmt(payCost))+'</b></button><small class="drop-note">'+(freeBasic?'Базовая попытка сейчас бесплатна':cantAfford?'Недостаточно денег для выбранной стоимости':'Цена влияет на качество пула, проценты скрыты')+'</small>')+'</section>'+
- '<section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b>'+badge(last.rarity)+'<strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
+ const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
+ return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
+ '<section class="drop-zone"><div class="drop-headline"><div><span>DROP</span><small>'+(freeBasic?'Бесплатная попытка':('Попытка '+fmt(payCost)))+'</small></div>'+(!p?'<button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>⌄</em></button>':'')+'</div>'+
+ (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Прокрутить username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b><small>'+(cantAfford?'Недостаточно денег':'Нажми на username')+'</small></button>')+
+ '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
 }
-async function animateDrop(result){const stage=document.querySelector('#handleStage'),btn=document.querySelector('#dropBtn');if(!stage||!btn)return;btn.disabled=true;const samples=['@vision','@storm7','@phantom','@dealer77','@blackout','@master7','@prime','@ghost77','@mister777'];const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,100]:[55,55,60,70,85,110,150,220,330,470];let i=0;for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b>'+samples[i++%samples.length]+'</b>';await new Promise(r=>setTimeout(r,d))}stage.innerHTML='<b>'+esc(result.handle)+'</b>';stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?120:420));state.home.pending=result;render()}
+async function animateDrop(result){
+ const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
+ const samples=['@vision','@storm7','@phantom','@dealer77','@blackout','@master7','@prime','@ghost77','@mister777','@nightfa','@street','@alpha7'];
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[100,140]:[55,55,60,70,80,95,115,140,180,235,310,420,540,650];let i=0;
+ for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++%samples.length]+'</b><small>Прокрутка…</small>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
+ stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b><small>Выпало</small>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?120:190));state.home.pending=result;render();
+}
 function collectionView(){const c=state.collection;return '<div class="page-body"><div class="collection-tools"><div class="chips">'+['ALL','COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-rarity="'+r+'" class="'+(state.filters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="sortSelect"><option value="new" '+(state.filters.sort==='new'?'selected':'')+'>Новые</option><option value="value" '+(state.filters.sort==='value'?'selected':'')+'>Дорогие</option><option value="rarity" '+(state.filters.sort==='rarity'?'selected':'')+'>Редкие</option><option value="short" '+(state.filters.sort==='short'?'selected':'')+'>Короткие</option></select></div><div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card"><button class="user-card-main" data-detail="'+x.id+'"><span>'+x.handle+'</span>'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b><small>#'+x.instanceNumber+' / '+x.maxSupply+'</small></button><button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button></article>').join(''):'<div class="empty">Здесь пока пусто.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>'}
 function pager(page,pages,type){if(pages<=1)return '';return '<div class="pager"><button data-pager="'+type+'" data-dir="-1" '+(page<=1?'disabled':'')+'>Назад</button><span>'+page+' / '+pages+'</span><button data-pager="'+type+'" data-dir="1" '+(page>=pages?'disabled':'')+'>Дальше</button></div>'}
 function marketView(){const m=state.market;return '<div class="page-body"><div class="market-search"><input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username"><button data-market-search>Найти</button></div><div class="market-tools"><div class="chips">'+['ALL','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-market-rarity="'+r+'" class="'+(state.marketFilters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="marketSort"><option value="new">Новые</option><option value="cheap">Дешёвые</option><option value="expensive">Дорогие</option><option value="rare">Редкие</option><option value="short">Короткие</option></select></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div><span>'+x.handle+'</span>'+badge(x.rarity)+'</div><small>Продавец: '+esc(x.sellerName)+'</small><b>'+fmt(x.price)+'</b>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять</button>':'<button data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">На рынке пока ничего нет.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>'}
@@ -250,7 +256,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
- if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
+ if(el.hasAttribute('data-drop-trigger')&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
  if(el.dataset.storyCopy){try{await navigator.clipboard.writeText(el.dataset.storyCopy);toast('Ссылка скопирована')}catch{toast('Не удалось скопировать')}return}
  if(el.dataset.shareStory){
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
