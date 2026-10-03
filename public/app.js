@@ -11,11 +11,11 @@ const state={
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ERR={
-  unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно NC',pending_drop:'Сначала решите, что делать с текущим username',
+  unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранные usernames недоступны',upgrade_bad_recipe:'Неверный набор для апгрейда',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',network:'Нет соединения с сервером'
 };
 function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
@@ -45,7 +45,11 @@ const MENU=[
  ['friends','friends','Друзья','Приглашения и друзья'],['gift','gift','Подарок','Отправить username другу'],['upgrader','upgrade','Апгрейдер','До 5 usernames · общий риск'],['seasons','season','Сезоны','Текущий сезон и награды']
 ];
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
-function menuHtml(){return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-list">'+MENU.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b><small>'+s+'</small></span><em>›</em></button>').join('')+'</div><div class="menu-divider"></div><div class="menu-list compact">'+MENU_BOTTOM.map(([p,i,t])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b></span><em>›</em></button>').join('')+'</div></aside></div>'}
+function menuHtml(){
+ const play=MENU.slice(0,5),social=MENU.slice(5);
+ const rows=list=>list.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b><small>'+s+'</small></span><em>›</em></button>').join('');
+ return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-group-title">ИГРАТЬ</div><div class="menu-list">'+rows(play)+'</div><div class="menu-group-title">СОЦИАЛЬНОЕ</div><div class="menu-list">'+rows(social)+'</div><div class="menu-divider"></div><div class="menu-list compact">'+MENU_BOTTOM.map(([p,i,t])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b></span><em>›</em></button>').join('')+'</div></aside></div>'
+}
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){window.__USERNAME_READY=true;app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>'}
 function rarityTone(rarity){
@@ -54,7 +58,7 @@ function rarityTone(rarity){
 function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result">'+
    '<div class="drop-result-main minimal"><h1>'+esc(x.handle)+'</h1></div>'+
-   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b></span></button></div>':'')+
+   (pending?'<div class="drop-result-actions"><div class="drop-result-row"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.sellValue??x.value)+'</button></div><button class="story-share-btn" data-share-story="'+x.id+'"><span class="story-share-mark">↗</span><span><b>Выложить в историю</b></span></button></div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){
@@ -88,28 +92,15 @@ function generateStoryImage(item){
 }
 function openStoryFallback(item,mediaUrl){
  const root=document.createElement('div');root.className='modal-root story-fallback-root';
- root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal story-fallback-modal"><div class="modal-head"><b>История готова</b><button data-modal-close>'+icon('close')+'</button></div><div class="story-fallback-preview"><img src="'+esc(mediaUrl)+'" alt="USERNAME story"></div><div class="story-fallback-actions"><button class="primary" data-story-open="'+esc(mediaUrl)+'">Открыть картинку</button><button data-story-copy="'+esc(mediaUrl)+'">Скопировать ссылку</button></div><small>Если редактор Telegram Stories не открылся автоматически, открой картинку и добавь её в историю вручную.</small></div>';
+ root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal story-fallback-modal"><div class="modal-head"><b>История готова</b><button data-modal-close>'+icon('close')+'</button></div><div class="story-fallback-preview"><img src="'+esc(mediaUrl)+'" alt="USERNAME story"></div><div class="story-fallback-actions"><button class="primary" data-story-native="'+esc(mediaUrl)+'" data-story-caption="'+esc('Я выиграл '+item.handle+' в USERNAME')+'">В Telegram Stories</button><button data-story-open="'+esc(mediaUrl)+'">Открыть картинку</button></div><small>Сначала показываем превью. Если Telegram Stories недоступны на устройстве, открой картинку и добавь её вручную.</small></div>';
  document.body.appendChild(root);
 }
 async function shareDropStory(item){
   if(!item)return;
-  const dataUrl=generateStoryImage(item);
-  toast('Готовлю историю…');
+  const dataUrl=generateStoryImage(item);toast('Готовлю историю…');
   const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
-  const caption='Я выиграл '+item.handle+' в USERNAME';
-  let opened=false;
-  try{
-    if(typeof TG?.shareToStory==='function'){
-      TG.shareToStory(uploaded.mediaUrl,{text:caption});
-      opened=true;
-      haptic('medium');
-    }
-  }catch(e){console.warn('shareToStory failed',e)}
-  if(opened){toast('Открываю Telegram Stories…');return}
-  openStoryFallback(item,uploaded.mediaUrl);
-  toast('Открыл запасной вариант');
+  openStoryFallback(item,uploaded.mediaUrl);haptic('light');
 }
-
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
   return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$2K',cost:2000};
@@ -128,16 +119,26 @@ function homeView(){
  '<section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b>'+badge(last.rarity)+'<strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
 }
 async function animateDrop(result){const stage=document.querySelector('#handleStage'),btn=document.querySelector('#dropBtn');if(!stage||!btn)return;btn.disabled=true;const samples=['@vision','@storm7','@phantom','@dealer77','@blackout','@master7','@prime','@ghost77','@mister777'];const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,100]:[55,55,60,70,85,110,150,220,330,470];let i=0;for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b>'+samples[i++%samples.length]+'</b>';await new Promise(r=>setTimeout(r,d))}stage.innerHTML='<b>'+esc(result.handle)+'</b>';stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?120:420));state.home.pending=result;render()}
-function collectionView(){const c=state.collection;return '<div class="page-body"><div class="collection-tools"><div class="chips">'+['ALL','COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-rarity="'+r+'" class="'+(state.filters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="sortSelect"><option value="new" '+(state.filters.sort==='new'?'selected':'')+'>Новые</option><option value="value" '+(state.filters.sort==='value'?'selected':'')+'>Дорогие</option><option value="rarity" '+(state.filters.sort==='rarity'?'selected':'')+'>Редкие</option><option value="short" '+(state.filters.sort==='short'?'selected':'')+'>Короткие</option></select></div><div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card"><button class="user-card-main" data-detail="'+x.id+'"><span>'+x.handle+'</span>'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b><small>#'+x.instanceNumber+' / '+x.maxSupply+'</small></button><button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать</button></article>').join(''):'<div class="empty">Здесь пока пусто.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>'}
+function collectionView(){const c=state.collection;return '<div class="page-body"><div class="collection-tools"><div class="chips">'+['ALL','COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-rarity="'+r+'" class="'+(state.filters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="sortSelect"><option value="new" '+(state.filters.sort==='new'?'selected':'')+'>Новые</option><option value="value" '+(state.filters.sort==='value'?'selected':'')+'>Дорогие</option><option value="rarity" '+(state.filters.sort==='rarity'?'selected':'')+'>Редкие</option><option value="short" '+(state.filters.sort==='short'?'selected':'')+'>Короткие</option></select></div><div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card"><button class="user-card-main" data-detail="'+x.id+'"><span>'+x.handle+'</span>'+badge(x.rarity)+'<b>'+fmt(x.value)+'</b><small>#'+x.instanceNumber+' / '+x.maxSupply+'</small></button><button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button></article>').join(''):'<div class="empty">Здесь пока пусто.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>'}
 function pager(page,pages,type){if(pages<=1)return '';return '<div class="pager"><button data-pager="'+type+'" data-dir="-1" '+(page<=1?'disabled':'')+'>Назад</button><span>'+page+' / '+pages+'</span><button data-pager="'+type+'" data-dir="1" '+(page>=pages?'disabled':'')+'>Дальше</button></div>'}
 function marketView(){const m=state.market;return '<div class="page-body"><div class="market-search"><input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username"><button data-market-search>Найти</button></div><div class="market-tools"><div class="chips">'+['ALL','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-market-rarity="'+r+'" class="'+(state.marketFilters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="marketSort"><option value="new">Новые</option><option value="cheap">Дешёвые</option><option value="expensive">Дорогие</option><option value="rare">Редкие</option><option value="short">Короткие</option></select></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div><span>'+x.handle+'</span>'+badge(x.rarity)+'</div><small>Продавец: '+esc(x.sellerName)+'</small><b>'+fmt(x.price)+'</b>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять</button>':'<button data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">На рынке пока ничего нет.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>'}
-function topView(){const all=state.leaderboard?.items||[],size=8,pages=Math.max(1,Math.ceil(all.length/size));state.rankPage=Math.max(1,Math.min(state.rankPage,pages));const list=all.slice((state.rankPage-1)*size,state.rankPage*size);return '<div class="page-body"><div class="mode-tabs">'+[['collection','Коллекция'],['capital','Капитал'],['best','Лучший username']].map(([m,t])=>'<button data-mode="'+m+'" class="'+(state.rankMode===m?'active':'')+'">'+t+'</button>').join('')+'</div><div class="period-tabs">'+[['week','Неделя'],['month','Месяц'],['season','Сезон'],['all','Всё время']].map(([p,t])=>'<button data-period="'+p+'" class="'+(state.rankPeriod===p?'active':'')+'">'+t+'</button>').join('')+'</div><div class="rank-list">'+list.map(r=>'<button class="rank-row '+(r.position<=3?'top'+r.position:'')+'" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'—')+'</small></div><strong>'+fmt(state.rankMode==='capital'?r.capital:state.rankMode==='best'?r.best:r.collection_value)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>'}
-function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>'<article class="task"><div><b>'+esc(t.label)+'</b><span>'+t.current+' / '+t.target+'</span></div><strong>+'+fmt(t.reward)+'</strong><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><button data-claim="'+t.key+'" '+(t.current<t.target||t.claimed?'disabled':'')+'>'+(t.claimed?'Получено':t.current>=t.target?'Забрать':'В процессе')+'</button></article>').join('')+'</div>'}
-function wheelView(){
- const w=state.wheel,items=(w.rewards||[]),short={'nc500':'$500','nc1000':'$1K','xp50':'50 XP','nc2500':'$2.5K','drop1':'FREE DROP','nc5000':'$5K'};
- return '<div class="wheel-page"><div class="daily-wheel-shell"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc">'+items.map((x,i)=>'<span class="daily-wheel-label" style="--i:'+i+'">'+esc(short[x.key]||x.label)+'</span>').join('')+'<div class="daily-wheel-core"><b>DAILY</b><span>USERNAME</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Ежедневное вращение доступно':'Колесо уже использовано')+'</b><span>'+(w.available?'Одно бесплатное вращение каждые 24 часа.':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
+function topView(){
+ const all=state.leaderboard?.items||[],size=8,pages=Math.max(1,Math.ceil(all.length/size));state.rankPage=Math.max(1,Math.min(state.rankPage,pages));const list=all.slice((state.rankPage-1)*size,state.rankPage*size),capital=state.rankMode==='capital';
+ return '<div class="page-body"><div class="mode-tabs">'+[['collection','Коллекция'],['capital','Капитал'],['best','Лучший username']].map(([m,t])=>'<button data-mode="'+m+'" class="'+(state.rankMode===m?'active':'')+'">'+t+'</button>').join('')+'</div>'+
+ (capital?'<div class="period-note">Капитал показывается по текущему балансу и всем активам.</div>':'<div class="period-tabs">'+[['week','Неделя'],['month','Месяц'],['season','Сезон'],['all','Всё время']].map(([p,t])=>'<button data-period="'+p+'" class="'+(state.rankPeriod===p?'active':'')+'">'+t+'</button>').join('')+'</div>')+
+ '<div class="rank-list">'+list.map(r=>'<button class="rank-row '+(r.position<=3?'top'+r.position:'')+'" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'—')+'</small></div><strong>'+fmt(capital?r.capital:state.rankMode==='best'?r.best:r.collection_value)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>';
 }
-function friendsView(){const f=state.friends;return '<div class="page-body"><section class="ref-card"><span>Ваша ссылка</span><div><input id="refLink" readonly value="'+esc(f.referralLink)+'"><button data-copy-ref>Копировать</button></div></section><div class="home-metrics">'+metric('Приглашено',f.invited)+metric('Активных',f.active)+metric('Наград',f.rewards.length)+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласите первого друга.</div>')+'</div></div>'}
+function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>'<article class="task"><div><b>'+esc(t.label)+'</b><span>'+t.current+' / '+t.target+'</span></div><strong>+'+fmt(t.reward)+'</strong><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><button data-claim="'+t.key+'" '+(t.current<t.target||t.claimed?'disabled':'')+'>'+(t.claimed?'Получено':t.current>=t.target?'Забрать':'В процессе')+'</button></article>').join('')+'</div>'}
+function wheelGeometry(items){
+ const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||1),0));let cursor=0;
+ const colors=['#ffffff','#edf1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||1);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2}});
+ return {rows,background:'conic-gradient('+segments.join(',')+')'};
+}
+function wheelView(){
+ const w=state.wheel,items=(w.rewards||[]),short={'nc500':'$500','nc1000':'$1K','xp50':'50 XP','nc2500':'$2.5K','drop1':'FREE DROP','nc5000':'$5K'},g=wheelGeometry(items);
+ return '<div class="wheel-page"><div class="daily-wheel-shell"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+g.rows.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(short[x.key]||x.label)+'</span>').join('')+'<div class="daily-wheel-core"><b>DAILY</b><span>USERNAME</span></div></div></div><div class="wheel-copy"><b>'+(w.available?'Ежедневное вращение доступно':'Колесо уже использовано')+'</b><span>'+(w.available?'Одно бесплатное вращение каждые 24 часа.':('Следующее: '+new Date(w.nextAt).toLocaleString('ru-RU')))+'</span></div><button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>Крутить колесо</button><div id="wheelResult" class="wheel-result"></div></div>';
+}
+function friendsView(){const f=state.friends;return '<div class="page-body"><section class="ref-card"><span>Ваша ссылка</span><div><input id="refLink" readonly value="'+esc(f.referralLink||'Ссылка временно недоступна')+'"><button data-copy-ref>Копировать</button></div></section><div class="home-metrics">'+metric('Приглашено',f.invited)+metric('Активных',f.active)+metric('Наград',f.rewards.length)+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласите первого друга.</div>')+'</div></div>'}
 function giftView(){const g=state.gift;return '<div class="gift-page"><div class="form-card"><label>Username<select id="giftInstance"><option value="">Выберите username</option>'+g.items.map(x=>'<option value="'+x.id+'">'+x.handle+' · '+x.rarity+' · '+fmt(x.value)+'</option>').join('')+'</select></label><label>Друг<select id="giftFriend"><option value="">Выберите друга</option>'+g.friends.map(x=>'<option value="'+x.id+'">'+esc(x.first_name||x.username||'Игрок')+'</option>').join('')+'</select></label><div class="notice">Передача необратима. Username должен находиться в вашей коллекции и не быть выставлен на рынке.</div><button class="primary" data-gift>Подарить username</button></div></div>'}
 function selectedUpgradeItems(){
  const list=state.upgrader?.available||[],set=new Set(state.upgradeSelectedIds||[]);
@@ -159,16 +160,18 @@ function upgraderView(){
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
 function premiumView(){const p=state.premium;return '<div class="premium-page"><div class="plus-hero"><small>USERNAME+</small><h1>'+(p.active?'Подписка активна':'Больше возможностей. Без pay-to-win.')+'</h1><p>USERNAME+ не влияет на редкость дропа, награды колеса или апгрейдер.</p></div><div class="feature-list">'+p.features.map(x=>'<div>'+esc(x)+'</div>').join('')+'</div>'+(p.active?'<div class="plus-active">Активно до '+new Date(p.activeUntil).toLocaleDateString('ru-RU')+'</div>':'<button class="primary" data-premium '+(!p.starsEnabled?'disabled':'')+'>Подключить · '+p.stars+' Stars</button>')+'</div>'}
-function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String((x.rawHandle||x.handle.slice(1)).length))+metric('Редкость',x.rarity)+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">На витрину</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать системе · '+fmt(x.value)+'</button></div></div>'}
+function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String((x.rawHandle||x.handle.slice(1)).length))+metric('Редкость',x.rarity)+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">На витрину</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать системе · '+fmt(x.sellValue??x.value)+'</button></div></div>'}
 function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true})}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+'};
 async function load(page){
- state.page=page;state.menu=false;app.innerHTML='<div class="boot"><b>USERNAME</b><span></span></div>';
+ state.page=page;state.menu=false;
+ shell(PAGE_TITLE[page]||'USERNAME','<div class="screen-skeleton"><i></i><i></i><i></i><i></i></div>');
  try{
   if(!state.user||page==='home')await refreshUser();
   if(page==='collection')state.collection=await api('/api/collection?rarity='+state.filters.rarity+'&sort='+state.filters.sort+'&page='+state.filters.page);
   if(page==='market')state.market=await api('/api/market?rarity='+state.marketFilters.rarity+'&sort='+state.marketFilters.sort+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
-  if(page==='top')state.leaderboard=await api('/api/leaderboard?mode='+state.rankMode+'&period='+state.rankPeriod);
+  if(page==='top')state.leaderboard=await api('/api/leaderboard?mode='+state.rankMode+'&period='+(state.rankMode==='capital'?'all':state.rankPeriod));
   if(page==='tasks')state.tasks=await api('/api/tasks');
   if(page==='wheel')state.wheel=await api('/api/wheel');
   if(page==='friends')state.friends=await api('/api/friends');
@@ -178,7 +181,7 @@ async function load(page){
   if(page==='profile')state.profile=await api('/api/profile');
   if(page==='premium')state.premium=await api('/api/premium');
   render();
- }catch(e){shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||e.message)+'</b><button data-page="'+page+'">Повторить</button></div>')}
+ }catch(e){shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||'Что-то пошло не так')+'</b><button data-page="'+page+'">Повторить</button></div>')}
 }
 function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function openSystemSellModal(id,handle,value){
@@ -189,22 +192,16 @@ function openSystemSellModal(id,handle,value){
 function closeModal(el){el?.closest('.modal-root')?.remove()}
 async function spinWheelUi(){
  if(state.busy)return;state.busy=true;
- const req=crypto.randomUUID?.()||('w-'+Date.now());
- const r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
- const items=state.wheel.rewards||[],idx=Math.max(0,items.findIndex(x=>x.key===r.reward.key)),n=Math.max(1,items.length),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
- if(disc){
-   const segment=360/n;
-   const targetCenter=idx*segment;
-   const turns=6*360;
-   disc.classList.add('spinning');
-   requestAnimationFrame(()=>{disc.style.transform='rotate('+(turns-targetCenter)+'deg)'});
-   await new Promise(x=>setTimeout(x,3200));
-   disc.classList.remove('spinning');
- }
- if(res)res.textContent='Получено: '+r.reward.label;
- haptic('medium');
- await refreshUser();state.wheel=await api('/api/wheel');state.busy=false;
- setTimeout(()=>render(),800);
+ try{
+  const req=crypto.randomUUID?.()||('w-'+Date.now()),r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
+  const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
+  if(disc&&target){
+    const final=6*360-target.center;disc.classList.add('spinning');requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});
+    await new Promise(x=>setTimeout(x,3200));disc.classList.remove('spinning');
+  }
+  if(res)res.textContent='Получено: '+r.reward.label;haptic('medium');
+  await refreshUser();state.wheel=await api('/api/wheel');setTimeout(()=>render(),800);
+ }finally{state.busy=false}
 }
 let upgradePreviewSeq=0;
 async function refreshUpgradePreview(){
@@ -244,7 +241,11 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
  if(el.id==='dropBtn'&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
- if(el.dataset.storyOpen){TG?.openLink?.(el.dataset.storyOpen,{try_instant_view:false})||window.open(el.dataset.storyOpen,'_blank','noopener');return}
+ if(el.dataset.storyNative){
+   try{if(typeof TG?.shareToStory==='function'){TG.shareToStory(el.dataset.storyNative,{text:el.dataset.storyCaption||''});haptic('medium');return}}catch{}
+   if(typeof TG?.openLink==='function')TG.openLink(el.dataset.storyNative,{try_instant_view:false});else window.open(el.dataset.storyNative,'_blank','noopener');return
+ }
+ if(el.dataset.storyOpen){if(typeof TG?.openLink==='function')TG.openLink(el.dataset.storyOpen,{try_instant_view:false});else window.open(el.dataset.storyOpen,'_blank','noopener');return}
  if(el.dataset.storyCopy){try{await navigator.clipboard.writeText(el.dataset.storyCopy);toast('Ссылка скопирована')}catch{toast('Не удалось скопировать')}return}
  if(el.dataset.shareStory){
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
@@ -260,19 +261,19 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-market-search')){state.marketFilters.q=document.querySelector('#marketQuery')?.value||'';state.marketFilters.page=1;await load('market');return}
  if(el.dataset.marketBuy){const r=await api('/api/market/'+el.dataset.marketBuy+'/buy',{method:'POST'});toast('Куплено '+r.handle);await refreshUser();await load('market');return}
  if(el.dataset.marketCancel){await api('/api/market/'+el.dataset.marketCancel+'/cancel',{method:'POST'});toast('Лот снят');await load('market');return}
- if(el.dataset.mode){state.rankMode=el.dataset.mode;state.rankPage=1;await load('top');return}
+ if(el.dataset.mode){state.rankMode=el.dataset.mode;if(state.rankMode==='capital')state.rankPeriod='all';state.rankPage=1;await load('top');return}
  if(el.dataset.period){state.rankPeriod=el.dataset.period;state.rankPage=1;await load('top');return}
  if(el.dataset.claim){const r=await api('/api/tasks/'+el.dataset.claim+'/claim',{method:'POST'});toast('+'+fmt(r.reward));await refreshUser();await load('tasks');return}
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.backPage='top';state.page='profile';state.profile=r;render();return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
  if(el.dataset.showcase){await api('/api/showcase/'+el.dataset.showcase,{method:'POST'});toast('Добавлено на витрину');return}
  if(el.dataset.sellSystem){openSystemSellModal(el.dataset.sellSystem,el.dataset.handle,Number(el.dataset.value));return}
- if(el.dataset.confirmSystemSell){const r=await api('/api/collection/'+el.dataset.confirmSystemSell+'/sell',{method:'POST'});closeModal(el);state.user=r.user;toast(r.handle+' продан за '+fmt(r.value));await load('collection');return}
+ if(el.dataset.confirmSystemSell){const r=await api('/api/collection/'+el.dataset.confirmSystemSell+'/sell',{method:'POST'});closeModal(el);state.user=r.user;toast(r.handle+' продан за '+fmt(r.sellValue??r.value));await load('collection');return}
  if(el.dataset.listMarket){openMarketModal(el.dataset.listMarket,el.dataset.handle,Number(el.dataset.value));return}
  if(el.dataset.createListing){const root=el.closest('.modal-root'),price=Number(root.querySelector('#listingPrice').value);await api('/api/market',{method:'POST',body:JSON.stringify({instanceId:el.dataset.createListing,price})});closeModal(el);toast('Лот опубликован');await load('collection');return}
  if(el.hasAttribute('data-modal-close')){closeModal(el);return}
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
- if(el.hasAttribute('data-copy-ref')){await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
+ if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка временно недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});toast(r.handle+' отправлен пользователю '+r.recipient);await load('gift');return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem,ids=[...(state.upgradeSelectedIds||[])],i=ids.indexOf(id);
@@ -290,6 +291,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('premium')}});return}
  if(el.hasAttribute('data-back')){await load(state.backPage||'collection');return}
-}catch(err){state.busy=false;toast(ERR[err.message]||err.message||'Ошибка');el.disabled=false}});
+}catch(err){state.busy=false;toast(ERR[err.message]||'Что-то пошло не так');el.disabled=false}});
 document.addEventListener('change',async e=>{if(e.target.id==='sortSelect'){state.filters.sort=e.target.value;state.filters.page=1;await load('collection')}if(e.target.id==='marketSort'){state.marketFilters.sort=e.target.value;state.marketFilters.page=1;await load('market')}});
 load('home');
