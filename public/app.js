@@ -5,7 +5,7 @@ const state={
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,upgradeOutcome:null,
   filters:{rarity:'ALL',sort:'new',page:1},
   marketFilters:{rarity:'ALL',sort:'new',q:'',page:1},
-  rankMode:'collection',rankPeriod:'all',rankPage:1,
+  rankPage:1,
   upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
@@ -115,10 +115,11 @@ function collectionView(){const c=state.collection;return '<div class="page-body
 function pager(page,pages,type){if(pages<=1)return '';return '<div class="pager"><button data-pager="'+type+'" data-dir="-1" '+(page<=1?'disabled':'')+'>Назад</button><span>'+page+' / '+pages+'</span><button data-pager="'+type+'" data-dir="1" '+(page>=pages?'disabled':'')+'>Дальше</button></div>'}
 function marketView(){const m=state.market;return '<div class="page-body"><div class="market-search"><input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username"><button data-market-search>Найти</button></div><div class="market-tools"><div class="chips">'+['ALL','RARE','EPIC','LEGEND','ULTRA'].map(r=>'<button data-market-rarity="'+r+'" class="'+(state.marketFilters.rarity===r?'active':'')+'">'+(r==='ALL'?'Все':r)+'</button>').join('')+'</div><select id="marketSort"><option value="new">Новые</option><option value="cheap">Дешёвые</option><option value="expensive">Дорогие</option><option value="rare">Редкие</option><option value="short">Короткие</option></select></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div><span>'+x.handle+'</span>'+badge(x.rarity)+'</div><small>Продавец: '+esc(x.sellerName)+'</small><b>'+fmt(x.price)+'</b>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять</button>':'<button data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">На рынке пока ничего нет.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>'}
 function topView(){
- const all=state.leaderboard?.items||[],size=8,pages=Math.max(1,Math.ceil(all.length/size));state.rankPage=Math.max(1,Math.min(state.rankPage,pages));const list=all.slice((state.rankPage-1)*size,state.rankPage*size),capital=state.rankMode==='capital';
- return '<div class="page-body"><div class="mode-tabs">'+[['collection','Коллекция'],['capital','Капитал'],['best','Лучший username']].map(([m,t])=>'<button data-mode="'+m+'" class="'+(state.rankMode===m?'active':'')+'">'+t+'</button>').join('')+'</div>'+
- (capital?'<div class="period-note">Капитал показывается по текущему балансу и всем активам.</div>':'<div class="period-tabs">'+[['week','Неделя'],['month','Месяц'],['season','Сезон'],['all','Всё время']].map(([p,t])=>'<button data-period="'+p+'" class="'+(state.rankPeriod===p?'active':'')+'">'+t+'</button>').join('')+'</div>')+
- '<div class="rank-list">'+list.map(r=>'<button class="rank-row '+(r.position<=3?'top'+r.position:'')+'" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'—')+'</small></div><strong>'+fmt(capital?r.capital:state.rankMode==='best'?r.best:r.collection_value)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>';
+ const all=state.leaderboard?.items||[],size=8,pages=Math.max(1,Math.ceil(all.length/size));
+ state.rankPage=Math.max(1,Math.min(state.rankPage,pages));
+ const list=all.slice((state.rankPage-1)*size,state.rankPage*size);
+ return '<div class="page-body"><div class="rank-summary"><b>Общий капитал</b><span>Баланс + стоимость всех твоих usernames</span></div>'+
+ '<div class="rank-list">'+list.map(r=>'<button class="rank-row '+(r.position<=3?'top'+r.position:'')+'" data-profile="'+r.id+'"><span class="pos">'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'Без usernames')+'</small></div><strong>'+fmt(r.capital)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>';
 }
 function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>'<article class="task"><div><b>'+esc(t.label)+'</b><span>'+t.current+' / '+t.target+'</span></div><strong>+'+fmt(t.reward)+'</strong><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><button data-claim="'+t.key+'" '+(t.current<t.target||t.claimed?'disabled':'')+'>'+(t.claimed?'Получено':t.current>=t.target?'Забрать':'В процессе')+'</button></article>').join('')+'</div>'}
 function wheelGeometry(items){
@@ -163,7 +164,7 @@ async function load(page){
   if(!state.user||page==='home')await refreshUser();
   if(page==='collection')state.collection=await api('/api/collection?rarity='+state.filters.rarity+'&sort='+state.filters.sort+'&page='+state.filters.page);
   if(page==='market')state.market=await api('/api/market?rarity='+state.marketFilters.rarity+'&sort='+state.marketFilters.sort+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
-  if(page==='top')state.leaderboard=await api('/api/leaderboard?mode='+state.rankMode+'&period='+(state.rankMode==='capital'?'all':state.rankPeriod));
+  if(page==='top')state.leaderboard=await api('/api/leaderboard');
   if(page==='tasks')state.tasks=await api('/api/tasks');
   if(page==='wheel')state.wheel=await api('/api/wheel');
   if(page==='friends')state.friends=await api('/api/friends');
@@ -268,8 +269,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-market-search')){state.marketFilters.q=document.querySelector('#marketQuery')?.value||'';state.marketFilters.page=1;await load('market');return}
  if(el.dataset.marketBuy){const id=el.dataset.marketBuy,r=await api('/api/market/'+id+'/buy',{method:'POST'});removeMarketLocal(id);toast('Куплено '+r.handle);await refreshUser();render();return}
  if(el.dataset.marketCancel){const id=el.dataset.marketCancel;await api('/api/market/'+id+'/cancel',{method:'POST'});removeMarketLocal(id);toast('Лот снят');render();return}
- if(el.dataset.mode){state.rankMode=el.dataset.mode;if(state.rankMode==='capital')state.rankPeriod='all';state.rankPage=1;await load('top');return}
- if(el.dataset.period){state.rankPeriod=el.dataset.period;state.rankPage=1;await load('top');return}
  if(el.dataset.claim){const r=await api('/api/tasks/'+el.dataset.claim+'/claim',{method:'POST'});toast('+'+fmt(r.reward));await refreshUser();await load('tasks');return}
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.backPage='top';state.page='profile';state.profile=r;render();return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
