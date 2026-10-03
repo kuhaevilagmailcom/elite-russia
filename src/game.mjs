@@ -66,17 +66,18 @@ export function shapeInstance(r){
   }:null;
 }
 export function publicUser(db,user){
-  const assets=assetStats(db,user.id);
+  const assets=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(user.id);
   const owned=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id).c;
-  const active=activeCollectionCount(db,user.id);
+  const active=activeCollectionCount(db,user.id),capital=Number(user.balance||0)+Number(assets.value||0);
   const rank=db.prepare(`SELECT COUNT(*)+1 rank FROM (
-    SELECT owner_id,SUM(value) total FROM username_instances
-    WHERE status IN ('owned','market') GROUP BY owner_id HAVING total>?
-  )`).get(assets.value).rank;
+    SELECT u.id,u.balance+COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) capital
+    FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
+    WHERE u.blocked=0 GROUP BY u.id HAVING capital>?
+  )`).get(capital).rank;
   return {
     id:user.id,telegramId:user.telegram_id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
     level:levelFromXp(user.xp),xp:user.xp,premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,
-    collectionValue:assets.value,bestValue:assets.best,rank
+    collectionValue:assets.value,bestValue:assets.best,capital,rank
   };
 }
 export function homeData(db,user){
@@ -144,37 +145,21 @@ export function collection(db,user,{rarity='ALL',sort='new',page=1}={}){
   const total=db.prepare(`SELECT COUNT(*) c FROM username_instances WHERE ${where.join(' AND ')}`).get(...args).c;
   return {items:rows,total,page:p,pages:Math.max(1,Math.ceil(total/size))};
 }
-function periodWhere(period){
-  const now=Date.now();
-  if(period==='week')return {sql:'obtained_at>=?',args:[new Date(now-7*86400000).toISOString()]};
-  if(period==='month')return {sql:'obtained_at>=?',args:[new Date(now-30*86400000).toISOString()]};
-  return {sql:'1=1',args:[]};
-}
-export function leaderboard(db,mode='collection',period='all'){
-  if(mode==='capital')period='all';
-  let cond=periodWhere(period);
-  if(period==='season'){
-    const s=activeSeason(db);cond=s?{sql:'season_id=?',args:[s.id]}:{sql:'0=1',args:[]};
-  }
-  const order=mode==='best'?'best DESC':mode==='capital'?'capital DESC':'collection_value DESC';
+export function leaderboard(db){
   const rows=db.prepare(`
-    WITH filtered AS (
-      SELECT * FROM username_instances
-      WHERE status IN ('owned','market') AND ${cond.sql}
-    ),
-    agg AS (
-      SELECT owner_id,COALESCE(SUM(value),0) collection_value,COALESCE(MAX(value),0) best
-      FROM filtered GROUP BY owner_id
-    )
     SELECT u.id,u.username,u.first_name,u.balance,
-      COALESCE(a.collection_value,0) collection_value,
-      COALESCE(a.best,0) best,
-      u.balance+COALESCE(a.collection_value,0) capital,
-      (SELECT f.handle FROM filtered f WHERE f.owner_id=u.id ORDER BY f.value DESC LIMIT 1) best_handle
-    FROM users u LEFT JOIN agg a ON a.owner_id=u.id
+      COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) username_value,
+      u.balance+COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) capital,
+      MAX(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE NULL END) best,
+      (SELECT x.handle FROM username_instances x
+       WHERE x.owner_id=u.id AND x.status IN ('pending','owned','market')
+       ORDER BY x.value DESC,x.obtained_at ASC LIMIT 1) best_handle
+    FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
     WHERE u.blocked=0
-    ORDER BY ${order},u.id ASC LIMIT 100
-  `).all(...cond.args);
+    GROUP BY u.id
+    ORDER BY capital DESC,u.id ASC
+    LIMIT 100
+  `).all();
   return rows.map((r,i)=>({...r,position:i+1,best_handle:r.best_handle?'@'+r.best_handle:null}));
 }
 export function tasks(db,user){
