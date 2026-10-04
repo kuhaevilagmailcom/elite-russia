@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'5.1.1',
+  version:'5.2.0',
   startBalance:50000,
   freeDrops:1,
   dropCost:3000,
@@ -22,7 +22,7 @@ export const RARITY_BASE={
   RARE:[15000,99999],
   EPIC:[100000,499999],
   LEGEND:[500000,1999999],
-  ULTRA:[2000000,25000000]
+  ULTRA:[2000000,100000000]
 };
 export const DROP_TIERS=Object.freeze({
   basic:{key:'basic',label:'$3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
