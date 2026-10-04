@@ -668,3 +668,148 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
 .market-filter-glyph i:nth-child(1):after{left:3px}
 .market-filter-glyph i:nth-child(2):after{right:2px}
 .market-filter-glyph i:nth-child(3):after{left:7px}
+
+
+/* USERNAME 5.0 — icon grid menu + canonical price cleanup */
+.menu-grid-sheet{
+  top:50%!important;
+  left:50%!important;
+  width:min(390px,calc(100% - 28px))!important;
+  max-height:none!important;
+  overflow:visible!important;
+  padding:12px!important;
+  border-radius:24px!important;
+  transform:translate(-50%,calc(-50% - 6px))!important;
+  background:#fff;
+}
+.menu-backdrop.open .menu-grid-sheet{
+  transform:translate(-50%,-50%)!important;
+}
+.menu-grid-top{
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+}
+.menu-grid-top>span{width:42px;height:42px}
+.menu-head-icon{
+  width:42px;
+  height:42px;
+  min-width:42px;
+  min-height:42px;
+  border-radius:12px;
+  background:#f0f2f4;
+  display:grid;
+  place-items:center;
+  color:#22272d;
+}
+.menu-head-icon .ico{width:20px;height:20px}
+.menu-grid-main,
+.menu-grid-bottom{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+.menu-grid-divider{
+  height:1px;
+  background:#e8eaed;
+  margin:11px 2px;
+}
+.menu-tile{
+  width:100%;
+  min-height:0!important;
+  aspect-ratio:1;
+  border-radius:18px;
+  border:1px solid #e3e6e9;
+  background:#f7f8f9;
+  display:grid;
+  place-items:center;
+  padding:0;
+  color:#22272d;
+}
+.menu-tile:active{
+  background:#edf5f9;
+  border-color:#d2e8f3;
+  transform:scale(.97);
+}
+.menu-tile .ico{
+  width:27px;
+  height:27px;
+  stroke-width:2!important;
+}
+.menu-grid-bottom .menu-tile{
+  background:#fff;
+}
+@media(max-height:620px){
+  .menu-grid-sheet{width:min(340px,calc(100% - 24px))!important;padding:10px!important}
+  .menu-grid-top{height:34px;margin-bottom:6px}
+  .menu-head-icon{width:34px;height:34px;min-width:34px;min-height:34px;border-radius:10px}
+  .menu-grid-top>span{width:34px;height:34px}
+  .menu-grid-main,.menu-grid-bottom{gap:7px}
+  .menu-tile{border-radius:15px}
+  .menu-tile .ico{width:23px;height:23px}
+  .menu-grid-divider{margin:8px 2px}
+}
+@media(max-height:520px){
+  .menu-grid-sheet{width:min(300px,calc(100% - 20px))!important}
+  .menu-grid-main,.menu-grid-bottom{gap:6px}
+  .menu-tile{border-radius:13px}
+  .menu-tile .ico{width:21px;height:21px}
+}
+
+/* Source usernames use the same baseline and price placement as target usernames. */
+.upgrade-source-stage .upgrade-pick{
+  grid-template-columns:minmax(0,1fr) 32px!important;
+  gap:8px!important;
+  padding:8px 9px 8px 13px!important;
+}
+.upgrade-source-stage .upgrade-own-main{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-self:stretch;
+}
+.upgrade-source-stage .upgrade-own-main b,
+.upgrade-target-main b{
+  margin:0!important;
+  line-height:1.15!important;
+}
+.upgrade-source-stage .upgrade-own-main small,
+.upgrade-target-main small{
+  display:block;
+  margin-top:5px!important;
+  font-size:10px!important;
+  line-height:1!important;
+  font-weight:750!important;
+  color:#737c86!important;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.upgrade-source-stage .upgrade-own-select{
+  align-self:center;
+}
+.upgrade-own-value{display:none!important}
+.upgrade-source-summary strong,
+.upgrade-match-side strong{
+  font-variant-numeric:tabular-nums;
+}
+
+/* Market filter icon is inline SVG and cannot disappear if Lucide fails. */
+.market-filter-button{
+  display:grid!important;
+  place-items:center!important;
+  color:#252a30!important;
+}
+.market-filter-svg{
+  display:block;
+  width:22px;
+  height:22px;
+  overflow:visible;
+}
+.market-filter-glyph{display:none!important}
+
+/* Rarity labels are no longer part of the user-facing UI. */
+.rarity{display:none!important}
+.showcase-row small{display:none!important}
