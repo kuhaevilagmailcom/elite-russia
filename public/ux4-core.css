@@ -463,3 +463,208 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
  .upgrade-match-side b{margin-top:4px}
  .upgrade-spin-stage .upgrade-roulette-clean{width:min(180px,28vh,calc(100vw - 132px))}
 }
+
+
+/* USERNAME 4.9 — drop/upgrader alignment + market filter icon */
+.drop-price-corner{
+  position:absolute;
+  top:14px;
+  right:16px;
+  z-index:4;
+}
+.drop-zone>.drop-result-card{
+  margin-top:0;
+  flex:1;
+}
+.drop-result-card.minimal-result{
+  width:100%;
+  min-height:0;
+  padding:0;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+  overflow:hidden;
+}
+.drop-result-card.minimal-result:before,
+.drop-result-card.minimal-result:after{display:none}
+.drop-result-main.minimal{
+  flex:1;
+  min-height:140px;
+  width:100%;
+  padding:18px 6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.drop-result-main.minimal h1{
+  display:block;
+  width:100%;
+  max-width:100%;
+  margin:0;
+  padding:0 2px;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:clamp(24px,8.6vw,46px);
+  line-height:1.02;
+  letter-spacing:-1.6px;
+}
+.drop-result-card.minimal-result .drop-result-actions{
+  flex:0 0 auto;
+  padding-top:10px;
+}
+@media(max-width:370px){
+  .drop-price-corner{top:12px;right:12px}
+  .drop-result-main.minimal{padding-left:2px;padding-right:2px}
+  .drop-result-main.minimal h1{font-size:clamp(22px,8vw,38px)}
+}
+
+/* Own username selector mirrors the target selector geometry exactly. */
+.upgrade-source-stage .upgrade-pick{
+  width:100%;
+  height:66px;
+  min-height:66px;
+  flex:0 0 66px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 78px 32px;
+  align-items:center;
+  gap:8px;
+  padding:8px 9px 8px 13px;
+  border-radius:17px;
+  background:#fff;
+  border:1px solid var(--border);
+  box-shadow:none;
+}
+.upgrade-source-stage .upgrade-pick.selected{
+  border-color:#55bde9;
+  background:#f2faff;
+  box-shadow:inset 0 0 0 1px rgba(42,171,238,.12);
+}
+.upgrade-source-stage .upgrade-own-main{
+  display:block;
+  min-width:0;
+  align-self:center;
+}
+.upgrade-source-stage .upgrade-own-main b{
+  display:block;
+  max-width:100%;
+  margin:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:13px;
+  font-weight:850;
+  line-height:1.15;
+  color:#1b1f24;
+}
+.upgrade-source-stage .upgrade-own-main small{
+  display:block;
+  margin-top:5px;
+  font-size:9.5px;
+  font-weight:650;
+  line-height:1.1;
+  color:#7b848e;
+}
+.upgrade-own-value{
+  height:44px;
+  border-radius:12px;
+  background:#f0f2f4;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  align-self:center;
+}
+.upgrade-source-stage .upgrade-pick.selected .upgrade-own-value{
+  background:#dff4fd;
+}
+.upgrade-own-value small{
+  display:block;
+  margin:0;
+  font-size:7px;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:.7px;
+  color:#8a929b;
+}
+.upgrade-own-value strong{
+  display:block;
+  margin-top:3px;
+  font-size:11px;
+  font-weight:900;
+  line-height:1;
+  color:#181c21;
+  white-space:nowrap;
+}
+.upgrade-source-stage .upgrade-pick.selected .upgrade-own-value small,
+.upgrade-source-stage .upgrade-pick.selected .upgrade-own-value strong{
+  color:#178fc8;
+}
+.upgrade-source-stage .upgrade-own-select{
+  width:30px;
+  height:30px;
+  min-width:30px;
+  border-radius:10px;
+  background:#f0f2f4;
+  display:grid;
+  place-items:center;
+  align-self:center;
+  color:#69727b;
+  font-style:normal;
+}
+.upgrade-source-stage .upgrade-own-select .ico{width:16px;height:16px}
+.upgrade-source-stage .upgrade-pick.selected .upgrade-own-select{
+  background:#dff4fd;
+  color:#178fc8;
+}
+@media(max-height:680px){
+  .upgrade-source-stage .upgrade-pick{height:58px;min-height:58px;flex-basis:58px}
+  .upgrade-own-value{height:40px}
+}
+@media(max-height:570px){
+  .upgrade-source-stage .upgrade-pick{height:52px;min-height:52px;flex-basis:52px}
+  .upgrade-own-value{height:36px}
+}
+
+/* The wheel explains itself visually; no success/fail text labels. */
+.upgrade-spin-stage .upgrade-wheel-card{padding-bottom:15px}
+.upgrade-spin-stage .upgrade-wheel-legend{display:none!important}
+
+/* Permanent market filter glyph; no external icon hydration dependency. */
+.market-filter-button{
+  color:#31363c;
+}
+.market-filter-glyph{
+  width:20px;
+  height:18px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.market-filter-glyph i{
+  position:relative;
+  display:block;
+  width:20px;
+  height:2px;
+  border-radius:999px;
+  background:currentColor;
+}
+.market-filter-glyph i:nth-child(1):after,
+.market-filter-glyph i:nth-child(2):after,
+.market-filter-glyph i:nth-child(3):after{
+  content:"";
+  position:absolute;
+  top:50%;
+  width:5px;
+  height:5px;
+  border:2px solid currentColor;
+  border-radius:50%;
+  background:#fff;
+  transform:translateY(-50%);
+}
+.market-filter-glyph i:nth-child(1):after{left:3px}
+.market-filter-glyph i:nth-child(2):after{right:2px}
+.market-filter-glyph i:nth-child(3):after{left:7px}
