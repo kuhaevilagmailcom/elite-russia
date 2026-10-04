@@ -35,3 +35,12 @@ test('bot profile and permanent game menu are configured on startup',()=>{
   assert.match(serverSrc,/type:'web_app',text:'🎮 Играть'/);
   assert.match(serverSrc,/WEBAPP_URL must be a public HTTPS URL/);
 });
+
+test('admins receive a status message after every successful bot process start',()=>{
+  assert.match(serverSrc,/async function notifyAdminsBotStarted/);
+  assert.match(serverSrc,/БОТ ПЕРЕЗАПУЩЕН/);
+  assert.match(serverSrc,/Версия:/);
+  assert.match(serverSrc,/Mini App:/);
+  assert.match(serverSrc,/Меню:/);
+  assert.match(serverSrc,/await notifyAdminsBotStarted\(setup\)/);
+});
