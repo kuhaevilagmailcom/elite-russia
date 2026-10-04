@@ -115,10 +115,10 @@ async function sendBotMenuMessage(chatId,text,url,label){
   return telegramApi('sendMessage',payload);
 }
 async function sendStartMessage(chatId,firstName='',ref=''){
-  return sendBotMenuMessage(chatId,startMessage(firstName),publicWebAppUrl(ref),'🎮 Открыть игру');
+  return sendBotMenuMessage(chatId,startMessage(firstName),publicWebAppUrl(ref),'🎮 Начать играть');
 }
 async function sendHelpMessage(chatId){
-  return sendBotMenuMessage(chatId,helpMessage(),publicWebAppUrl(),'🎮 Перейти в игру');
+  return sendBotMenuMessage(chatId,helpMessage(),publicWebAppUrl(),'🎮 Начать играть');
 }
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
@@ -135,7 +135,7 @@ async function handleTelegramUpdate(u){
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
-  if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*открыть игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicWebAppUrl(),'🎮 Открыть игру');
+  if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicWebAppUrl(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
 }
 let telegramPolling=false;
@@ -147,15 +147,18 @@ function acquirePollLease(){
 }
 function refreshPollLease(){db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID)}
 async function resolveBotUsername(){
-  if(BOT_USERNAME||!BOT_TOKEN)return;
-  try{const me=await telegramApi('getMe');BOT_USERNAME=String(me?.username||'').replace(/^@/,'')}catch(e){console.error('Bot username:',e.message)}
+  if(!BOT_TOKEN)return;
+  try{
+    const me=await telegramApi('getMe'),resolved=String(me?.username||'').replace(/^@/,'');
+    if(resolved)BOT_USERNAME=resolved;
+  }catch(e){console.error('Bot username:',e.message)}
 }
 async function configureTelegramBot(){
   const url=publicWebAppUrl(),steps=[
     ['commands',()=>telegramApi('setMyCommands',{commands:BOT_COMMANDS})],
     ['description',()=>telegramApi('setMyDescription',{description:BOT_DESCRIPTION})],
     ['short description',()=>telegramApi('setMyShortDescription',{short_description:BOT_SHORT_DESCRIPTION})],
-    ['menu button',()=>telegramApi('setChatMenuButton',{menu_button:url?{type:'web_app',text:'🎮 Играть',web_app:{url}}:{type:'commands'}})]
+    ['menu button',()=>telegramApi('setChatMenuButton',{menu_button:url?{type:'web_app',text:'🎮 Начать играть',web_app:{url}}:{type:'commands'}})]
   ];
   const configured=[],failed=[];
   for(const [name,run] of steps){try{await run();configured.push(name)}catch(e){failed.push(name);console.error(`Telegram ${name}:`,e.message)}}
