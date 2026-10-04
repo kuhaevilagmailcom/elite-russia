@@ -36,5 +36,5 @@ export function helpMessage(){
 
 export function gameKeyboard(url,label='🎮 Начать играть'){
   if(!url)return undefined;
-  return {inline_keyboard:[[{text:label,web_app:{url}}]]};
+  return {inline_keyboard:[[{text:label,url}]]};
 }
