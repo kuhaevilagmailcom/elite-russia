@@ -197,11 +197,29 @@ function wheelShortLabel(x){
  if(x.type==='drop')return 'DROP';
  return String(x.label||'').replace('$1 500','$1.5K').replace(' бесплатный дроп',' DROP');
 }
+function wheelPoint(angle,r=48){
+ const a=(Number(angle)-90)*Math.PI/180;
+ return [50+r*Math.cos(a),50+r*Math.sin(a)];
+}
+function wheelSlicePath(start,end,r=48){
+ const [x1,y1]=wheelPoint(start,r),[x2,y2]=wheelPoint(end,r),large=(end-start)>180?1:0;
+ return 'M50 50 L'+x1.toFixed(3)+' '+y1.toFixed(3)+' A'+r+' '+r+' 0 '+large+' 1 '+x2.toFixed(3)+' '+y2.toFixed(3)+' Z';
+}
+function wheelSvgMarkup(rows){
+ const fills=['#ffffff','#eef1f4'];
+ return '<svg class="fortune-svg" id="wheelDisc" viewBox="0 0 100 100" aria-hidden="true">'+
+  rows.map((x,i)=>{
+   const [tx,ty]=wheelPoint(x.center,31),label=x.span>=11?('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle">'+esc(wheelShortLabel(x))+'</text>'):'';
+   return '<path d="'+wheelSlicePath(x.start,x.end)+'" fill="'+fills[i%2]+'"></path>'+label;
+  }).join('')+
+  '<circle cx="50" cy="50" r="48" fill="none" stroke="#dfe3e7" stroke-width=".55"></circle>'+
+ '</svg>';
+}
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<12),visible=g.rows.filter(x=>x.span>=12),last=state.wheelLastResult;
  return '<div class="wheel-page wheel-page-clean"><section class="wheel-card wheel-card-clean"><div class="fortune-stage">'+
   '<div class="fortune-pointer"></div>'+
-  '<div class="fortune-disc" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="fortune-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'</div>'+
+  wheelSvgMarkup(g.rows)+
   '<div class="fortune-hub"><b>@</b></div>'+
  '</div>'+
  (rare.length?'<div class="wheel-rare"><span>БОНУСЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
@@ -234,9 +252,8 @@ function selectedUpgradeTarget(){
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
  return '<button class="upgrade-pick upgrade-source-card '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
-  '<span class="upgrade-source-handle" data-fit-username data-max-size="16" data-min-size="11">'+esc(x.handle)+'</span>'+
+  '<span class="upgrade-source-handle" data-fit-username data-max-size="17" data-min-size="11">'+esc(x.handle)+'</span>'+
   '<strong class="upgrade-source-price">'+fmt(x.value)+'</strong>'+
-  '<i class="upgrade-source-chevron">'+(selected?icon('check'):icon('chevron'))+'</i>'+
  '</button>';
 }
 function upgradeTargetRowHtml(x){
@@ -467,5 +484,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=5.2.0').catch(()=>{});
+import('/admin-ui.js?v=5.3.0').catch(()=>{});
 load('home');
