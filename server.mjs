@@ -13,6 +13,7 @@ import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from '
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from './src/payments.mjs';
 import {adminOverview,adminUserDetail,adminSetBalance,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
+import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -108,10 +109,16 @@ async function telegramApi(method,payload={}){
   try{const r=await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});const j=await r.json().catch(()=>({ok:false}));if(!r.ok||!j.ok)throw new Error(j.description||'telegram_error');return j.result}finally{clearTimeout(timer)}
 }
 function publicWebAppUrl(ref=''){try{const u=new URL(WEBAPP_URL);if(u.protocol!=='https:')return '';if(ref)u.searchParams.set('ref',ref);return u.toString()}catch{return ''}}
+async function sendBotMenuMessage(chatId,text,url,label){
+  const payload={chat_id:chatId,text,parse_mode:'HTML',disable_web_page_preview:true},keyboard=gameKeyboard(url,label);
+  if(keyboard)payload.reply_markup=keyboard;
+  return telegramApi('sendMessage',payload);
+}
 async function sendStartMessage(chatId,firstName='',ref=''){
-  const url=publicWebAppUrl(ref),name=String(firstName||'').trim();
-  const text=(name?`Привет, ${name}!\n\n`:'')+'<b>USERNAME</b>\n\nКоллекционируй редкие виртуальные usernames, собирай коллекцию и поднимайся в рейтинге.';
-  const payload={chat_id:chatId,text,parse_mode:'HTML'};if(url)payload.reply_markup={inline_keyboard:[[{text:'Открыть игру',web_app:{url}}]]};return telegramApi('sendMessage',payload)
+  return sendBotMenuMessage(chatId,startMessage(firstName),publicWebAppUrl(ref),'🎮 Открыть игру');
+}
+async function sendHelpMessage(chatId){
+  return sendBotMenuMessage(chatId,helpMessage(),publicWebAppUrl(),'🎮 Перейти в игру');
 }
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
@@ -125,8 +132,11 @@ async function handleTelegramUpdate(u){
     const result=applyPremiumPayment(m,payment);
     if(result.applied)await telegramApi('sendMessage',{chat_id:m.chat.id,text:'USERNAME+ активирован на 30 дней.'}).catch(()=>{});
   }
-  const text=String(m.text||'').trim(),match=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?/i);
-  if(m.chat?.id&&match)await sendStartMessage(m.chat.id,m.from?.first_name||'',match[1]||'');
+  const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
+  if(!m.chat?.id)return;
+  if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
+  if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*открыть игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicWebAppUrl(),'🎮 Открыть игру');
+  if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
 }
 let telegramPolling=false;
 function acquirePollLease(){
@@ -140,12 +150,21 @@ async function resolveBotUsername(){
   if(BOT_USERNAME||!BOT_TOKEN)return;
   try{const me=await telegramApi('getMe');BOT_USERNAME=String(me?.username||'').replace(/^@/,'')}catch(e){console.error('Bot username:',e.message)}
 }
+async function configureTelegramBot(){
+  const url=publicWebAppUrl(),steps=[
+    ['commands',()=>telegramApi('setMyCommands',{commands:BOT_COMMANDS})],
+    ['description',()=>telegramApi('setMyDescription',{description:BOT_DESCRIPTION})],
+    ['short description',()=>telegramApi('setMyShortDescription',{short_description:BOT_SHORT_DESCRIPTION})],
+    ['menu button',()=>telegramApi('setChatMenuButton',{menu_button:url?{type:'web_app',text:'🎮 Играть',web_app:{url}}:{type:'commands'}})]
+  ];
+  for(const [name,run] of steps){try{await run()}catch(e){console.error(`Telegram ${name}:`,e.message)}}
+  if(!url)console.warn('Telegram Web App button disabled: WEBAPP_URL must be a public HTTPS URL');
+}
 async function startTelegramPolling(){
   if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');return}
   telegramPolling=true;await resolveBotUsername();
   await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
-  const url=publicWebAppUrl();if(url)await telegramApi('setChatMenuButton',{menu_button:{type:'web_app',text:'USERNAME',web_app:{url}}}).catch(()=>{});
-  await telegramApi('setMyCommands',{commands:[{command:'start',description:'Открыть USERNAME'}]}).catch(()=>{});
+  await configureTelegramBot();
   let offset=0,lastLease=0;console.log('Telegram bot polling started');
   while(telegramPolling){
     try{
