@@ -29,7 +29,7 @@ test('Lucide hydration retries if the library loads after app render',()=>{
   assert.match(appSrc,/addEventListener\('load',hydrateIcons/);
 });
 test('all interface icons use the external Lucide set instead of homemade SVG paths',()=>{
-  assert.match(indexSrc,/unpkg\.com\/lucide@1\.33\.0\/dist\/umd\/lucide\.min\.js/);
+  assert.match(indexSrc,/unpkg\.com\/lucide@1\.50\.0\/dist\/umd\/lucide\.min\.js/);
   assert.match(appSrc,/const ICON_NAME=Object\.freeze/);
   assert.match(appSrc,/data-lucide=/);
   assert.match(appSrc,/lucide\?\.createIcons/);
@@ -123,7 +123,7 @@ test('upgrader result keeps price and chance on one compact line',()=>{
   assert.match(view,/upgrade-side target/);
   assert.match(view,/fmt\(p\.target\.value\)/);
   assert.match(view,/chance/);
-  assert.match(uxCss,/\.upgrade-side\{[^}]*height:68px/);
+  assert.match(uxCss,/\.upgrade-side\{[^}]*height:66px/);
 });
 
 
