@@ -32,6 +32,7 @@ const ICON_NAME=Object.freeze({
  down:'chevron-down',plus:'plus',check:'check',x:'x'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico lucide-slot" data-lucide="'+name+'" aria-hidden="true"></i>'}
+function marketFilterIcon(){return '<svg class="market-filter-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="14" cy="7" r="2.3" fill="#fff" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.3" fill="#fff" stroke="currentColor" stroke-width="2"/></svg>'}
 let lucideRetry=0;
 function hydrateIcons(){
  try{
@@ -40,7 +41,6 @@ function hydrateIcons(){
  if(lucideRetry<20){lucideRetry++;setTimeout(hydrateIcons,100)}
 }
 addEventListener('load',hydrateIcons,{once:true});
-function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU=[
@@ -49,10 +49,14 @@ const MENU=[
 ];
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
 function menuHtml(){
- const play=MENU.slice(0,5),social=MENU.slice(5),bottom=[...MENU_BOTTOM];
- if(state.user?.isAdmin)bottom.push(['admin','admin','Админка']);
- const rows=list=>list.map(([p,i,t,s])=>'<button data-page="'+p+'"><span class="menu-icon">'+icon(i)+'</span><span><b>'+t+'</b>'+(s?'<small>'+s+'</small>':'')+'</span><em>'+icon('chevron')+'</em></button>').join('');
- return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet" data-menu-sheet><div class="menu-head"><div><small>USERNAME</small><b>Меню</b></div><button data-menu-close>'+icon('close')+'</button></div><div class="menu-group-title">ИГРАТЬ</div><div class="menu-list">'+rows(play)+'</div><div class="menu-group-title">СОЦИАЛЬНОЕ</div><div class="menu-list">'+rows(social)+'</div><div class="menu-divider"></div><div class="menu-list compact">'+rows(bottom)+'</div></aside></div>'
+ const main=[...MENU],bottom=[...MENU_BOTTOM];
+ const tiles=list=>list.map(([p,i,t])=>'<button class="menu-tile" data-page="'+p+'" aria-label="'+esc(t)+'" title="'+esc(t)+'">'+icon(i)+'</button>').join('');
+ return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-grid-sheet" data-menu-sheet>'+
+  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-head-icon" data-page="admin" aria-label="Админка" title="Админка">'+icon('admin')+'</button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+  '<div class="menu-grid-main">'+tiles(main)+'</div>'+
+  '<div class="menu-grid-divider"></div>'+
+  '<div class="menu-grid-bottom">'+tiles(bottom)+'</div>'+
+ '</aside></div>'
 }
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){
@@ -80,13 +84,10 @@ function randomRollUsername(used=new Set(),blocked=''){
 function buildRollSequence(count,finalHandle=''){const used=new Set();const rows=[];for(let i=0;i<count;i++)rows.push(randomRollUsername(used,String(finalHandle||'')));return rows}
 function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.length-1;i>0;i--){const j=rollRandomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}return out}
 
-function rarityTone(rarity){
-  return {COMMON:'#8f98a3',RARE:'#2aabee',EPIC:'#7257d8',LEGEND:'#d88b22',ULTRA:'#e34850'}[String(rarity||'').toUpperCase()]||'#8f98a3';
-}
 function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result">'+
    '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
-   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.sellValue??x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
+   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){
@@ -161,7 +162,7 @@ function marketFilterSheet(){
 }
 function marketView(){
  const m=state.market||{items:[],page:1,pages:1};
- return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр"><span class="market-filter-glyph" aria-hidden="true"><i></i><i></i><i></i></span></button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
+ return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
 }
 function topView(){
  const all=state.leaderboard?.items||[],top=all.slice(0,3),rest=all.slice(3),size=10,pages=Math.max(1,Math.ceil(rest.length/size));
@@ -192,7 +193,7 @@ function friendsView(){
  const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
  return '<div class="page-body friends-page"><div class="friends-intro"><b>Друзья</b><span>Приглашай друзей и собирай коллекцию вместе.</span></div><section class="ref-card"><small>ТВОЯ ССЫЛКА</small><b>'+esc(link||'Ссылка загружается…')+'</b><div><button class="secondary" data-copy-ref '+(!link?'disabled':'')+'>Скопировать</button><button class="primary" data-share-ref '+(!link?'disabled':'')+'>Отправить другу</button></div></section><div class="friend-stats">'+metric('Приглашено',f.invited)+metric('Наград',f.rewardsCount??f.rewards.length)+metric('До следующей',f.nextReward?f.nextReward.remaining:'—')+'</div><div class="section-label">Друзья</div><div class="friends-list">'+(f.friends.length?f.friends.map(x=>'<div class="friend-row"><div><b>'+esc(x.first_name||x.username||'Игрок')+'</b><span>'+(x.username?'@'+esc(x.username):'Без username')+'</span></div><strong>ур. '+x.level+'</strong></div>').join(''):'<div class="empty">Пригласи первого друга.</div>')+'</div></div>';
 }
-function giftView(){const g=state.gift;return '<div class="gift-page"><div class="form-card"><label>Username<select id="giftInstance"><option value="">Выберите username</option>'+g.items.map(x=>'<option value="'+x.id+'">'+x.handle+' · '+x.rarity+' · '+fmt(x.value)+'</option>').join('')+'</select></label><label>Друг<select id="giftFriend"><option value="">Выберите друга</option>'+g.friends.map(x=>'<option value="'+x.id+'">'+esc(x.first_name||x.username||'Игрок')+'</option>').join('')+'</select></label><div class="notice">Передача необратима. Username должен находиться в вашей коллекции и не быть выставлен на рынке.</div><button class="primary" data-gift>Подарить username</button></div></div>'}
+function giftView(){const g=state.gift;return '<div class="gift-page"><div class="form-card"><label>Username<select id="giftInstance"><option value="">Выберите username</option>'+g.items.map(x=>'<option value="'+x.id+'">'+x.handle+' · '+fmt(x.value)+'</option>').join('')+'</select></label><label>Друг<select id="giftFriend"><option value="">Выберите друга</option>'+g.friends.map(x=>'<option value="'+x.id+'">'+esc(x.first_name||x.username||'Игрок')+'</option>').join('')+'</select></label><div class="notice">Передача необратима. Username должен находиться в вашей коллекции и не быть выставлен на рынке.</div><button class="primary" data-gift>Подарить username</button></div></div>'}
 function selectedUpgradeItems(){
  const list=state.upgrader?.available||[],set=new Set(state.upgradeSelectedIds||[]);
  return list.filter(x=>set.has(x.id));
@@ -213,14 +214,13 @@ function selectedUpgradeTarget(){
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
  return '<button class="upgrade-pick '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
-  '<span class="upgrade-own-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.handle)+'</b><small>'+esc(x.rarity)+'</small></span>'+
-  '<span class="upgrade-own-value"><small>ЦЕНА</small><strong>'+fmt(x.value)+'</strong></span>'+
+  '<span class="upgrade-own-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span>'+
   '<i class="upgrade-own-select">'+(selected?icon('check'):icon('chevron'))+'</i>'+
  '</button>';
 }
 function upgradeTargetRowHtml(x){
  const selected=String(state.upgradeTargetSessionId||'')===String(x.sessionId),chance=upgradeChanceText(x.chance);
- return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+' · '+esc(x.target.rarity)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
+ return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
 }
 function appendUpgradeBatch(){
  const list=document.querySelector('.upgrade-list'),all=state.upgrader?.available||[];if(!list)return;
@@ -269,9 +269,9 @@ function upgraderView(){
  '</div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
-function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
+function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'</div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
 function premiumView(){const p=state.premium;return '<div class="premium-page"><div class="plus-hero"><small>USERNAME+</small><h1>'+(p.active?'Подписка активна':'Больше возможностей. Без pay-to-win.')+'</h1><p>USERNAME+ не влияет на редкость дропа, награды колеса или апгрейдер.</p></div><div class="feature-list">'+p.features.map(x=>'<div>'+esc(x)+'</div>').join('')+'</div>'+(p.active?'<div class="plus-active">Активно до '+new Date(p.activeUntil).toLocaleDateString('ru-RU')+'</div>':'<button class="primary" data-premium '+(!p.starsEnabled?'disabled':'')+'>Подключить · '+p.stars+' Stars</button>')+'</div>'}
-function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String((x.rawHandle||x.handle.slice(1)).length))+metric('Редкость',x.rarity)+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">'+(x.inShowcase?'Убрать с витрины':'На витрину')+'</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать системе · '+fmt(x.sellValue??x.value)+'</button></div></div>'}
+function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String((x.rawHandle||x.handle.slice(1)).length))+metric('Цена',fmt(x.value))+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">'+(x.inShowcase?'Убрать с витрины':'На витрину')+'</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать системе · '+fmt(x.value)+'</button></div></div>'}
 function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
 const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',admin:'Админка'};
@@ -446,5 +446,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.9.0').catch(()=>{});
+import('/admin-ui.js?v=5.0.0').catch(()=>{});
 load('home');
