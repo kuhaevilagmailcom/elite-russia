@@ -4,7 +4,7 @@ const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
-  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -23,19 +23,16 @@ function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeo
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
 function startParam(){return String(TG?.initDataUnsafe?.start_param||new URLSearchParams(location.search).get('ref')||'')}
 async function api(url,opts={}){const headers={'Content-Type':'application/json',...(opts.headers||{})};const d=await initData();if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';const sp=startParam();if(sp)headers['X-Start-Param']=sp;const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);try{const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'network');return j}catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}finally{clearTimeout(tm)}}
-const ICON={
-home:'<path d="M4 11.5 12 5l8 6.5V20H5V11.5Z"/><path d="M9 20v-6h6v6"/>',menu:'<path d="M5 7h14M5 12h14M5 17h14"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',back:'<path d="m15 18-6-6 6-6"/>',
-market:'<path d="M4 9h16l-1-4H5L4 9Z"/><path d="M6 9v10h12V9M9 19v-5h6v5"/>',rank:'<path d="M5 20V12h4v8M10 20V5h4v15M15 20v-10h4v10"/>',
-tasks:'<path d="M8 6h12M8 12h12M8 18h12"/><path d="m3 6 1 1 2-2m-3 7 1 1 2-2m-3 7 1 1 2-2"/>',
-wheel:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3 6.3 17.7"/>',
-friends:'<circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.4"/><path d="M3 20a6 6 0 0 1 12 0M14 17a5 5 0 0 1 7 3"/>',
-gift:'<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M12 9v11M4 13h16"/><path d="M12 9c-4-1-5-3-3-4 1.7-.8 3 1 3 4Zm0 0c4-1 5-3 3-4-1.7-.8-3 1-3 4Z"/>',
-upgrade:'<path d="M5 16 12 9l4 4 3-3"/><path d="M14 10h5v5"/><path d="M5 5v14h14"/>',season:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M12 13v5M8 21h8"/>',
-collection:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
-profile:'<circle cx="12" cy="8" r="3"/><path d="M5 20a7 7 0 0 1 14 0"/>',premium:'<path d="m12 3 3 5 6 1-4 4 .8 6L12 16l-5.8 3L7 13 3 9l6-1 3-5Z"/>',filter:'<path d="M4 7h16M7 12h10M10 17h4"/>',search:'<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',admin:'<path d="M12 3 4 6v6c0 4.7 3.2 7.7 8 9 4.8-1.3 8-4.3 8-9V6l-8-3Z"/><path d="M9 12h6M12 9v6"/>',story:'<path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M5 12v7h14v-7"/>',
-chevron:'<path d="m9 6 6 6-6 6"/>',down:'<path d="m7 9 5 5 5-5"/>',plus:'<path d="M12 5v14M5 12h14"/>',check:'<path d="m5 12 4 4L19 6"/>',x:'<path d="m6 6 12 12M18 6 6 18"/>'
-};
-function icon(k){return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICON[k]||ICON.menu)+'</svg>'}
+const ICON_NAME=Object.freeze({
+ home:'house',menu:'menu',close:'x',back:'chevron-left',
+ market:'store',rank:'chart-column-increasing',tasks:'list-checks',wheel:'gauge',
+ friends:'users',gift:'gift',upgrade:'arrow-up-right',season:'trophy',
+ collection:'layout-grid',profile:'user-round',premium:'gem',filter:'sliders-horizontal',
+ search:'search',admin:'shield-check',story:'share-2',chevron:'chevron-right',
+ down:'chevron-down',plus:'plus',check:'check',x:'x'
+});
+function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico lucide-slot" data-lucide="'+name+'" aria-hidden="true"></i>'}
+function hydrateIcons(){try{window.lucide?.createIcons({attrs:{'stroke-width':'2.2'}})}catch{}}
 function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
@@ -54,7 +51,7 @@ function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<
 function shell(title,html,opts={}){
  window.__USERNAME_READY=true;
  app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';
- requestAnimationFrame(()=>{fitAllUsernames();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
+ requestAnimationFrame(()=>{fitAllUsernames();hydrateIcons();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
 }
 function fitUsername(el,max=48,min=20){if(!el)return;el.style.fontSize='';let size=Math.min(max,parseFloat(getComputedStyle(el).fontSize)||max);const room=Math.max(1,el.parentElement?.clientWidth||el.clientWidth);while(size>min&&el.scrollWidth>room-8){size-=1;el.style.fontSize=size+'px'}}
 function fitAllUsernames(){document.querySelectorAll('[data-fit-username]').forEach(el=>fitUsername(el,Number(el.dataset.maxSize||48),Number(el.dataset.minSize||20)))}
@@ -200,16 +197,19 @@ function upgradeRowHtml(x){
 function appendUpgradeBatch(){
  const list=document.querySelector('.upgrade-list'),all=state.upgrader?.available||[];if(!list)return;
  const from=Math.min(state.upgradeVisibleCount||30,all.length),to=Math.min(all.length,from+18);if(to<=from)return;
- const tpl=document.createElement('template');tpl.innerHTML=all.slice(from,to).map(upgradeRowHtml).join('');list.append(tpl.content);state.upgradeVisibleCount=to;
+ const tpl=document.createElement('template');tpl.innerHTML=all.slice(from,to).map(upgradeRowHtml).join('');list.append(tpl.content);state.upgradeVisibleCount=to;hydrateIcons();
 }
 
 function upgraderView(){
- const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),source=selected[0],p=state.upgradePreview,rawChance=Number(p?.chance||0)*100,chance=p?(rawChance<10?rawChance.toFixed(1):Math.round(rawChance).toString()):'—',angle=p?Math.max(3,Math.min(270,Number(p.chance||0)*360)):0;
- return '<div class="upgrade-page"><div class="upgrade-copy"><span>Выбери один username. Цветной сектор — выигрыш, серый — потеря.</span></div>'+
- '<section class="upgrade-duel"><div class="upgrade-side source"><small>СТАВКА</small><b data-fit-username data-max-size="19" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'Выбери ниже')+'</strong></div><span class="upgrade-arrow">'+icon('chevron')+'</span><div class="upgrade-side target"><small>ВЫИГРЫШ</small><b data-fit-username data-max-size="19" data-min-size="12">'+(p?esc(p.target.handle):'—')+'</b><strong>'+(p?fmt(p.target.value):'Подбираем')+'</strong></div></section>'+
- '<section class="upgrade-wheel-card '+(p?'ready':'empty')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> выигрыш</span><span><i></i> проигрыш</span></div></section>'+
- (state.upgradeOutcome&&!state.upgradeSpinning?'<section class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><small>РЕЗУЛЬТАТ</small><b>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle):'Не получилось')+'</b><span>'+(state.upgradeOutcome.success?fmt(state.upgradeOutcome.result.value):'Выбранный username сгорел')+'</span><button class="secondary" data-upgrade-continue>Продолжить</button></section>':'')+
- '<div class="upgrade-list-title"><b>Мои usernames</b><span>1 предмет</span></div><div class="upgrade-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div><div class="upgrade-footer"><div><span>Шанс</span><b>'+(p?chance+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!selected.length||!p||state.upgradeSpinning?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится…':'Апгрейд')+'</button></div></div>';
+ const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),liveSource=selected[0],round=state.upgradeLastRound;
+ const source=round?.source||liveSource,p=round?{chance:round.chance,target:round.target}:state.upgradePreview;
+ const rawChance=Number(p?.chance||0)*100,chance=p?(rawChance<10?rawChance.toFixed(1):Math.round(rawChance).toString()):'—',angle=p?Math.max(3,Math.min(270,Number(p.chance||0)*360)):0;
+ const pointerAngle=round?Number(state.upgradeLandingAngle||0):0;
+ return '<div class="upgrade-page"><div class="upgrade-copy"><span>Выбери username — круг сразу покажет шанс апгрейда.</span></div>'+
+ '<section class="upgrade-duel"><div class="upgrade-side source"><small>ТВОЙ USERNAME</small><b data-fit-username data-max-size="19" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'Выбери ниже')+'</strong></div><span class="upgrade-arrow">'+icon('chevron')+'</span><div class="upgrade-side target"><small>МОЖНО ПОЛУЧИТЬ</small><b data-fit-username data-max-size="19" data-min-size="12">'+(p?esc(p.target.handle):'—')+'</b><strong>'+(p?fmt(p.target.value):'Подбираем')+'</strong></div></section>'+
+ '<section class="upgrade-wheel-card '+(p?'ready':'empty')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer" style="transform:rotate('+pointerAngle+'deg)"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> успех</span><span><i></i> неудача</span></div></section>'+
+ (state.upgradeOutcome&&!state.upgradeSpinning?'<section class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><small>РЕЗУЛЬТАТ</small><b>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle):'Не получилось')+'</b><span>'+(state.upgradeOutcome.success?fmt(state.upgradeOutcome.result.value):'Username использован в апгрейде')+'</span><button class="secondary" data-upgrade-continue>Продолжить</button></section>':'')+
+ '<div class="upgrade-list-title"><b>Мои usernames</b></div><div class="upgrade-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div><div class="upgrade-footer"><div><span>Шанс</span><b>'+(p?chance+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!selected.length||!state.upgradePreview||state.upgradeSpinning||!!round?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится…':'Апгрейд')+'</button></div></div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
@@ -230,7 +230,7 @@ async function load(page){
   if(page==='wheel')state.wheel=await api('/api/wheel');
   if(page==='friends')state.friends=await api('/api/friends');
   if(page==='gift')state.gift=await api('/api/gift/options');
-  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0}
+  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0}
   if(page==='seasons')state.season=await api('/api/seasons');
   if(page==='profile')state.profile=await api('/api/profile');
   if(page==='premium')state.premium=await api('/api/premium');
@@ -238,11 +238,11 @@ async function load(page){
   render();
  }catch(e){shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||'Что-то пошло не так')+'</b><button data-page="'+page+'">Повторить</button></div>')}
 }
-function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
+function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function openSystemSellModal(id,handle,value){
  const root=document.createElement('div');root.className='modal-root';
  root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Продать '+esc(handle)+'?</b><button data-modal-close>'+icon('close')+'</button></div><div class="system-sell-copy">Система сразу начислит <b>'+fmt(value)+'</b>. Username исчезнет из коллекции. Отменить продажу после подтверждения нельзя.</div><button class="primary" data-confirm-system-sell="'+id+'">Продать за '+fmt(value)+'</button></div>';
- document.body.appendChild(root);
+ document.body.appendChild(root);hydrateIcons();
 }
 function closeModal(el){el?.closest('.modal-root')?.remove()}
 async function spinWheelUi(){
@@ -262,13 +262,17 @@ async function refreshUpgradePreview(){
  try{const p=await api('/api/upgrader/preview',{method:'POST',body:JSON.stringify({ids})});if(seq!==upgradePreviewSeq)return;state.upgradePreview=p;render()}catch(e){if(seq===upgradePreviewSeq){state.upgradePreview=null;toast(ERR[e.message]||'Не удалось рассчитать шанс');render()}}
 }
 async function animateUpgradeWheel(result){
- state.upgradeOutcome=result;state.upgradeSpinning=true;render();
+ const source=result.sources?.[0]||selectedUpgradeItems()[0]||null;
+ state.upgradeOutcome=result;state.upgradeSpinning=true;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();
  const pointer=document.querySelector('#upgradePointer');if(!pointer){state.upgradeSpinning=false;render();return}
- const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(4,winArc/3),unit=rollRandomInt(10000)/10000;
+ const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(5,winArc/3),unit=rollRandomInt(10000)/10000;
  const landing=result.success?(margin+unit*Math.max(1,winArc-margin*2)):(winArc+margin+unit*Math.max(1,360-winArc-margin*2));
  pointer.style.transition='none';pointer.style.transform='rotate(0deg)';pointer.getBoundingClientRect();
  requestAnimationFrame(()=>{pointer.style.transition='transform 3.2s cubic-bezier(.12,.72,.08,1)';pointer.style.transform='rotate('+(360*6+landing)+'deg)'});
- await new Promise(r=>setTimeout(r,3250));haptic(result.success?'medium':'light');state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
+ await new Promise(r=>setTimeout(r,3250));haptic(result.success?'medium':'light');
+ state.upgradeLandingAngle=landing;state.upgradeLastRound={source,target:result.target,chance:Number(result.chance||0),success:!!result.success};
+ state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;
+ state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
 }
 function applyUserLocal(user){
   if(!user)return;state.user=user;if(state.home)state.home.user=user;
@@ -341,11 +345,11 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem,selected=(state.upgradeSelectedIds||[]).includes(id);
-   state.upgradeSelectedIds=selected?[]:[id];state.upgradeOutcome=null;await refreshUpgradePreview();return
+   state.upgradeSelectedIds=selected?[]:[id];state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;await refreshUpgradePreview();return
  }
  if(el.dataset.upRemove){state.upgradeSelectedIds=(state.upgradeSelectedIds||[]).filter(id=>id!==el.dataset.upRemove);await refreshUpgradePreview();return}
  if(el.hasAttribute('data-up-clear')){state.upgradeSelectedIds=[];state.upgradePreview=null;render();return}
- if(el.hasAttribute('data-upgrade-continue')){state.upgradeOutcome=null;state.upgradeSelectedIds=[];state.upgradePreview=null;render();return}
+ if(el.hasAttribute('data-upgrade-continue')){state.upgradeOutcome=null;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();return}
  if(el.hasAttribute('data-upgrade')&&!state.upgradeSpinning){
    const ids=[...(state.upgradeSelectedIds||[])],sessionId=state.upgradePreview?.sessionId;if(!ids.length||!sessionId)return;
    state.upgradeSpinning=true;el.disabled=true;
@@ -364,5 +368,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.3.0').catch(()=>{});
+import('/admin-ui.js?v=4.5.0').catch(()=>{});
 load('home');
