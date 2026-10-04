@@ -248,6 +248,22 @@ export function createDatabase(dataDir){
     })();
   }
 
+  const specialHandlesV53=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('5.3.0-special-handles-expanded');
+  if(!specialHandlesV53){
+    db.transaction(()=>{
+      const updTemplate=db.prepare('UPDATE username_templates SET rarity=?,base_value=?,max_supply=1,special=1,active=1,category=? WHERE handle=?');
+      const updInstance=db.prepare('UPDATE username_instances SET rarity=?,value=?,instance_number=1,max_supply=1 WHERE handle=?');
+      const updHistory=db.prepare('UPDATE drop_history SET rarity=?,value=? WHERE handle=?');
+      for(const [handle,_declared,value,_supply,category] of SPECIALS){
+        const rarity=rarityFromValue(Number(value));
+        updTemplate.run(rarity,Number(value),category,handle);
+        updInstance.run(rarity,Number(value),handle);
+        updHistory.run(rarity,Number(value),handle);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('5.3.0-special-handles-expanded',now);
+    })();
+  }
+
   const integrity=db.pragma('integrity_check',{simple:true});
   if(String(integrity).toLowerCase()!=='ok')throw new Error('sqlite_integrity_check_failed:'+integrity);
   return db;
