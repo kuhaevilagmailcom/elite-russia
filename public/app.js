@@ -50,9 +50,10 @@ const MENU=[
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
 function menuHtml(){
  const main=[...MENU],bottom=[...MENU_BOTTOM];
- const tiles=list=>list.map(([p,i,t])=>'<button class="menu-tile" data-page="'+p+'" aria-label="'+esc(t)+'" title="'+esc(t)+'">'+icon(i)+'</button>').join('');
+ const shortLabel=t=>({'Рейтинг':'Топ','USERNAME+':'Plus'}[t]||t);
+ const tiles=list=>list.map(([p,i,t])=>'<button class="menu-tile" data-page="'+p+'" aria-label="'+esc(t)+'" title="'+esc(t)+'">'+icon(i)+'<span>'+esc(shortLabel(t))+'</span></button>').join('');
  return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-grid-sheet" data-menu-sheet>'+
-  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-head-icon" data-page="admin" aria-label="Админка" title="Админка">'+icon('admin')+'</button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin" aria-label="Админка" title="Админка">'+icon('admin')+'<span>Админ</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
   '<div class="menu-grid-main">'+tiles(main)+'</div>'+
   '<div class="menu-grid-divider"></div>'+
   '<div class="menu-grid-bottom">'+tiles(bottom)+'</div>'+
@@ -446,5 +447,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=5.0.0').catch(()=>{});
+import('/admin-ui.js?v=5.0.1').catch(()=>{});
 load('home');
