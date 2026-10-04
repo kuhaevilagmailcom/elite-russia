@@ -20,6 +20,7 @@ const PORT=Number(process.env.PORT||8080);
 const BOT_TOKEN=process.env.BOT_TOKEN||'';
 let BOT_USERNAME=(process.env.BOT_USERNAME||'').replace(/^@/,'');
 const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
+const MINIAPP_LINK=process.env.MINIAPP_LINK||'https://t.me/usernamegamebot/usernamegame';
 const NODE_ENV=process.env.NODE_ENV||'development';
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
 const DEV_ADMIN=process.env.DEV_ADMIN==='1';
@@ -109,16 +110,17 @@ async function telegramApi(method,payload={}){
   try{const r=await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});const j=await r.json().catch(()=>({ok:false}));if(!r.ok||!j.ok)throw new Error(j.description||'telegram_error');return j.result}finally{clearTimeout(timer)}
 }
 function publicWebAppUrl(ref=''){try{const u=new URL(WEBAPP_URL);if(u.protocol!=='https:')return '';if(ref)u.searchParams.set('ref',ref);return u.toString()}catch{return ''}}
+function publicMiniAppLink(ref=''){try{const u=new URL(MINIAPP_LINK);if(ref)u.searchParams.set('startapp',ref);return u.toString()}catch{return 'https://t.me/usernamegamebot/usernamegame'}}
 async function sendBotMenuMessage(chatId,text,url,label){
   const payload={chat_id:chatId,text,parse_mode:'HTML',disable_web_page_preview:true},keyboard=gameKeyboard(url,label);
   if(keyboard)payload.reply_markup=keyboard;
   return telegramApi('sendMessage',payload);
 }
 async function sendStartMessage(chatId,firstName='',ref=''){
-  return sendBotMenuMessage(chatId,startMessage(firstName),publicWebAppUrl(ref),'🎮 Начать играть');
+  return sendBotMenuMessage(chatId,startMessage(firstName),publicMiniAppLink(ref),'🎮 Начать играть');
 }
 async function sendHelpMessage(chatId){
-  return sendBotMenuMessage(chatId,helpMessage(),publicWebAppUrl(),'🎮 Начать играть');
+  return sendBotMenuMessage(chatId,helpMessage(),publicMiniAppLink(),'🎮 Начать играть');
 }
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
@@ -135,7 +137,7 @@ async function handleTelegramUpdate(u){
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
-  if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicWebAppUrl(),'🎮 Начать играть');
+  if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
 }
 let telegramPolling=false;
