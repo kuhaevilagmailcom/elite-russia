@@ -2264,3 +2264,49 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
     font-size:11px!important;
   }
 }
+
+
+/* USERNAME 5.3.2 — move upgrader prices left and show them fully */
+.upgrade-source-list{
+  box-sizing:border-box!important;
+  width:100%!important;
+  padding-left:1px!important;
+  padding-right:8px!important;
+}
+.upgrade-source-card{
+  box-sizing:border-box!important;
+  width:100%!important;
+  max-width:100%!important;
+  grid-template-columns:minmax(0,1fr) max-content!important;
+  gap:12px!important;
+  padding-left:14px!important;
+  padding-right:22px!important;
+  overflow:hidden!important;
+}
+.upgrade-source-price{
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  justify-self:end!important;
+  text-align:right!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  white-space:nowrap!important;
+  font-size:11px!important;
+  letter-spacing:-.1px!important;
+}
+@media(max-width:360px){
+  .upgrade-source-list{
+    padding-right:7px!important;
+  }
+  .upgrade-source-card{
+    grid-template-columns:minmax(0,1fr) max-content!important;
+    gap:9px!important;
+    padding-right:18px!important;
+  }
+  .upgrade-source-price{
+    width:auto!important;
+    max-width:none!important;
+    font-size:10.5px!important;
+  }
+}
