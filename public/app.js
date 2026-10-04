@@ -134,7 +134,7 @@ function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
  const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
  return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
- '<section class="drop-zone"><div class="drop-headline"><div><span>DROP</span><small>'+(freeBasic?'Бесплатная попытка':('Попытка '+fmt(payCost)))+'</small></div>'+(!p?'<button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button>':'')+'</div>'+
+ '<section class="drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
  (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить случайный username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b>'+(cantAfford?'<small>Недостаточно денег</small>':'')+'</button>')+
  '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
 }
@@ -161,7 +161,7 @@ function marketFilterSheet(){
 }
 function marketView(){
  const m=state.market||{items:[],page:1,pages:1};
- return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button data-market-filter-open aria-label="Фильтр">'+icon('filter')+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
+ return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр"><span class="market-filter-glyph" aria-hidden="true"><i></i><i></i><i></i></span></button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
 }
 function topView(){
  const all=state.leaderboard?.items||[],top=all.slice(0,3),rest=all.slice(3),size=10,pages=Math.max(1,Math.ceil(rest.length/size));
@@ -213,9 +213,8 @@ function selectedUpgradeTarget(){
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
  return '<button class="upgrade-pick '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
-  '<span class="upgrade-own-mark">@</span>'+
-  '<span class="upgrade-own-main"><b>'+esc(x.handle)+'</b><small>'+esc(x.rarity)+'</small></span>'+
-  '<strong class="upgrade-own-price">'+fmt(x.value)+'</strong>'+
+  '<span class="upgrade-own-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.handle)+'</b><small>'+esc(x.rarity)+'</small></span>'+
+  '<span class="upgrade-own-value"><small>ЦЕНА</small><strong>'+fmt(x.value)+'</strong></span>'+
   '<i class="upgrade-own-select">'+(selected?icon('check'):icon('chevron'))+'</i>'+
  '</button>';
 }
@@ -265,7 +264,6 @@ function upgraderView(){
     '<div class="upgrade-pointer-static"></div>'+
     '<div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div>'+
    '</div>'+
-   '<div class="upgrade-wheel-legend"><span><i class="win"></i> зона успеха</span><span><i></i> зона неудачи</span></div>'+
   '</section>'+
   (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><small>'+(success?'УСПЕХ':'НЕ ПОВЕЗЛО')+'</small><b>'+(success?'Круто, апгрейд залетел!':'Апгрейд не зашёл')+'</b><span>'+(success?('Ты получил '+esc(state.upgradeOutcome.result.handle)+' · '+fmt(state.upgradeOutcome.result.value)):((source?esc(source.handle):'Username')+' сгорел. Можно рискнуть ещё раз.'))+'</span><button class="primary" data-upgrade-continue>'+(success?'Продолжить':'Попробовать ещё раз')+'</button></section>':'')+
  '</div>';
@@ -448,5 +446,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.8.0').catch(()=>{});
+import('/admin-ui.js?v=4.9.0').catch(()=>{});
 load('home');
