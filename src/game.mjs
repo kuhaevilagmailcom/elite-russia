@@ -180,7 +180,7 @@ export function leaderboard(db){
 export function tasks(db,user){
   const defs=[
     {key:'drop3',label:'Получить 3 usernames',target:3,reward:600,source:'drop'},
-    {key:'rare1',label:'Получить RARE или выше',target:1,reward:900,source:'rare'},
+    {key:'rare1',label:'Получить username от $15,000',target:1,reward:900,source:'rare'},
     {key:'sell1',label:'Продать username',target:1,reward:300,source:'sell'},
     {key:'market1',label:'Купить username на рынке',target:1,reward:500,source:'market_buy'},
     {key:'keep2',label:'Оставить 2 usernames',target:2,reward:350,source:'keep'},
