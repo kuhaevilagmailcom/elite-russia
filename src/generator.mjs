@@ -7,7 +7,7 @@ const EXTRA_RU_ROOTS=[
   'poka','spasibo','druzhba','druzya','rodnoy','rodnaya','semya','batya','batka','mamulya',
   'papulya','babushka','dedushka','bratishka','sestrenka','parni','devchonka','paren','devochka','muzhik',
   'rebyata','sosed','sosedka','rayon','gorod','dvor','ulitsa','podik','kvartal','tusovka',
-  'dvizh','dvizhuhа','vibe','ugар','prikol','memas','shutka','rzhaka','kringe','zhiza',
+  'dvizh','dvizhuha','vibe','ugar','prikol','memas','shutka','rzhaka','kringe','zhiza',
   'normis','imba','top','skill','profi','krasivo','silno','bistro','legko','zhestko',
   'mashina','tachka','avto','garazh','motor','turbo','drift','gonka','trassa','doroga',
   'moskva','piter','sochi','kazan','ufa','omsk','perm','tula','samara','saratov',
