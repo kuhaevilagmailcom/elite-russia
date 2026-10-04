@@ -36,11 +36,9 @@ test('bot profile and permanent game menu are configured on startup',()=>{
   assert.match(serverSrc,/WEBAPP_URL must be a public HTTPS URL/);
 });
 
-test('admins receive a status message after every successful bot process start',()=>{
-  assert.match(serverSrc,/async function notifyAdminsBotStarted/);
-  assert.match(serverSrc,/БОТ ПЕРЕЗАПУЩЕН/);
+test('admins receive a restart message immediately after the active bot process starts',()=>{
+  assert.match(serverSrc,/async function notifyAdminsBotRestarted/);
+  assert.match(serverSrc,/Бот перезапущен/);
   assert.match(serverSrc,/Версия:/);
-  assert.match(serverSrc,/Mini App:/);
-  assert.match(serverSrc,/Меню:/);
-  assert.match(serverSrc,/await notifyAdminsBotStarted\(setup\)/);
+  assert.match(serverSrc,/await notifyAdminsBotRestarted\(\);\s*await configureTelegramBot\(\)/);
 });

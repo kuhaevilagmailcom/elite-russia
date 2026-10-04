@@ -162,14 +162,10 @@ async function configureTelegramBot(){
   if(!url)console.warn('Telegram Web App button disabled: WEBAPP_URL must be a public HTTPS URL');
   return {url,configured,failed};
 }
-async function notifyAdminsBotStarted(setup){
-  const ready=setup.url&&setup.failed.length===0,status=ready?'🟢 <b>БОТ ПЕРЕЗАПУЩЕН</b>':'🟡 <b>БОТ ЗАПУЩЕН С ПРЕДУПРЕЖДЕНИЕМ</b>',url=setup.url?escapeTelegramHtml(setup.url):'не настроен';
-  const text=status+'\n\n'+
+async function notifyAdminsBotRestarted(){
+  const text='🟢 <b>Бот перезапущен</b>\n\n'+
     `Версия: <code>${escapeTelegramHtml(GAME.version)}</code>\n`+
-    `Mini App: <code>${url}</code>\n`+
-    `Меню: ${setup.failed.length?'ошибка — '+escapeTelegramHtml(setup.failed.join(', ')):'настроено'}\n`+
-    `Время: ${escapeTelegramHtml(new Date().toLocaleString('ru-RU',{timeZone:'Asia/Yekaterinburg'}))} (ЕКБ)\n\n`+
-    (ready?'Бот принимает команды и готов открывать игру.':'Проверь BOT_TOKEN, WEBAPP_URL и журнал сервера.');
+    `Время: ${escapeTelegramHtml(new Date().toLocaleString('ru-RU',{timeZone:'Asia/Yekaterinburg'}))} (ЕКБ)`;
   for(const chatId of ADMIN_IDS){
     try{await telegramApi('sendMessage',{chat_id:chatId,text,parse_mode:'HTML',disable_web_page_preview:true})}
     catch(e){console.error(`Telegram admin notification ${chatId}:`,e.message)}
@@ -179,8 +175,8 @@ async function startTelegramPolling(){
   if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');return}
   telegramPolling=true;await resolveBotUsername();
   await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
-  const setup=await configureTelegramBot();
-  await notifyAdminsBotStarted(setup);
+  await notifyAdminsBotRestarted();
+  await configureTelegramBot();
   let offset=0,lastLease=0;console.log('Telegram bot polling started');
   while(telegramPolling){
     try{
