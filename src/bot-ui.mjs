@@ -1,6 +1,6 @@
 export const BOT_COMMANDS=Object.freeze([
   {command:'start',description:'Открыть главное меню'},
-  {command:'play',description:'Запустить игру'},
+  {command:'play',description:'Начать играть'},
   {command:'help',description:'Как играть'}
 ]);
 
@@ -34,7 +34,7 @@ export function helpMessage(){
     'Команды: /start — главное меню, /play — открыть игру, /help — эта подсказка.';
 }
 
-export function gameKeyboard(url,label='🎮 Открыть игру'){
+export function gameKeyboard(url,label='🎮 Начать играть'){
   if(!url)return undefined;
   return {inline_keyboard:[[{text:label,web_app:{url}}]]};
 }
