@@ -813,3 +813,105 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
 /* Rarity labels are no longer part of the user-facing UI. */
 .rarity{display:none!important}
 .showcase-row small{display:none!important}
+
+
+/* USERNAME 5.0.1 — smaller labeled icon menu */
+.menu-grid-sheet{
+  width:min(330px,calc(100% - 28px))!important;
+  padding:10px!important;
+  border-radius:20px!important;
+}
+.menu-grid-top{
+  height:34px;
+  margin-bottom:7px;
+}
+.menu-grid-top>span{
+  width:34px;
+  height:34px;
+}
+.menu-head-icon{
+  width:34px;
+  height:34px;
+  min-width:34px;
+  min-height:34px;
+  border-radius:10px;
+}
+.menu-head-icon .ico{
+  width:18px;
+  height:18px;
+}
+.menu-admin-shortcut{
+  min-width:48px;
+  min-height:34px;
+  height:34px;
+  padding:0 8px;
+  border-radius:10px;
+  background:#f0f2f4;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  color:#22272d;
+}
+.menu-admin-shortcut .ico{
+  width:16px;
+  height:16px;
+}
+.menu-admin-shortcut span{
+  font-size:9px;
+  line-height:1;
+  font-weight:800;
+}
+.menu-grid-main,
+.menu-grid-bottom{
+  gap:7px;
+}
+.menu-grid-divider{
+  margin:9px 2px;
+}
+.menu-tile{
+  aspect-ratio:auto!important;
+  height:74px;
+  min-height:74px!important;
+  border-radius:15px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+.menu-tile .ico{
+  width:22px;
+  height:22px;
+}
+.menu-tile>span{
+  display:block;
+  max-width:100%;
+  font-size:9.5px;
+  line-height:1;
+  font-weight:800;
+  color:#535b65;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.menu-grid-bottom .menu-tile{
+  height:68px;
+  min-height:68px!important;
+}
+@media(max-height:620px){
+  .menu-grid-sheet{
+    width:min(306px,calc(100% - 22px))!important;
+    padding:8px!important;
+  }
+  .menu-grid-top{height:30px;margin-bottom:5px}
+  .menu-head-icon{width:30px;height:30px;min-width:30px;min-height:30px}
+  .menu-grid-top>span{width:30px;height:30px}
+  .menu-admin-shortcut{height:30px;min-height:30px}
+  .menu-grid-main,.menu-grid-bottom{gap:6px}
+  .menu-tile{height:64px;min-height:64px!important;border-radius:13px;gap:5px}
+  .menu-tile .ico{width:20px;height:20px}
+  .menu-tile>span{font-size:8.5px}
+  .menu-grid-bottom .menu-tile{height:60px;min-height:60px!important}
+  .menu-grid-divider{margin:7px 2px}
+}
