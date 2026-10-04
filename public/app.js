@@ -199,10 +199,10 @@ function wheelShortLabel(x){
 }
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<12),visible=g.rows.filter(x=>x.span>=12),last=state.wheelLastResult;
- return '<div class="wheel-page wheel-page-clean"><section class="wheel-card wheel-card-clean"><div class="wheel-stage">'+
-  '<div class="daily-wheel-pointer"></div>'+
-  '<div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'</div>'+
-  '<div class="daily-wheel-core"><b>USERNAME</b><span>ДЕНЬ</span></div>'+
+ return '<div class="wheel-page wheel-page-clean"><section class="wheel-card wheel-card-clean"><div class="fortune-stage">'+
+  '<div class="fortune-pointer"></div>'+
+  '<div class="fortune-disc" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="fortune-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'</div>'+
+  '<div class="fortune-hub"><b>@</b></div>'+
  '</div>'+
  (rare.length?'<div class="wheel-rare"><span>БОНУСЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
  '<div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее вращение через '+untilText(w.nextAt)))+'</span></div>'+
@@ -233,9 +233,10 @@ function selectedUpgradeTarget(){
 }
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
- return '<button class="upgrade-pick '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
-  '<span class="upgrade-own-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span>'+
-  '<i class="upgrade-own-select">'+(selected?icon('check'):icon('chevron'))+'</i>'+
+ return '<button class="upgrade-pick upgrade-source-card '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
+  '<span class="upgrade-source-handle" data-fit-username data-max-size="16" data-min-size="11">'+esc(x.handle)+'</span>'+
+  '<strong class="upgrade-source-price">'+fmt(x.value)+'</strong>'+
+  '<i class="upgrade-source-chevron">'+(selected?icon('check'):icon('chevron'))+'</i>'+
  '</button>';
 }
 function upgradeTargetRowHtml(x){
@@ -466,5 +467,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=5.1.1').catch(()=>{});
+import('/admin-ui.js?v=5.2.0').catch(()=>{});
 load('home');
