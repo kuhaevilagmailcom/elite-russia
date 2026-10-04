@@ -3,19 +3,48 @@ import {RARITY_WEIGHTS} from './config.mjs';
 import {randomUnit} from './economy.mjs';
 
 export const ROOTS=[
-'card','loly','mama','sigma','love','dream','angel','baby','cool','club','news','music','bank','shop','monk','ghost','void','vision','legend','dealer','storm','night','phantom','million','master','mister','king','prime','rocket','shadow','venom','savage','black','white','wolf','tiger','moon','solar','street','drive','speed','turbo','money','rich','diamond','silver','rare','zero','pixel','cloud','wave','nova','silent','unknown','anonymous','alpha','omega','orbit','pulse','frame','motion','vector','signal','matrix','vertex','binary','cipher','static','future','chrome','carbon','graphite','velvet','royal','elite','major','minor','urban','metro','avenue','district','tower','garage','motor','rider','pilot','racer','drift','boost','nitro','gtr','amg','bmw','mclaren','porsche','supra','skyline','viper','cobra','falcon','hawk','raven','lion','panther','shark','orca','fox','bear','eagle','hunter','chief','boss','owner','founder','leader','winner','champion','hero','icon','famous','classic','vintage','simple','basic','clean','mono','blank','pure','clear','sharp','swift','quick','rapid','sonic','flash','light','bright','dark','midnight','sunset','dawn','winter','summer','north','south','west','east','ocean','river','stone','steel','iron','gold','platinum','onyx','jade','ruby','sapphire','emerald','luxury','premium','status','credit','cash','market','trade','stock','vault','mint','coin','profit','wealth','capital','business','studio','media','audio','beat','bass','vibe','mood','style','fashion','model','design','art','photo','film','camera','scene','screen','game','player','level','score','rank','top','arena','clutch','skill','aim','quest','party','lobby','server','online','digital','cyber','logic','code','byte','data','node','core','link','network','system','device','mobile','phone','apple','telegram','social','viral','trend','daily','global','world','planet','space','cosmos','astro','mars','lunar','star','comet','galaxy','mystic','secret','hidden','private','public','real','true','only','first','last','young','old','modern','retro','smart','wild','calm','cold','hot','high','low','big','small','great','super','hyper','ultra','max','pro','one','seven','noble','monarch','duke','baron','saint','ace','zen','echo','flux','frost','blaze','ember','mist','rain','snow','thunder','volt','crisp','solid','fluid','stark','roman','atlas','apollo','mercury','saturn','jupiter','venus','pluto','delta','lambda','kappa','daylight','nightfall','blackout','overdrive','redline','pitlane','roadster','coupe','sedan','touring','motors','driver','fastlane','highway','cityline','skyway','airline','railway','terminal','station','central','uptown','downtown','midtown','brook','park','garden','forest','valley','mountain','island','harbor','port','bay','coast','beach','desert','canyon','cliff','peak','summit','ridge','field','meadow','green','blue','red','orange','purple','gray','grey','ivory','obsidian','crystal','marble','granite','wood','paper','glass','metal','titanium','cobalt','nickel','copper','bronze','brass'
+'card','loly','mama','papa','sosi','sosal','dedyska','brat','sestra','drug','svoy','kot','pes','babka','ded','vova','dima','tema','maks','vlad','roma','sasha','sanya','artem','vasya','petya','kirill','ruslan','bogdan','sigma','love','dream','angel','baby','cool','club','news','music','bank','shop','monk','ghost','void','vision','legend','dealer','storm','night','phantom','million','master','mister','king','prime','rocket','shadow','venom','savage','black','white','wolf','tiger','moon','solar','street','drive','speed','turbo','money','rich','diamond','silver','rare','zero','pixel','cloud','wave','nova','silent','unknown','anonymous','alpha','omega','orbit','pulse','frame','motion','vector','signal','matrix','vertex','binary','cipher','static','future','chrome','carbon','graphite','velvet','royal','elite','major','minor','urban','metro','avenue','district','tower','garage','motor','rider','pilot','racer','drift','boost','nitro','gtr','amg','bmw','mclaren','porsche','supra','skyline','viper','cobra','falcon','hawk','raven','lion','panther','shark','orca','fox','bear','eagle','hunter','chief','boss','owner','founder','leader','winner','champion','hero','icon','famous','classic','vintage','simple','basic','clean','mono','blank','pure','clear','sharp','swift','quick','rapid','sonic','flash','light','bright','dark','midnight','sunset','dawn','winter','summer','north','south','west','east','ocean','river','stone','steel','iron','gold','platinum','onyx','jade','ruby','sapphire','emerald','luxury','premium','status','credit','cash','market','trade','stock','vault','mint','coin','profit','wealth','capital','business','studio','media','audio','beat','bass','vibe','mood','style','fashion','model','design','art','photo','film','camera','scene','screen','game','player','level','score','rank','top','arena','clutch','skill','aim','quest','party','lobby','server','online','digital','cyber','logic','code','byte','data','node','core','link','network','system','device','mobile','phone','apple','telegram','social','viral','trend','daily','global','world','planet','space','cosmos','astro','mars','lunar','star','comet','galaxy','mystic','secret','hidden','private','public','real','true','only','first','last','young','old','modern','retro','smart','wild','calm','cold','hot','high','low','big','small','great','super','hyper','ultra','max','pro','one','seven','noble','monarch','duke','baron','saint','ace','zen','echo','flux','frost','blaze','ember','mist','rain','snow','thunder','volt','crisp','solid','fluid','stark','roman','atlas','apollo','mercury','saturn','jupiter','venus','pluto','delta','lambda','kappa','daylight','nightfall','blackout','overdrive','redline','pitlane','roadster','coupe','sedan','touring','motors','driver','fastlane','highway','cityline','skyway','airline','railway','terminal','station','central','uptown','downtown','midtown','brook','park','garden','forest','valley','mountain','island','harbor','port','bay','coast','beach','desert','canyon','cliff','peak','summit','ridge','field','meadow','green','blue','red','orange','purple','gray','grey','ivory','obsidian','crystal','marble','granite','wood','paper','glass','metal','titanium','cobalt','nickel','copper','bronze','brass'
 ];
 export const SUFFIXES=['','7','77','777','1','01','07','007','x','xx','pro','one','max','hq','live','lab','io','tv','club','zone','hub','net','go'];
 export const PREFIXES=['','the','real','mr','its','iam'];
 
 export const SPECIALS=[
-  ['nft','ULTRA',42000000,1,'telegram_legacy'],
-  ['gif','ULTRA',40000000,1,'telegram_legacy'],
-  ['pic','ULTRA',38000000,1,'telegram_legacy'],
-  ['vid','ULTRA',36000000,1,'telegram_legacy'],
-  ['ufc','ULTRA',34000000,1,'telegram_legacy'],
+  // Telegram-native three-letter handles: the scarcest usernames in the game.
+  ['nft','ULTRA',75000000,1,'telegram_legacy'],
+  ['ufc','ULTRA',70000000,1,'telegram_legacy'],
+  ['gif','ULTRA',68000000,1,'telegram_legacy'],
+  ['vid','ULTRA',64000000,1,'telegram_legacy'],
+  ['pic','ULTRA',62000000,1,'telegram_legacy'],
+
+  // Memorable Russian/translit words are intentionally valuable too.
   ['card','ULTRA',15000000,1,'short_word'],
-  ['mama','ULTRA',12000000,1,'short_word'],
+  ['mama','ULTRA',12000000,1,'ru_word'],
+  ['papa','ULTRA',11000000,1,'ru_word'],
+  ['sosi','ULTRA',9800000,1,'ru_word'],
+  ['sosal','ULTRA',8200000,1,'ru_word'],
+  ['brat','ULTRA',7600000,1,'ru_word'],
+  ['dedyska','LEGEND',5600000,1,'ru_word'],
+  ['sestra','LEGEND',4800000,1,'ru_word'],
+  ['drug','ULTRA',6200000,1,'ru_word'],
+  ['svoy','LEGEND',4400000,1,'ru_word'],
+  ['kot','ULTRA',9000000,1,'ru_word'],
+  ['pes','ULTRA',8500000,1,'ru_word'],
+  ['ded','ULTRA',8000000,1,'ru_word'],
+  ['babka','LEGEND',3600000,1,'ru_word'],
+  ['vova','ULTRA',5200000,1,'ru_name'],
+  ['dima','ULTRA',5200000,1,'ru_name'],
+  ['tema','ULTRA',4900000,1,'ru_name'],
+  ['maks','ULTRA',5100000,1,'ru_name'],
+  ['vlad','ULTRA',4700000,1,'ru_name'],
+  ['roma','ULTRA',4600000,1,'ru_name'],
+  ['sasha','LEGEND',3900000,1,'ru_name'],
+  ['sanya','LEGEND',3500000,1,'ru_name'],
+  ['artem','LEGEND',3900000,1,'ru_name'],
+  ['vasya','LEGEND',3300000,1,'ru_name'],
+  ['petya','LEGEND',3100000,1,'ru_name'],
+  ['kirill','LEGEND',2500000,1,'ru_name'],
+  ['ruslan','LEGEND',2400000,1,'ru_name'],
+  ['bogdan','LEGEND',2300000,1,'ru_name'],
   ['monk','ULTRA',10000000,1,'short_word'],
   ['void','ULTRA',9000000,1,'short_word'],
   ['loly','ULTRA',6000000,1,'short_word'],
