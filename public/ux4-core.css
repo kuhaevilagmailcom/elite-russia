@@ -2230,3 +2230,37 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
   }
   .fortune-hub b{font-size:21px!important}
 }
+
+
+/* USERNAME 5.3.1 — keep upgrader price inside the card */
+.upgrade-source-card{
+  width:100%!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  grid-template-columns:minmax(0,1fr) 92px!important;
+  gap:10px!important;
+  padding-left:14px!important;
+  padding-right:12px!important;
+  overflow:hidden!important;
+}
+.upgrade-source-handle{
+  min-width:0!important;
+}
+.upgrade-source-price{
+  width:92px!important;
+  max-width:92px!important;
+  justify-self:start!important;
+  text-align:left!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+@media(max-width:360px){
+  .upgrade-source-card{
+    grid-template-columns:minmax(0,1fr) 84px!important;
+  }
+  .upgrade-source-price{
+    width:84px!important;
+    max-width:84px!important;
+    font-size:11px!important;
+  }
+}
