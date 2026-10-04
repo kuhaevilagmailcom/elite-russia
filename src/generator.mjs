@@ -9,6 +9,11 @@ export const SUFFIXES=['','7','77','777','1','01','07','007','x','xx','pro','one
 export const PREFIXES=['','the','real','mr','its','iam'];
 
 export const SPECIALS=[
+  ['nft','ULTRA',42000000,1,'telegram_legacy'],
+  ['gif','ULTRA',40000000,1,'telegram_legacy'],
+  ['pic','ULTRA',38000000,1,'telegram_legacy'],
+  ['vid','ULTRA',36000000,1,'telegram_legacy'],
+  ['ufc','ULTRA',34000000,1,'telegram_legacy'],
   ['card','ULTRA',15000000,1,'short_word'],
   ['mama','ULTRA',12000000,1,'short_word'],
   ['monk','ULTRA',10000000,1,'short_word'],
@@ -35,8 +40,13 @@ export const SPECIALS=[
   ['m5pro','RARE',35000,1,'pattern']
 ];
 
+export const TELEGRAM_THREE_LETTER=new Set(['nft','gif','pic','vid','ufc']);
 export function hasLetter(handle){return /[a-z]/i.test(String(handle||''))}
-export function isValidHandle(handle){return /^[a-z][a-z0-9_]{3,9}$/i.test(String(handle||''))&&hasLetter(handle)}
+export function isValidHandle(handle){
+  const h=String(handle||'').toLowerCase();
+  if(TELEGRAM_THREE_LETTER.has(h))return true;
+  return /^[a-z][a-z0-9_]{3,9}$/i.test(h)&&hasLetter(h);
+}
 const clampUnit=x=>Math.max(0,Math.min(.999999999,Number(x)||0));
 export function randInt(min,max,rng=randomUnit){return min+Math.floor(clampUnit(rng())*(max-min+1))}
 export function choice(arr,rng=randomUnit){return arr[Math.floor(clampUnit(rng())*arr.length)]}
@@ -108,7 +118,10 @@ export function wordQuality(handle){
   if(!ugly&&vowelRatio>=.25&&vowelRatio<=.6)return .42;
   return .22;
 }
-function lengthBase(len){return ({4:8000000,5:1200000,6:350000,7:150000,8:70000,9:35000,10:18000})[len]||12000}
+// Fragment behaves much more like a scarce domain market than a cosmetic rarity
+// ladder. Length establishes scarcity; meaning and cleanliness decide where a
+// handle lands inside that length band.
+function lengthBase(len){return ({3:36000000,4:9000000,5:1850000,6:720000,7:300000,8:125000,9:58000,10:28000})[len]||14000}
 export function rarityFromValue(value){
   const v=Math.max(0,Number(value)||0);
   if(v>=2000000)return 'ULTRA';
@@ -119,24 +132,27 @@ export function rarityFromValue(value){
 }
 function scoreCore(handle,jitter=0){
   const h=String(handle||'').toLowerCase(),len=h.length,quality=wordQuality(h);
-  const q=quality>=1?1:quality>=.7?.46:quality>=.6?.34:quality>=.55?.39:quality>=.4?.15:.055;
+  const q=quality>=1?1:quality>=.7?.58:quality>=.6?.46:quality>=.55?.38:quality>=.4?.24:.11;
   let score=lengthBase(len)*q;
-  if(/_/.test(h))score*=.48;
+  if(/_/.test(h))score*=.58;
   if(/\d/.test(h)){
-    score*=.55;
-    if(/777$/.test(h))score*=1.28;
-    else if(/77$/.test(h))score*=1.16;
-    else if(/007$/.test(h))score*=1.12;
-    else if(/(\d)\1{1,}$/.test(h))score*=1.08;
-  }else score*=1.08;
-  if(len===4)score*=1.35;
+    score*=len===4?.86:.68;
+    if(/777$/.test(h))score*=1.34;
+    else if(/77$/.test(h))score*=1.22;
+    else if(/007$/.test(h))score*=1.18;
+    else if(/(\d)\1{1,}$/.test(h))score*=1.14;
+  }else score*=1.1;
+  // Even arbitrary four-character collectibles are a tiny namespace. Give
+  // them a hard market floor instead of pricing them like long random strings.
+  if(len===4)score=Math.max(score,/\d/.test(h)?2100000:2600000);
+  if(len===3&&TELEGRAM_THREE_LETTER.has(h))score=Math.max(score,32000000);
   return Math.max(200,Math.round(score*(1+jitter)/100)*100);
 }
 export function scoreHandle(handle,_rarity='COMMON',_instanceNumber=1,_maxSupply=1,rng=randomUnit){
   return scoreCore(handle,(rng()-.5)*.08);
 }
 export function stableScoreHandle(handle){
-  const key=String(handle).toLowerCase()+':value-model-v4',h=crypto.createHash('sha256').update(key).digest(),unit=h.readUInt32BE(0)/0xffffffff;
+  const key=String(handle).toLowerCase()+':fragment-market-v5',h=crypto.createHash('sha256').update(key).digest(),unit=h.readUInt32BE(0)/0xffffffff;
   return scoreCore(handle,(unit-.5)*.08);
 }
 export function assessHandle(handle,{stable=false}={}){

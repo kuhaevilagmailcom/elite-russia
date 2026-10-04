@@ -30,6 +30,7 @@ test('drop starts from the central username area and has no separate drop CTA',(
   assert.match(home,/handle-stage drop-trigger/);
   assert.doesNotMatch(home,/id="dropBtn"|class="drop-btn"/);
   assert.match(appSrc,/hasAttribute\('data-drop-trigger'\)/);
+  assert.doesNotMatch(home,/Нажми на username/);
 });
 test('drop animation is about two and a half seconds and lands on server result',()=>{
   const m=appSrc.match(/const reduced=.*?delays=reduced\?\[[^\]]+\]:\[([^\]]+)\]/);
@@ -44,24 +45,27 @@ test('important UX uses click events and does not depend on touch-only handlers'
   assert.doesNotMatch(appSrc,/touchstart|touchend/);
   assert.match(appSrc,/requestAnimationFrame/);
 });
-test('upgrader uses a horizontal slot track, not the old circular roulette',()=>{
+test('upgrader uses a probability circle with a real win sector',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(view,/slot-viewport|upgradeSpinning/);
-  assert.doesNotMatch(view,/upgrade-roulette|upgrade-wheel-wrap/);
-  assert.match(appSrc,/slot-track/);
-  assert.match(uxCss,/\.slot-track/);
+  assert.match(view,/upgrade-roulette/);
+  assert.match(view,/--chance-angle/);
+  assert.doesNotMatch(view,/slot-viewport|slot-track/);
+  assert.match(appSrc,/winArc/);
+  assert.match(uxCss,/conic-gradient/);
+  assert.match(uxCss,/\.upgrade-pointer/);
 });
-test('upgrader has one screen title and no visible five-item-limit copy',()=>{
+test('upgrader has one screen title and explicitly explains single-item risk',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(appSrc,/page==='upgrader'\)shell\('Апгрейдер',upgraderView\(\)\)/);
-  assert.match(view,/Выбери usernames и попробуй получить более дорогой/);
+  assert.match(view,/Выбери один username/);
   assert.doesNotMatch(view,/>Апгрейдер</);
   assert.doesNotMatch(view,/Выбери до|от 1 до 5|максимум 5|5 usernames/i);
   assert.doesNotMatch(appSrc,/Лимит выбора достигнут|Можно выбрать максимум 5 usernames/);
 });
-test('upgrader selection cards are compact and footer is sticky',()=>{
-  assert.match(uxCss,/\.upgrade-selected\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(uxCss,/\.upgrade-selected>button\{[^}]*height:54px/);
+test('upgrader is single-item, compact and footer is sticky',()=>{
+  assert.match(appSrc,/maxItems:1/);
+  assert.match(appSrc,/state\.upgradeSelectedIds=selected\?\[\]:\[id\]/);
+  assert.match(uxCss,/\.upgrade-duel/);
   assert.match(uxCss,/\.upgrade-pick\{[^}]*height:60px/);
   assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:76px/);
   assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:54px/);
@@ -85,10 +89,10 @@ test('drop roll builds fresh unique random usernames instead of cycling a fixed 
 });
 test('upgrader result keeps price and chance on one compact line',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(view,/upgrade-target-meta/);
+  assert.match(view,/upgrade-side target/);
   assert.match(view,/fmt\(p\.target\.value\)/);
-  assert.match(view,/Шанс <b>/);
-  assert.match(uxCss,/\.upgrade-target\{[^}]*min-height:88px/);
+  assert.match(view,/chance/);
+  assert.match(uxCss,/\.upgrade-side\{[^}]*height:68px/);
 });
 
 

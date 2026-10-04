@@ -10,7 +10,7 @@ import {ensureUser,createDrop,resolveDrop,leaderboard,publicUser,sellOwnedUserna
 import {createListing,buyListing,cancelListing,listMarket} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
 import {spinWheel,wheelStatus} from '../src/wheel.mjs';
-import {previewUpgrade,performUpgrade,UPGRADE_RULES} from '../src/upgrader.mjs';
+import {previewUpgrade,performUpgrade,upgradeInfo} from '../src/upgrader.mjs';
 import {ensureSeasonLifecycle} from '../src/seasons.mjs';
 import {activeCollectionCount,systemSellValue,todayKey} from '../src/economy.mjs';
 import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from '../src/payments.mjs';
@@ -26,7 +26,7 @@ test('generator keeps usernames <=10 chars and never numeric-only',()=>{for(let 
 test('requested word handles exist',()=>{for(const h of ['card','loly','mama','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}});
 test('short real words are in a different value class than long or junk handles',()=>{
   assert.ok(scoreHandle('card','ULTRA')>scoreHandle('sigma','ULTRA')*4);
-  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*8);
+  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*3);
   assert.ok(wordQuality('mama')>wordQuality('qzvra'));
 });
 test('rarity is derived from value, not from a requested rarity label',()=>{
@@ -39,8 +39,17 @@ test('five-character real words beat long junk by a wide margin',()=>{
   assert.ok(scoreHandle('ghost','COMMON',1,1,()=>.5)>scoreHandle('qzxvbnm123','ULTRA',1,1,()=>.5)*20);
 });
 test('three-character usernames are excluded from ordinary generation',()=>{
-  assert.equal(isValidHandle('abc'),false);
+  assert.equal(isValidHandle('abc'),false);assert.equal(isValidHandle('nft'),true);
   for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])for(let i=0;i<1000;i++)assert.ok(buildGeneratedHandle(profile).length>=4);
+});
+test('Fragment-style scarcity gives every clean four-character handle a premium floor',()=>{
+  assert.ok(scoreHandle('qzvr','COMMON',1,1,()=>.5)>=2600000);
+  assert.ok(scoreHandle('a7x9','COMMON',1,1,()=>.5)>=2100000);
+});
+test('meaningful five to seven character words retain strong market value',()=>{
+  assert.ok(scoreHandle('ghost','COMMON',1,1,()=>.5)>=1500000);
+  assert.ok(scoreHandle('vision','COMMON',1,1,()=>.5)>=700000);
+  assert.ok(scoreHandle('million','COMMON',1,1,()=>.5)>=300000);
 });
 test('RARE generation never creates 4 or 5 character handles',()=>{
   for(let i=0;i<5000;i++)assert.ok(buildGeneratedHandle('RARE').length>=6);
@@ -141,19 +150,22 @@ test('showcase compacts after removing middle item',()=>{
   assert.deepEqual(db.prepare('SELECT position FROM profile_showcase WHERE user_id=? ORDER BY position').all(u.id).map(x=>x.position),[1,2,3]);
 });
 
-test('cheaper username has higher upgrade chance and extra items increase it',()=>{
-  const u=ensureUser(db,{id:20004,username:'up',first_name:'Up'}),cheap=owned(u,'cheapup','COMMON',200),expensive=owned(u,'expensiveup','COMMON',1400),extra=owned(u,'extraup','COMMON',300),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  const a=previewUpgrade(db,fresh,[cheap]),b=previewUpgrade(db,fresh,[expensive]),c=previewUpgrade(db,fresh,[cheap,extra]);
-  assert.ok(a.chance>b.chance);assert.ok(c.chance>a.chance);
+test('upgrader accepts exactly one username and chance matches the displayed price ratio',()=>{
+  const u=ensureUser(db,{id:20004,username:'up',first_name:'Up'}),source=owned(u,'cheapup','COMMON',200),extra=owned(u,'extraup','COMMON',300),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+  const a=previewUpgrade(db,fresh,[source]);
+  assert.equal(upgradeInfo(db,fresh).maxItems,1);
+  assert.equal(a.maxItems,1);
+  assert.ok(Math.abs(a.chance-Math.max(.01,Math.min(.75,200*.9/a.target.value)))<1e-12);
+  assert.throws(()=>previewUpgrade(db,fresh,[source,extra]),/bad_upgrade/);
 });
 test('same upgrade inputs reuse same preview target instead of rerolling',()=>{
   const u=ensureUser(db,{id:20005,username:'reroll',first_name:'Reroll'}),id=owned(u,'rerollup','COMMON',600),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
   const a=previewUpgrade(db,fresh,[id]),b=previewUpgrade(db,fresh,[id]);assert.equal(a.sessionId,b.sessionId);assert.equal(a.target.handle,b.target.handle);
   const win=performUpgrade(db,fresh,[id],a.sessionId,()=>0);assert.equal(win.result.handle,a.target.handle);
 });
-test('failed multi-upgrade consumes all selected usernames',()=>{
-  const u=ensureUser(db,{id:20006,username:'fail',first_name:'Fail'}),a=owned(u,'faila','COMMON',400),b=owned(u,'failb','COMMON',350),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  const p=previewUpgrade(db,fresh,[a,b]),r=performUpgrade(db,fresh,[a,b],p.sessionId,()=>.999);assert.equal(r.success,false);assert.equal(r.result,null);assert.equal(db.prepare('SELECT status FROM username_instances WHERE id=?').get(a).status,'consumed');assert.equal(db.prepare('SELECT status FROM username_instances WHERE id=?').get(b).status,'consumed');
+test('failed single upgrade consumes the selected username',()=>{
+  const u=ensureUser(db,{id:20006,username:'fail',first_name:'Fail'}),a=owned(u,'faila','COMMON',400),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+  const p=previewUpgrade(db,fresh,[a]),r=performUpgrade(db,fresh,[a],p.sessionId,()=>.999);assert.equal(r.success,false);assert.equal(r.result,null);assert.equal(db.prepare('SELECT status FROM username_instances WHERE id=?').get(a).status,'consumed');
 });
 
 test('Stars checkout validates product, amount and payer',()=>{

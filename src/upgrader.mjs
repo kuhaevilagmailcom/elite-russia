@@ -1,19 +1,17 @@
 import {buildGeneratedHandle,scoreHandle,isValidHandle,rarityFromValue} from './generator.mjs';
-import {RARITY_BASE} from './config.mjs';
 import {uid,nowIso,bumpSeasonScore,randomUnit} from './economy.mjs';
 
-const ORDER=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
 export const UPGRADE_RULES=Object.freeze({
-  COMMON:{next:'RARE',highChance:.66,lowChance:.40,minMultiplier:1.35},
-  RARE:{next:'EPIC',highChance:.58,lowChance:.34,minMultiplier:1.32},
-  EPIC:{next:'LEGEND',highChance:.50,lowChance:.28,minMultiplier:1.28},
-  LEGEND:{next:'ULTRA',highChance:.42,lowChance:.24,minMultiplier:1.22}
+  COMMON:{next:'RARE',minMultiplier:1.35},
+  RARE:{next:'EPIC',minMultiplier:1.32},
+  EPIC:{next:'LEGEND',minMultiplier:1.28},
+  LEGEND:{next:'ULTRA',minMultiplier:1.22}
 });
 const shape=r=>r?{id:r.id,handle:'@'+r.handle,rarity:r.rarity,value:r.value,instanceNumber:r.instance_number,maxSupply:r.max_supply}:null;
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 function validateIds(ids){
-  if(!Array.isArray(ids)||ids.length<1||ids.length>5)throw new Error('bad_upgrade');
-  const uniq=[...new Set(ids.map(String).filter(Boolean))];if(uniq.length!==ids.length)throw new Error('bad_upgrade');return uniq;
+  if(!Array.isArray(ids)||ids.length!==1)throw new Error('bad_upgrade');
+  const clean=String(ids[0]||'');if(!clean)throw new Error('bad_upgrade');return [clean];
 }
 function loadSources(db,user,ids){
   const clean=validateIds(ids),marks=clean.map(()=>'?').join(',');
@@ -22,15 +20,10 @@ function loadSources(db,user,ids){
   if(rows.some(r=>r.rarity==='ULTRA'||!UPGRADE_RULES[r.rarity]))throw new Error('upgrade_bad_recipe');
   return clean.map(id=>rows.find(r=>r.id===id));
 }
-function anchorOf(rows){return rows.reduce((best,r)=>{const rb=ORDER.indexOf(best.rarity),rr=ORDER.indexOf(r.rarity);if(rr>rb)return r;if(rr===rb&&Number(r.value)>Number(best.value))return r;return best},rows[0])}
-function calculateChance(rows){
-  const anchor=anchorOf(rows),rule=UPGRADE_RULES[anchor.rarity],bounds=RARITY_BASE[anchor.rarity]||[1,1000];
-  const t=clamp((Number(anchor.value)-bounds[0])/Math.max(1,bounds[1]-bounds[0]),0,1);
-  let chance=rule.highChance-(rule.highChance-rule.lowChance)*t;
-  for(const r of rows){if(r.id===anchor.id)continue;const ratio=clamp(Number(r.value||0)/Math.max(1,Number(anchor.value||1)),0,2);chance+=.045+Math.min(.045,ratio*.035)}
-  chance=clamp(chance,.20,.80);
-  const totalValue=rows.reduce((s,r)=>s+Number(r.value||0),0),targetMinValue=Math.ceil(Math.max(Number(anchor.value)*rule.minMultiplier,totalValue*1.12)/50)*50;
-  return {anchor,rule,chance,totalValue,targetMinValue,from:anchor.rarity,to:rule.next,count:rows.length};
+function calculatePlan(source){
+  const rule=UPGRADE_RULES[source.rarity];
+  const targetMinValue=Math.ceil(Number(source.value)*rule.minMultiplier/50)*50;
+  return {source,rule,totalValue:Number(source.value),targetMinValue,from:source.rarity,to:rule.next,count:1};
 }
 function prepareTarget(db,next,minValue){
   for(let i=0;i<300;i++){
@@ -59,9 +52,13 @@ function findReusableSession(db,user,sourceIds){
 function createSession(db,user,rows,preview){
   const sorted=rows.map(r=>r.id).sort(),existing=findReusableSession(db,user,sorted);
   if(existing)return existing;
-  const target=prepareTarget(db,preview.to,preview.targetMinValue),id=uid(),created=nowIso(),expires=new Date(Date.now()+10*60*1000).toISOString();
+  const target=prepareTarget(db,preview.to,preview.targetMinValue);
+  // CS-style upgrader: the visible arc is the actual server probability. A
+  // 10% edge keeps the sink sustainable while price ratio remains intuitive.
+  const chance=clamp(Number(preview.source.value)*.90/Math.max(1,Number(target.value)),.01,.75);
+  const id=uid(),created=nowIso(),expires=new Date(Date.now()+10*60*1000).toISOString();
   db.prepare(`INSERT INTO upgrade_sessions(id,user_id,source_ids,target_template_id,target_handle,target_rarity,target_value,chance,from_rarity,created_at,expires_at,used_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)`).run(id,user.id,JSON.stringify(sorted),target.templateId,target.handle,target.rarity,target.value,preview.chance,preview.from,created,expires);
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)`).run(id,user.id,JSON.stringify(sorted),target.templateId,target.handle,target.rarity,target.value,chance,preview.from,created,expires);
   return db.prepare('SELECT * FROM upgrade_sessions WHERE id=?').get(id);
 }
 function allocateSessionTarget(db,user,session){
@@ -87,12 +84,12 @@ export function cleanupUpgradeSessions(db){
 }
 export function upgradeInfo(db,user){
   const available=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') ORDER BY value DESC LIMIT 250").all(user.id).map(shape);
-  return {rules:UPGRADE_RULES,maxItems:5,available};
+  return {rules:UPGRADE_RULES,maxItems:1,available};
 }
 export function previewUpgrade(db,user,ids){
   cleanupUpgradeSessions(db);
-  const rows=loadSources(db,user,ids),calc=calculateChance(rows),session=createSession(db,user,rows,calc),base=sessionPayload(session);
-  return {...base,totalValue:calc.totalValue,targetMinValue:calc.targetMinValue,sources:rows.map(shape),maxItems:5};
+  const rows=loadSources(db,user,ids),calc=calculatePlan(rows[0]),session=createSession(db,user,rows,calc),base=sessionPayload(session);
+  return {...base,totalValue:calc.totalValue,targetMinValue:calc.targetMinValue,sources:rows.map(shape),maxItems:1};
 }
 export function performUpgrade(db,user,ids,sessionId,rng=randomUnit){
   if(!sessionId||String(sessionId).length>100)throw new Error('bad_request_id');

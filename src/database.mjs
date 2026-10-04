@@ -209,6 +209,28 @@ export function createDatabase(dataDir){
     })();
   }
 
+  const fragmentValueV5=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('4.4.0-fragment-value-model');
+  if(!fragmentValueV5){
+    const specials=new Map(SPECIALS.map(x=>[x[0],x]));
+    db.transaction(()=>{
+      const templates=db.prepare('SELECT id,handle FROM username_templates').all();
+      const updTemplate=db.prepare('UPDATE username_templates SET rarity=?,base_value=? WHERE id=?');
+      for(const row of templates){
+        const sp=specials.get(row.handle),value=sp?Number(sp[2]):stableScoreHandle(row.handle);
+        updTemplate.run(rarityFromValue(value),value,row.id);
+      }
+      const instances=db.prepare('SELECT id,handle FROM username_instances').all();
+      const updInstance=db.prepare('UPDATE username_instances SET rarity=?,value=? WHERE id=?');
+      const updHistory=db.prepare('UPDATE drop_history SET rarity=?,value=?,handle=? WHERE instance_id=?');
+      for(const row of instances){
+        const sp=specials.get(row.handle),value=sp?Number(sp[2]):stableScoreHandle(row.handle),rarity=rarityFromValue(value);
+        updInstance.run(rarity,value,row.id);
+        updHistory.run(rarity,value,row.handle,row.id);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('4.4.0-fragment-value-model',now);
+    })();
+  }
+
   const integrity=db.pragma('integrity_check',{simple:true});
   if(String(integrity).toLowerCase()!=='ok')throw new Error('sqlite_integrity_check_failed:'+integrity);
   return db;
