@@ -17,7 +17,29 @@ const adminUi=fs.readFileSync(new URL('../public/admin-ui.js',import.meta.url),'
 const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 const wheelSrc=fs.readFileSync(new URL('../src/wheel.mjs',import.meta.url),'utf8');
 const gameSrc=fs.readFileSync(new URL('../src/game.mjs',import.meta.url),'utf8');
+const indexSrc=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 
+test('all interface icons use the external Lucide set instead of homemade SVG paths',()=>{
+  assert.match(indexSrc,/unpkg\.com\/lucide@1\.33\.0\/dist\/umd\/lucide\.min\.js/);
+  assert.match(appSrc,/const ICON_NAME=Object\.freeze/);
+  assert.match(appSrc,/data-lucide=/);
+  assert.match(appSrc,/lucide\?\.createIcons/);
+  assert.doesNotMatch(appSrc,/const ICON=\{/);
+});
+test('home drop keeps the username visually centered with no tap instruction',()=>{
+  const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.doesNotMatch(home,/Нажми на username/);
+  assert.match(uxCss,/\.drop-headline\{[^}]*position:absolute/);
+  assert.match(uxCss,/\.handle-stage\.drop-trigger\{[^}]*background:transparent/);
+  assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
+});
+test('upgrader keeps the final pointer position and round until continue',()=>{
+  assert.match(appSrc,/upgradeLastRound:null/);
+  assert.match(appSrc,/upgradeLandingAngle:0/);
+  assert.match(appSrc,/state\.upgradeLastRound=\{source,target:result\.target/);
+  assert.match(appSrc,/style="transform:rotate\('\+pointerAngle\+'deg\)"/);
+  assert.match(appSrc,/state\.upgradeLastRound=null;state\.upgradeLandingAngle=0;render\(\);return/);
+});
 test('long usernames use responsive fit instead of clipping',()=>{
   assert.match(appSrc,/function fitUsername/);
   assert.match(appSrc,/data-fit-username/);
@@ -57,7 +79,7 @@ test('upgrader uses a probability circle with a real win sector',()=>{
 test('upgrader has one screen title and explicitly explains single-item risk',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(appSrc,/page==='upgrader'\)shell\('Апгрейдер',upgraderView\(\)\)/);
-  assert.match(view,/Выбери один username/);
+  assert.match(view,/Выбери username — круг сразу покажет шанс апгрейда/);
   assert.doesNotMatch(view,/>Апгрейдер</);
   assert.doesNotMatch(view,/Выбери до|от 1 до 5|максимум 5|5 usernames/i);
   assert.doesNotMatch(appSrc,/Лимит выбора достигнут|Можно выбрать максимум 5 usernames/);
