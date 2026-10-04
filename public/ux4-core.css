@@ -2066,3 +2066,167 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
     font-size:22px!important;
   }
 }
+
+
+/* USERNAME 5.3 — pure upgrader rows + precise SVG fortune wheel */
+
+/* Upgrader source: literally only username + price */
+.upgrade-source-card{
+  width:100%!important;
+  height:56px!important;
+  min-height:56px!important;
+  flex:0 0 56px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:14px!important;
+  padding:0 14px!important;
+  border:1px solid #dde2e6!important;
+  border-radius:13px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+.upgrade-source-card.selected{
+  border-color:#38ace6!important;
+  background:#f3fbff!important;
+}
+.upgrade-source-handle{
+  min-width:0!important;
+  margin:0!important;
+  font-size:14.5px!important;
+  line-height:1!important;
+  font-weight:760!important;
+  color:#171b20!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.upgrade-source-price{
+  margin:0!important;
+  font-size:11.5px!important;
+  line-height:1!important;
+  font-weight:650!important;
+  color:#737c86!important;
+  white-space:nowrap!important;
+  font-variant-numeric:tabular-nums!important;
+}
+.upgrade-source-chevron{display:none!important}
+.upgrade-source-stage .upgrade-list{gap:7px!important}
+@media(max-height:620px){
+  .upgrade-source-card{
+    height:52px!important;
+    min-height:52px!important;
+    flex-basis:52px!important;
+  }
+}
+
+/* Wheel rebuilt as SVG: geometry is deterministic and cannot drift */
+.fortune-stage{
+  --fortune-size:min(260px,calc(100vw - 102px),39vh)!important;
+  position:relative!important;
+  width:var(--fortune-size)!important;
+  height:var(--fortune-size)!important;
+  flex:0 0 var(--fortune-size)!important;
+  margin:3px auto 0!important;
+}
+.fortune-svg{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:block!important;
+  overflow:visible!important;
+  border-radius:50%!important;
+  filter:drop-shadow(0 8px 16px rgba(25,29,34,.045));
+  transform-origin:50% 50%!important;
+  transform-box:fill-box!important;
+  will-change:transform!important;
+}
+.fortune-svg text{
+  fill:#30353b!important;
+  font-family:inherit!important;
+  font-size:3.75px!important;
+  font-weight:720!important;
+  letter-spacing:0!important;
+  pointer-events:none!important;
+}
+.fortune-hub{
+  position:absolute!important;
+  z-index:8!important;
+  left:50%!important;
+  top:50%!important;
+  width:68px!important;
+  height:68px!important;
+  transform:translate(-50%,-50%)!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:50%!important;
+  background:#fff!important;
+  border:1px solid #dfe3e7!important;
+  box-shadow:0 4px 12px rgba(25,29,34,.065)!important;
+  pointer-events:none!important;
+}
+.fortune-hub b{
+  margin:0!important;
+  font-size:26px!important;
+  line-height:1!important;
+  font-weight:780!important;
+  color:#15191e!important;
+}
+.fortune-pointer{
+  position:absolute!important;
+  z-index:12!important;
+  left:50%!important;
+  top:-4px!important;
+  width:20px!important;
+  height:19px!important;
+  transform:translateX(-50%)!important;
+  background:var(--accent)!important;
+  clip-path:polygon(8% 0,92% 0,100% 28%,50% 100%,0 28%)!important;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.10))!important;
+}
+.wheel-card-clean{
+  padding:12px 12px 10px!important;
+  border-radius:15px!important;
+}
+.wheel-card-clean .wheel-rare{
+  margin-top:10px!important;
+  min-height:38px!important;
+  padding:6px 8px!important;
+}
+.wheel-card-clean .wheel-rare>span{
+  font-size:7.5px!important;
+  letter-spacing:.55px!important;
+}
+.wheel-card-clean .wheel-rare b{
+  padding:5px 7px!important;
+  font-size:8.5px!important;
+}
+.wheel-page-clean .wheel-copy b{
+  font-size:13px!important;
+  font-weight:720!important;
+}
+.wheel-page-clean .wheel-copy span{
+  font-size:9.5px!important;
+}
+@media(max-width:370px){
+  .fortune-stage{
+    --fortune-size:min(236px,calc(100vw - 92px),37vh)!important;
+  }
+  .fortune-hub{
+    width:62px!important;
+    height:62px!important;
+  }
+  .fortune-hub b{font-size:23px!important}
+  .fortune-svg text{font-size:3.55px!important}
+}
+@media(max-height:620px){
+  .fortune-stage{
+    --fortune-size:min(218px,calc(100vw - 106px),34vh)!important;
+  }
+  .fortune-hub{
+    width:56px!important;
+    height:56px!important;
+  }
+  .fortune-hub b{font-size:21px!important}
+}
