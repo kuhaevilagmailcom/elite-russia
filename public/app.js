@@ -4,7 +4,7 @@ const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
-  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13,7 +13,7 @@ const ERR={
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',network:'Нет соединения с сервером'
 };
 function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
@@ -197,9 +197,26 @@ function selectedUpgradeItems(){
  const list=state.upgrader?.available||[],set=new Set(state.upgradeSelectedIds||[]);
  return list.filter(x=>set.has(x.id));
 }
+function upgradeChanceText(value){
+ const raw=Number(value||0)*100;
+ return raw<10?raw.toFixed(1):Math.round(raw).toString();
+}
+function upgradeTargetOptions(){
+ const list=state.upgradePreview?.targets;
+ if(Array.isArray(list)&&list.length)return list;
+ return state.upgradePreview?.sessionId?[state.upgradePreview]:[];
+}
+function selectedUpgradeTarget(){
+ const id=String(state.upgradeTargetSessionId||'');
+ return upgradeTargetOptions().find(x=>String(x.sessionId)===id)||null;
+}
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
- return '<button class="upgrade-pick '+(selected?'selected':'')+'" data-up-item="'+x.id+'"><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><i>'+(selected?icon('check'):icon('plus'))+'</i></button>';
+ return '<button class="upgrade-pick '+(selected?'selected':'')+'" data-up-item="'+x.id+'"><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+' · '+esc(x.rarity)+'</small></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
+}
+function upgradeTargetRowHtml(x){
+ const selected=String(state.upgradeTargetSessionId||'')===String(x.sessionId),chance=upgradeChanceText(x.chance);
+ return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+' · '+esc(x.target.rarity)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
 }
 function appendUpgradeBatch(){
  const list=document.querySelector('.upgrade-list'),all=state.upgrader?.available||[];if(!list)return;
@@ -209,14 +226,34 @@ function appendUpgradeBatch(){
 
 function upgraderView(){
  const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),liveSource=selected[0],round=state.upgradeLastRound;
- const source=round?.source||liveSource,p=round?{chance:round.chance,target:round.target}:state.upgradePreview;
- const rawChance=Number(p?.chance||0)*100,chance=p?(rawChance<10?rawChance.toFixed(1):Math.round(rawChance).toString()):'—',angle=p?Math.max(3,Math.min(270,Number(p.chance||0)*360)):0;
- const pointerAngle=round?Number(state.upgradeLandingAngle||0):0;
- return '<div class="upgrade-page"><div class="upgrade-copy"><span>Выбери username — увидишь цель и шанс апгрейда.</span></div>'+
- '<section class="upgrade-duel"><div class="upgrade-side source"><small>ТВОЙ USERNAME</small><b data-fit-username data-max-size="19" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'Выбери ниже')+'</strong></div><span class="upgrade-arrow">'+icon('chevron')+'</span><div class="upgrade-side target"><small>МОЖНО ПОЛУЧИТЬ</small><b data-fit-username data-max-size="19" data-min-size="12">'+(p?esc(p.target.handle):'—')+'</b><strong>'+(p?fmt(p.target.value):'Подбираем')+'</strong></div></section>'+
- '<section class="upgrade-wheel-card '+(p?'ready':'empty')+' '+(round?(round.success?'round-win':'round-fail'):'')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer" style="transform:rotate('+pointerAngle+'deg)"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> зона успеха</span><span><i></i> зона неудачи</span></div></section>'+
- (state.upgradeOutcome&&!state.upgradeSpinning?'<section class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><small>РЕЗУЛЬТАТ</small><b>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle):'Не получилось')+'</b><span>'+(state.upgradeOutcome.success?fmt(state.upgradeOutcome.result.value):'Username использован в апгрейде')+'</span><button class="secondary" data-upgrade-continue>Продолжить</button></section>':'')+
- '<div class="upgrade-list-title"><b>Мои usernames</b></div><div class="upgrade-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div><div class="upgrade-footer"><div><span>Шанс</span><b>'+(p?chance+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!selected.length||!state.upgradePreview||state.upgradeSpinning||!!round?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится…':'Апгрейд')+'</button></div></div>';
+ const stage=state.upgradeStage||'source';
+ if(stage==='source'){
+  return '<div class="upgrade-page upgrade-source-stage">'+
+   '<div class="upgrade-copy"><span>Сначала выбери username, который ставишь в апгрейд.</span></div>'+
+   '<div class="upgrade-step-head"><span>ШАГ 1 ИЗ 3</span><b>Что ставим?</b><small>После выбора покажем usernames, которые можно получить.</small></div>'+
+   '<div class="upgrade-list-title"><b>Мои usernames</b><span>'+(u.available||[]).length+' доступно</span></div>'+
+   '<div class="upgrade-list upgrade-source-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div>'+
+  '</div>';
+ }
+ if(stage==='target'){
+  const targets=upgradeTargetOptions(),picked=selectedUpgradeTarget();
+  return '<div class="upgrade-page upgrade-target-stage">'+
+   '<div class="upgrade-step-head with-action"><div><span>ШАГ 2 ИЗ 3</span><b>Что хочешь получить?</b><small>Чем дороже username — тем ниже шанс.</small></div><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+' Назад</button></div>'+
+   '<section class="upgrade-source-summary"><span>ТЫ СТАВИШЬ</span><div><b data-fit-username data-max-size="20" data-min-size="12">'+(liveSource?esc(liveSource.handle):'—')+'</b><strong>'+(liveSource?fmt(liveSource.value):'—')+'</strong></div></section>'+
+   '<div class="upgrade-list-title"><b>Выбери цель</b><span>'+targets.length+' вариантов</span></div>'+
+   '<div class="upgrade-target-list">'+(targets.length?targets.map(upgradeTargetRowHtml).join(''):'<div class="upgrade-target-loading"><span></span><b>Подбираем варианты…</b><small>Считаем цены и реальные шансы.</small></div>')+'</div>'+
+   '<div class="upgrade-footer upgrade-target-footer"><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>'+icon('upgrade')+' Апгрейд</button></div>'+
+  '</div>';
+ }
+ const picked=selectedUpgradeTarget(),source=round?.source||liveSource,target=round?.target||picked?.target||state.upgradeOutcome?.target;
+ const chanceValue=round?.chance??picked?.chance??state.upgradeOutcome?.chance??0,chance=upgradeChanceText(chanceValue),angle=Math.max(3,Math.min(270,Number(chanceValue||0)*360)),pointerAngle=round?Number(state.upgradeLandingAngle||0):0;
+ const done=!!state.upgradeOutcome&&!state.upgradeSpinning&&!!round,success=!!state.upgradeOutcome?.success;
+ return '<div class="upgrade-page upgrade-spin-stage">'+
+  '<div class="upgrade-step-head"><span>ШАГ 3 ИЗ 3</span><b>'+(done?'Результат':'Крутим апгрейд')+'</b><small>'+(done?(success?'Залетело. Username уже в коллекции.':'Не залетело. Ставка сгорела.'):'Стрелка остановится либо в зоне успеха, либо в зоне неудачи.')+'</small></div>'+
+  '<section class="upgrade-duel"><div class="upgrade-side source"><small>СТАВИШЬ</small><b data-fit-username data-max-size="18" data-min-size="11">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'—')+'</strong></div><span class="upgrade-arrow">'+icon('chevron')+'</span><div class="upgrade-side target"><small>МОЖЕШЬ ПОЛУЧИТЬ</small><b data-fit-username data-max-size="18" data-min-size="11">'+(target?esc(target.handle):'—')+'</b><strong>'+(target?fmt(target.value):'—')+'</strong></div></section>'+
+  '<section class="upgrade-wheel-card ready '+(done?(success?'round-win':'round-fail'):'')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer" style="transform:rotate('+pointerAngle+'deg)"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> зона успеха</span><span><i></i> зона неудачи</span></div></section>'+
+  (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><small>'+(success?'УСПЕХ':'НЕ ПОВЕЗЛО')+'</small><b>'+(success?'Круто, апгрейд залетел!':'Апгрейд не зашёл')+'</b><span>'+(success?('Ты получил '+esc(state.upgradeOutcome.result.handle)+' · '+fmt(state.upgradeOutcome.result.value)):((source?esc(source.handle):'Username')+' сгорел. Можно рискнуть ещё раз.'))+'</span><button class="primary" data-upgrade-continue>'+(success?'Продолжить':'Попробовать ещё раз')+'</button></section>':'<div class="upgrade-spin-status"><span></span><b>Крутим…</b><small>Результат уже считается на сервере.</small></div>')+
+ '</div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'<small>'+x.rarity+'</small></div>').join(''):'<div class="empty-line">Добавьте usernames из коллекции.</div>')+'</div></section></div>'}
@@ -237,7 +274,7 @@ async function load(page){
   if(page==='wheel')state.wheel=await api('/api/wheel');
   if(page==='friends')state.friends=await api('/api/friends');
   if(page==='gift')state.gift=await api('/api/gift/options');
-  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0}
+  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0}
   if(page==='seasons')state.season=await api('/api/seasons');
   if(page==='profile')state.profile=await api('/api/profile');
   if(page==='premium')state.premium=await api('/api/premium');
@@ -264,9 +301,15 @@ async function spinWheelUi(){
 let upgradePreviewSeq=0;
 async function refreshUpgradePreview(){
  const ids=[...(state.upgradeSelectedIds||[])],seq=++upgradePreviewSeq;
- if(!ids.length){state.upgradePreview=null;render();return}
- state.upgradePreview=null;render();
- try{const p=await api('/api/upgrader/preview',{method:'POST',body:JSON.stringify({ids})});if(seq!==upgradePreviewSeq)return;state.upgradePreview=p;render()}catch(e){if(seq===upgradePreviewSeq){state.upgradePreview=null;toast(ERR[e.message]||'Не удалось рассчитать шанс');render()}}
+ if(!ids.length){state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeStage='source';render();return}
+ state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeStage='target';render();
+ try{
+  const p=await api('/api/upgrader/preview',{method:'POST',body:JSON.stringify({ids})});
+  if(seq!==upgradePreviewSeq)return;
+  state.upgradePreview=p;state.upgradeStage='target';render();
+ }catch(e){
+  if(seq===upgradePreviewSeq){state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeStage='source';toast(ERR[e.message]||'Не удалось подобрать цели');render()}
+ }
 }
 async function animateUpgradeWheel(result){
  const source=result.sources?.[0]||selectedUpgradeItems()[0]||null;
@@ -278,7 +321,7 @@ async function animateUpgradeWheel(result){
  requestAnimationFrame(()=>{pointer.style.transition='transform 3.2s cubic-bezier(.12,.72,.08,1)';pointer.style.transform='rotate('+(360*6+landing)+'deg)'});
  await new Promise(r=>setTimeout(r,3250));haptic(result.success?'medium':'light');
  state.upgradeLandingAngle=landing;state.upgradeLastRound={source,target:result.target,chance:Number(result.chance||0),success:!!result.success};
- state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;
+ state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeTargetSessionId='';
  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
 }
 function applyUserLocal(user){
@@ -351,17 +394,32 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
  if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
  if(el.dataset.upItem){
-   const id=el.dataset.upItem,selected=(state.upgradeSelectedIds||[]).includes(id);
-   state.upgradeSelectedIds=selected?[]:[id];state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;await refreshUpgradePreview();return
+   const id=el.dataset.upItem;
+   state.upgradeSelectedIds=[id];state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeScrollTop=0;
+   await refreshUpgradePreview();return
  }
- if(el.dataset.upRemove){state.upgradeSelectedIds=(state.upgradeSelectedIds||[]).filter(id=>id!==el.dataset.upRemove);await refreshUpgradePreview();return}
- if(el.hasAttribute('data-up-clear')){state.upgradeSelectedIds=[];state.upgradePreview=null;render();return}
- if(el.hasAttribute('data-upgrade-continue')){state.upgradeOutcome=null;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();return}
+ if(el.hasAttribute('data-upgrade-back-source')){
+   state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();return
+ }
+ if(el.dataset.upTarget){
+   const option=upgradeTargetOptions().find(x=>String(x.sessionId)===String(el.dataset.upTarget));
+   if(!option)return;
+   state.upgradeTargetSessionId=String(option.sessionId);haptic('light');render();return
+ }
+ if(el.hasAttribute('data-upgrade-continue')){
+   state.upgradeOutcome=null;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeStage='source';state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();return
+ }
  if(el.hasAttribute('data-upgrade')&&!state.upgradeSpinning){
-   const ids=[...(state.upgradeSelectedIds||[])],sessionId=state.upgradePreview?.sessionId;if(!ids.length||!sessionId)return;
-   state.upgradeSpinning=true;el.disabled=true;
-   const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({ids,sessionId})});
-   await animateUpgradeWheel(r);return
+   const ids=[...(state.upgradeSelectedIds||[])],target=selectedUpgradeTarget(),sessionId=target?.sessionId;
+   if(!ids.length||!sessionId)return;
+   state.upgradeStage='spin';state.upgradeSpinning=true;state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;el.disabled=true;render();
+   try{
+    const r=await api('/api/upgrader',{method:'POST',body:JSON.stringify({ids,sessionId})});
+    await animateUpgradeWheel(r);
+   }catch(err){
+    state.upgradeStage='target';state.upgradeSpinning=false;render();throw err
+   }
+   return
  }
  if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('premium')}});return}
  if(el.hasAttribute('data-back')){await load(state.backPage||'collection');return}
@@ -375,5 +433,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.6.0').catch(()=>{});
+import('/admin-ui.js?v=4.7.0').catch(()=>{});
 load('home');
