@@ -19,6 +19,15 @@ const wheelSrc=fs.readFileSync(new URL('../src/wheel.mjs',import.meta.url),'utf8
 const gameSrc=fs.readFileSync(new URL('../src/game.mjs',import.meta.url),'utf8');
 const indexSrc=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 
+test('CSP explicitly allows the Lucide CDN',()=>{
+  assert.match(serverSrc,/script-src 'self' https:\/\/telegram\.org https:\/\/unpkg\.com/);
+  assert.match(indexSrc,/unpkg\.com\/lucide@1\.50\.0\/dist\/umd\/lucide\.min\.js/);
+});
+test('Lucide hydration retries if the library loads after app render',()=>{
+  assert.match(appSrc,/let lucideRetry=0/);
+  assert.match(appSrc,/setTimeout\(hydrateIcons,100\)/);
+  assert.match(appSrc,/addEventListener\('load',hydrateIcons/);
+});
 test('all interface icons use the external Lucide set instead of homemade SVG paths',()=>{
   assert.match(indexSrc,/unpkg\.com\/lucide@1\.33\.0\/dist\/umd\/lucide\.min\.js/);
   assert.match(appSrc,/const ICON_NAME=Object\.freeze/);
@@ -79,7 +88,7 @@ test('upgrader uses a probability circle with a real win sector',()=>{
 test('upgrader has one screen title and explicitly explains single-item risk',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(appSrc,/page==='upgrader'\)shell\('Апгрейдер',upgraderView\(\)\)/);
-  assert.match(view,/Выбери username — круг сразу покажет шанс апгрейда/);
+  assert.match(view,/Выбери username — увидишь цель и шанс апгрейда/);
   assert.doesNotMatch(view,/>Апгрейдер</);
   assert.doesNotMatch(view,/Выбери до|от 1 до 5|максимум 5|5 usernames/i);
   assert.doesNotMatch(appSrc,/Лимит выбора достигнут|Можно выбрать максимум 5 usernames/);
@@ -88,8 +97,8 @@ test('upgrader is single-item, compact and footer is sticky',()=>{
   assert.match(appSrc,/maxItems:1/);
   assert.match(appSrc,/state\.upgradeSelectedIds=selected\?\[\]:\[id\]/);
   assert.match(uxCss,/\.upgrade-duel/);
-  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:60px/);
-  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:76px/);
+  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:58px/);
+  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:74px/);
   assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:54px/);
 });
 test('upgrader lazily extends the real inventory without replacing selected usernames',()=>{
