@@ -10,7 +10,7 @@ export const UPGRADE_RULES=Object.freeze({
 const shape=r=>r?{id:r.id,handle:'@'+r.handle,rarity:r.rarity,value:r.value,instanceNumber:r.instance_number,maxSupply:r.max_supply}:null;
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const TARGET_OPTION_COUNT=8;
-const TARGET_OPTION_POOL=14;
+const TARGET_RANGE=Object.freeze({RARE:[15000,99999],EPIC:[100000,499999],LEGEND:[500000,1999999],ULTRA:[2000000,25000000]});
 const chanceFor=(sourceValue,targetValue)=>clamp(Number(sourceValue)*.90/Math.max(1,Number(targetValue)),.01,.75);
 function validateIds(ids){
   if(!Array.isArray(ids)||ids.length!==1)throw new Error('bad_upgrade');
@@ -28,13 +28,13 @@ function calculatePlan(source){
   const targetMinValue=Math.ceil(Number(source.value)*rule.minMultiplier/50)*50;
   return {source,rule,totalValue:Number(source.value),targetMinValue,from:source.rarity,to:rule.next,count:1};
 }
-function prepareTarget(db,next,minValue){
+function prepareTarget(db,next,minValue,maxValue=Infinity){
   for(let i=0;i<300;i++){
     const handle=buildGeneratedHandle(next);if(!isValidHandle(handle))continue;
     if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))continue;
     if(db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso()))continue;
     const raw=scoreHandle(handle),value=Math.max(raw,minValue),rarity=rarityFromValue(value);
-    if(rarity!==next)continue;
+    if(value>maxValue||rarity!==next)continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)').run(handle,rarity,raw,1,'upgrade',nowIso());
@@ -47,12 +47,8 @@ function prepareTarget(db,next,minValue){
   throw new Error('upgrade_unavailable');
 }
 function sessionPayload(s){return {sessionId:s.id,chance:Number(s.chance),from:s.from_rarity,to:s.target_rarity,target:{handle:'@'+s.target_handle,rarity:s.target_rarity,value:s.target_value}}}
-function findReusableSessions(db,user,sourceIds){
-  const now=nowIso(),key=JSON.stringify([...sourceIds].sort());
-  return db.prepare('SELECT * FROM upgrade_sessions WHERE user_id=? AND source_ids=? AND used_at IS NULL AND expires_at>? ORDER BY target_value ASC,created_at ASC').all(user.id,key,now);
-}
-function createSession(db,user,rows,preview){
-  const sorted=rows.map(r=>r.id).sort(),target=prepareTarget(db,preview.to,preview.targetMinValue);
+function createSession(db,user,rows,preview,targetMinValue=preview.targetMinValue,targetMaxValue=Infinity){
+  const sorted=rows.map(r=>r.id).sort(),target=prepareTarget(db,preview.to,targetMinValue,targetMaxValue);
   // CS-style upgrader: every visible target carries its real server-side
   // probability. More expensive targets therefore have a smaller win arc.
   const chance=chanceFor(preview.source.value,target.value);
@@ -62,24 +58,27 @@ function createSession(db,user,rows,preview){
   return db.prepare('SELECT * FROM upgrade_sessions WHERE id=?').get(id);
 }
 function targetOptions(db,user,rows,preview){
-  let sessions=findReusableSessions(db,user,rows.map(r=>r.id));
-  for(let i=sessions.length;i<TARGET_OPTION_POOL;i++){
-    try{sessions.push(createSession(db,user,rows,preview))}
-    catch(e){if(e.message==='upgrade_unavailable')break;throw e}
-  }
-  sessions=sessions.sort((a,b)=>Number(a.target_value)-Number(b.target_value));
-  if(!sessions.length)throw new Error('upgrade_unavailable');
-  if(sessions.length<=TARGET_OPTION_COUNT)return sessions.map(sessionPayload);
-  const picked=[],used=new Set();
+  const key=JSON.stringify(rows.map(r=>r.id).sort()),range=TARGET_RANGE[preview.to];
+  if(!range)throw new Error('upgrade_unavailable');
+  // A fresh source selection gets a deterministic ladder of target prices.
+  // That guarantees visibly different chances instead of several near-identical rows.
+  db.prepare('DELETE FROM upgrade_sessions WHERE user_id=? AND source_ids=? AND used_at IS NULL').run(user.id,key);
+  const floor=Math.max(Number(preview.targetMinValue),range[0]),upper=Math.min(range[1],Math.max(floor+350,Math.round(floor*6)));
+  const floors=[];
   for(let i=0;i<TARGET_OPTION_COUNT;i++){
-    const idx=Math.round(i*(sessions.length-1)/(TARGET_OPTION_COUNT-1)),s=sessions[idx];
-    if(s&&!used.has(s.id)){used.add(s.id);picked.push(sessionPayload(s))}
+    const t=TARGET_OPTION_COUNT===1?0:i/(TARGET_OPTION_COUNT-1);
+    let value=Math.round((floor*Math.pow(Math.max(1,upper/floor),t))/50)*50;
+    if(floors.length&&value<=floors[floors.length-1])value=floors[floors.length-1]+50;
+    floors.push(Math.min(range[1],value));
   }
-  for(const s of sessions){
-    if(picked.length>=TARGET_OPTION_COUNT)break;
-    if(!used.has(s.id)){used.add(s.id);picked.push(sessionPayload(s))}
+  const sessions=[];
+  for(let i=0;i<floors.length;i++){
+    const minValue=floors[i],maxValue=i<floors.length-1?Math.max(minValue,floors[i+1]-50):range[1];
+    try{sessions.push(createSession(db,user,rows,preview,minValue,maxValue))}
+    catch(e){if(e.message!=='upgrade_unavailable')throw e}
   }
-  return picked;
+  if(!sessions.length)throw new Error('upgrade_unavailable');
+  return sessions.sort((a,b)=>Number(a.target_value)-Number(b.target_value)).map(sessionPayload);
 }
 function allocateSessionTarget(db,user,session){
   const t=db.prepare('SELECT * FROM username_templates WHERE id=?').get(session.target_template_id);
