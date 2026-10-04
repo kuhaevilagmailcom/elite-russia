@@ -73,3 +73,96 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
 .market-card>*,.user-card>*,.rank-row>*,.upgrade-pick>*{min-width:0}.pager{min-height:44px;height:44px}
 @media(max-width:370px){.upgrade-roulette{width:min(198px,31vh,calc(100vw - 96px))}.upgrade-duel{grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr)}.upgrade-side{padding-left:9px;padding-right:9px}.upgrade-footer{grid-template-columns:70px minmax(0,1fr)}.shell{padding-left:12px;padding-right:12px}.drop-zone{padding:12px}.drop-result-card.minimal-result{padding:13px}.drop-result-actions.compact-actions{grid-template-columns:minmax(0,.9fr) minmax(0,1.35fr) 46px;gap:5px}.drop-result-actions.compact-actions>button{padding:0 5px;font-size:10px}.collection-grid{grid-template-columns:1fr;grid-auto-rows:104px}.market-card{grid-template-columns:minmax(0,1fr) 106px}.podium{grid-template-columns:1fr}.podium>div{grid-template-columns:1fr 1fr;grid-template-rows:auto}.wheel-stage{--wheel-size:min(258px,calc(100vw - 58px),39vh)}.daily-wheel-label{font-size:9px;width:56px}.wheel-card{padding-left:10px;padding-right:10px}.ref-card>div{grid-template-columns:1fr}}
 @media(min-width:768px){.shell{max-width:600px}.handle-stage.drop-trigger{min-height:210px}.wheel-stage{--wheel-size:304px}}
+
+
+/* USERNAME 4.7 — staged CS-style upgrader */
+.upgrade-step-head{flex:0 0 auto;background:#fff;border:1px solid var(--border);border-radius:17px;padding:12px 13px;display:flex;flex-direction:column;gap:3px}
+.upgrade-step-head>span,.upgrade-step-head>div>span{font-size:8px;font-weight:900;letter-spacing:1.15px;color:#8a929c}
+.upgrade-step-head>b,.upgrade-step-head>div>b{font-size:17px;line-height:1.1;font-weight:850;letter-spacing:-.35px;color:#171a1f}
+.upgrade-step-head>small,.upgrade-step-head>div>small{font-size:10px;line-height:1.35;color:#747d87}
+.upgrade-step-head.with-action{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+.upgrade-step-head.with-action>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.upgrade-back-step{height:38px;min-height:38px;padding:0 10px;border-radius:11px;display:flex;align-items:center;gap:5px;font-size:10px}
+.upgrade-back-step .ico{width:15px;height:15px}
+
+.upgrade-source-stage .upgrade-list-title,.upgrade-target-stage .upgrade-list-title{margin-top:1px}
+.upgrade-list-title span{font-size:9.5px;font-weight:700;color:#8a929b}
+.upgrade-source-list{margin-top:0;padding:0 1px 5px}
+.upgrade-source-stage .upgrade-pick{height:62px;min-height:62px;flex-basis:62px;border-radius:16px;padding-left:13px}
+.upgrade-source-stage .upgrade-pick span b{font-size:13px}
+.upgrade-source-stage .upgrade-pick span small{font-size:10px}
+.upgrade-source-stage .upgrade-pick i{background:#f0f2f4}
+.upgrade-source-stage .upgrade-pick.selected{background:#f4faff;border-color:#70c7f2}
+
+.upgrade-source-summary{flex:0 0 auto;background:#171a1f;color:#fff;border-radius:17px;padding:11px 13px;box-shadow:0 8px 22px rgba(21,24,29,.08)}
+.upgrade-source-summary>span{display:block;font-size:8px;font-weight:900;letter-spacing:1.1px;color:#9fa6ae}
+.upgrade-source-summary>div{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:5px}
+.upgrade-source-summary b{font-size:18px;line-height:1.05;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upgrade-source-summary strong{font-size:11px;font-weight:800;color:#c9d0d7;white-space:nowrap}
+
+.upgrade-target-list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:0 1px 5px;overscroll-behavior:contain;scrollbar-width:none}
+.upgrade-target-list::-webkit-scrollbar{display:none}
+.upgrade-target-pick{width:100%;height:66px;min-height:66px;flex:0 0 66px;border:1px solid var(--border);border-radius:17px;background:#fff;padding:8px 9px 8px 13px;display:grid;grid-template-columns:minmax(0,1fr) 62px 32px;align-items:center;gap:8px;text-align:left;box-shadow:none}
+.upgrade-target-pick.selected{border-color:#55bde9;background:#f2faff;box-shadow:inset 0 0 0 1px rgba(42,171,238,.12)}
+.upgrade-target-main{min-width:0}
+.upgrade-target-main b{display:block;font-size:13px;font-weight:850;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1b1f24}
+.upgrade-target-main small{display:block;font-size:9.5px;font-weight:650;color:#7b848e;margin-top:5px}
+.upgrade-target-chance{height:44px;border-radius:12px;background:#f0f2f4;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.upgrade-target-pick.selected .upgrade-target-chance{background:#dff4fd;color:#178fc8}
+.upgrade-target-chance small{font-size:7px;font-weight:900;letter-spacing:.75px;color:#8a929b}
+.upgrade-target-chance strong{display:block;font-size:16px;font-weight:900;line-height:1.05;margin-top:2px;color:#181c21}
+.upgrade-target-pick.selected .upgrade-target-chance small,.upgrade-target-pick.selected .upgrade-target-chance strong{color:#178fc8}
+.upgrade-target-pick>i{width:30px;height:30px;border-radius:10px;background:#f0f2f4;display:grid;place-items:center;color:#69727b;font-style:normal}
+.upgrade-target-pick>i .ico{width:16px;height:16px}
+.upgrade-target-pick.selected>i{background:#dff4fd;color:#178fc8}
+.upgrade-target-loading{margin:auto;width:100%;min-height:150px;border:1px dashed #d7dce1;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px}
+.upgrade-target-loading>span,.upgrade-spin-status>span{width:28px;height:28px;border:3px solid #e2e6e9;border-top-color:var(--accent);border-radius:50%;animation:upgradeLoading .75s linear infinite}
+.upgrade-target-loading b,.upgrade-spin-status b{font-size:12px;margin-top:10px}
+.upgrade-target-loading small,.upgrade-spin-status small{font-size:9.5px;color:var(--muted);margin-top:4px}
+@keyframes upgradeLoading{to{transform:rotate(360deg)}}
+
+.upgrade-target-footer{margin-top:0}
+.upgrade-target-footer button{display:flex;align-items:center;justify-content:center;gap:7px}
+.upgrade-target-footer button .ico{width:17px;height:17px}
+
+.upgrade-spin-stage{gap:8px}
+.upgrade-spin-stage .upgrade-step-head{padding-top:10px;padding-bottom:10px}
+.upgrade-spin-stage .upgrade-duel{gap:6px}
+.upgrade-spin-stage .upgrade-side{height:60px;border-radius:15px}
+.upgrade-spin-stage .upgrade-wheel-card{margin:auto 0;padding:10px 12px 9px;border-radius:20px}
+.upgrade-spin-stage .upgrade-roulette{width:min(222px,31vh,calc(100vw - 112px))}
+.upgrade-spin-status{flex:0 0 auto;min-height:84px;border-radius:17px;background:#fff;border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:9px}
+.upgrade-spin-status>span{width:22px;height:22px;border-width:2px}
+.upgrade-spin-status b{margin-top:6px}
+.upgrade-result-panel{flex:0 0 auto;border-radius:18px;border:1px solid var(--border);background:#fff;padding:12px;text-align:center}
+.upgrade-result-panel.success{border-color:#a7dec1;background:#f5fbf7}
+.upgrade-result-panel.fail{border-color:#e3caca;background:#fff8f8}
+.upgrade-result-panel>small{font-size:8px;font-weight:900;letter-spacing:1.1px;color:#7f8892}
+.upgrade-result-panel.success>small{color:#319862}.upgrade-result-panel.fail>small{color:#bd5a5a}
+.upgrade-result-panel>b{display:block;font-size:18px;font-weight:900;letter-spacing:-.35px;margin-top:3px;color:#171a1f}
+.upgrade-result-panel>span{display:block;font-size:10px;line-height:1.35;color:#717a84;margin:4px 0 9px}
+.upgrade-result-panel>button{width:100%;height:46px;min-height:46px}
+
+@media(max-height:680px){
+ .upgrade-page{gap:7px}
+ .upgrade-step-head{padding:9px 10px}
+ .upgrade-step-head>b,.upgrade-step-head>div>b{font-size:15px}
+ .upgrade-step-head>small,.upgrade-step-head>div>small{font-size:9px}
+ .upgrade-source-stage .upgrade-pick{height:54px;min-height:54px;flex-basis:54px}
+ .upgrade-target-pick{height:58px;min-height:58px;flex-basis:58px}
+ .upgrade-target-chance{height:40px}
+ .upgrade-spin-stage .upgrade-roulette{width:min(188px,28vh,calc(100vw - 126px))}
+ .upgrade-wheel-legend{margin-top:5px}
+ .upgrade-result-panel{padding:9px 10px}
+ .upgrade-result-panel>b{font-size:16px}
+}
+@media(max-height:570px){
+ .upgrade-step-head>small,.upgrade-step-head>div>small{display:none}
+ .upgrade-source-summary{padding:8px 10px}
+ .upgrade-source-summary b{font-size:15px}
+ .upgrade-target-pick{height:52px;min-height:52px;flex-basis:52px}
+ .upgrade-target-chance{height:36px}
+ .upgrade-spin-stage .upgrade-step-head{display:none}
+ .upgrade-spin-stage .upgrade-roulette{width:min(170px,27vh,calc(100vw - 140px))}
+ .upgrade-result-panel>span{display:none}
+}
