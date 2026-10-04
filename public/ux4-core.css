@@ -1849,3 +1849,220 @@ button{min-height:44px}button:active{transform:scale(.99)}.primary,.secondary{mi
   }
   .wheel-card-clean .wheel-rare{margin-top:8px!important}
 }
+
+
+/* USERNAME 5.2 — straight upgrader cards + rebuilt fortune wheel */
+
+/* Source username cards: one clean line, price on the right, no floating blocks */
+.upgrade-source-card{
+  width:100%!important;
+  height:58px!important;
+  min-height:58px!important;
+  flex:0 0 58px!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto 22px!important;
+  align-items:center!important;
+  gap:10px!important;
+  padding:0 12px!important;
+  border:1px solid #dde2e6!important;
+  border-radius:14px!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  text-align:left!important;
+}
+.upgrade-source-card.selected{
+  border-color:#56bde8!important;
+  background:#f4fbff!important;
+}
+.upgrade-source-handle{
+  min-width:0!important;
+  display:block!important;
+  margin:0!important;
+  font-size:14px!important;
+  line-height:1!important;
+  font-weight:760!important;
+  letter-spacing:-.15px!important;
+  color:#171b20!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.upgrade-source-price{
+  display:block!important;
+  margin:0!important;
+  font-size:11px!important;
+  line-height:1!important;
+  font-weight:650!important;
+  color:#737c86!important;
+  white-space:nowrap!important;
+  font-variant-numeric:tabular-nums;
+}
+.upgrade-source-chevron{
+  width:22px!important;
+  height:22px!important;
+  min-width:22px!important;
+  display:grid!important;
+  place-items:center!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:transparent!important;
+  color:#858e98!important;
+  font-style:normal!important;
+}
+.upgrade-source-chevron .ico{
+  width:16px!important;
+  height:16px!important;
+}
+.upgrade-source-card.selected .upgrade-source-chevron{
+  background:#dff4fd!important;
+  color:#168fc8!important;
+}
+.upgrade-source-stage .upgrade-list{
+  gap:7px!important;
+}
+.upgrade-source-head{
+  padding:9px 11px!important;
+  border-radius:14px!important;
+}
+.upgrade-source-head>b{
+  font-size:16px!important;
+  font-weight:760!important;
+}
+.upgrade-list-title{
+  min-height:22px!important;
+  align-items:center!important;
+}
+.upgrade-list-title b{
+  font-size:11px!important;
+  font-weight:700!important;
+}
+.upgrade-list-title span{
+  font-size:9px!important;
+  font-weight:580!important;
+  color:#8a929b!important;
+}
+
+/* Fortune wheel: isolated classes so old wheel CSS cannot distort geometry */
+.fortune-stage{
+  --fortune-size:min(248px,calc(100vw - 118px),38vh);
+  --fortune-radius:calc(var(--fortune-size) * .35);
+  position:relative!important;
+  width:var(--fortune-size)!important;
+  height:var(--fortune-size)!important;
+  flex:0 0 var(--fortune-size)!important;
+  margin:3px auto 0!important;
+}
+.fortune-disc{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  border:1px solid #dde2e6!important;
+  background:var(--wheel-bg)!important;
+  box-shadow:0 8px 20px rgba(25,29,34,.05)!important;
+  transform-origin:50% 50%!important;
+  will-change:transform!important;
+}
+.fortune-disc:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:50%;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.72);
+  pointer-events:none;
+}
+.fortune-label{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  width:58px!important;
+  margin:0!important;
+  padding:0!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  font-size:9.5px!important;
+  line-height:1!important;
+  font-weight:700!important;
+  color:#30353b!important;
+  transform:
+    translate(-50%,-50%)
+    rotate(var(--angle))
+    translateY(calc(-1 * var(--fortune-radius)))
+    rotate(calc(-1 * var(--angle)))!important;
+  transform-origin:center center!important;
+  pointer-events:none!important;
+}
+.fortune-hub{
+  position:absolute!important;
+  z-index:8!important;
+  left:50%!important;
+  top:50%!important;
+  width:66px!important;
+  height:66px!important;
+  transform:translate(-50%,-50%)!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:50%!important;
+  background:#fff!important;
+  border:1px solid #dfe3e7!important;
+  box-shadow:0 5px 14px rgba(25,29,34,.07)!important;
+  pointer-events:none!important;
+}
+.fortune-hub b{
+  margin:0!important;
+  font-size:25px!important;
+  line-height:1!important;
+  font-weight:780!important;
+  color:#171b20!important;
+}
+.fortune-pointer{
+  position:absolute!important;
+  z-index:12!important;
+  left:50%!important;
+  top:-4px!important;
+  width:22px!important;
+  height:20px!important;
+  transform:translateX(-50%)!important;
+  background:var(--accent)!important;
+  clip-path:polygon(8% 0,92% 0,100% 28%,50% 100%,0 28%)!important;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,.10))!important;
+}
+.wheel-card-clean{
+  padding:12px 12px 10px!important;
+  overflow:hidden!important;
+}
+.wheel-card-clean .wheel-rare{
+  margin-top:10px!important;
+}
+.wheel-page-clean .wheel-copy{
+  padding-top:2px!important;
+}
+@media(max-width:370px){
+  .fortune-stage{
+    --fortune-size:min(228px,calc(100vw - 104px),36vh);
+  }
+  .fortune-label{
+    width:52px!important;
+    font-size:9px!important;
+  }
+  .fortune-hub{
+    width:60px!important;
+    height:60px!important;
+  }
+}
+@media(max-height:620px){
+  .fortune-stage{
+    --fortune-size:min(212px,calc(100vw - 112px),33vh);
+  }
+  .fortune-hub{
+    width:56px!important;
+    height:56px!important;
+  }
+  .fortune-hub b{
+    font-size:22px!important;
+  }
+}
