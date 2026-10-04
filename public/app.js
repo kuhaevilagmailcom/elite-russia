@@ -160,7 +160,12 @@ function collectionFilterSheet(){
 }
 function collectionView(){
  const c=state.collection||{items:[],summary:{count:0,value:0},page:1,pages:1};
- return '<div class="page-body collection-page">'+collectionFilterSheet()+'<div class="screen-toolbar"><div><b>Коллекция</b><span>'+(c.summary?.count||0)+' usernames · '+fmt(c.summary?.value||0)+'</span></div><button data-collection-filter-open aria-label="Фильтр">'+icon('filter')+'</button></div><div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card"><button class="user-card-main" data-detail="'+x.id+'"><span data-fit-username data-max-size="18" data-min-size="12">'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b><small>'+(x.inShowcase?'На витрине':'В коллекции')+'</small></button><button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button></article>').join(''):'<div class="empty">По этому фильтру ничего нет.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>';
+ return '<div class="page-body collection-page collection-page-clean">'+collectionFilterSheet()+
+  '<div class="screen-toolbar collection-toolbar"><div><b>'+(c.summary?.count||0)+' usernames</b><span>Общая стоимость · '+fmt(c.summary?.value||0)+'</span></div><button class="collection-filter-button" data-collection-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div>'+
+  '<div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card collection-card">'+
+   '<button class="user-card-main" data-detail="'+x.id+'"><span data-fit-username data-max-size="18" data-min-size="11">'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b><small>'+(x.inShowcase?'На витрине':'В коллекции')+'</small></button>'+
+   '<button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button>'+
+  '</article>').join(''):'<div class="empty">По этому фильтру ничего нет.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>';
 }
 function pager(page,pages,type){if(pages<=1)return '';return '<div class="pager"><button data-pager="'+type+'" data-dir="-1" '+(page<=1?'disabled':'')+'>Назад</button><span>'+page+' / '+pages+'</span><button data-pager="'+type+'" data-dir="1" '+(page>=pages?'disabled':'')+'>Дальше</button></div>'}
 function marketFilterSheet(){
@@ -194,7 +199,11 @@ function wheelShortLabel(x){
 }
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<12),visible=g.rows.filter(x=>x.span>=12),last=state.wheelLastResult;
- return '<div class="wheel-page"><section class="wheel-card"><div class="wheel-stage"><div class="daily-wheel-pointer"></div><div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'<div class="daily-wheel-core"><b>USERNAME</b><span>ДЕНЬ</span></div></div></div>'+
+ return '<div class="wheel-page wheel-page-clean"><section class="wheel-card wheel-card-clean"><div class="wheel-stage">'+
+  '<div class="daily-wheel-pointer"></div>'+
+  '<div class="daily-wheel" id="wheelDisc" style="--wheel-bg:'+g.background+'">'+visible.map(x=>'<span class="daily-wheel-label" style="--angle:'+x.center+'deg">'+esc(wheelShortLabel(x))+'</span>').join('')+'</div>'+
+  '<div class="daily-wheel-core"><b>USERNAME</b><span>ДЕНЬ</span></div>'+
+ '</div>'+
  (rare.length?'<div class="wheel-rare"><span>БОНУСЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
  '<div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее вращение через '+untilText(w.nextAt)))+'</span></div>'+
  '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить колесо':'Недоступно')+'</button>'+
@@ -457,5 +466,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=5.1.0').catch(()=>{});
+import('/admin-ui.js?v=5.1.1').catch(()=>{});
 load('home');
