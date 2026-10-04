@@ -25,14 +25,21 @@ function startParam(){return String(TG?.initDataUnsafe?.start_param||new URLSear
 async function api(url,opts={}){const headers={'Content-Type':'application/json',...(opts.headers||{})};const d=await initData();if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';const sp=startParam();if(sp)headers['X-Start-Param']=sp;const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);try{const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'network');return j}catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}finally{clearTimeout(tm)}}
 const ICON_NAME=Object.freeze({
  home:'house',menu:'menu',close:'x',back:'chevron-left',
- market:'store',rank:'chart-column-increasing',tasks:'list-checks',wheel:'gauge',
- friends:'users',gift:'gift',upgrade:'arrow-up-right',season:'trophy',
+ market:'store',rank:'chart-bar-increasing',tasks:'list-checks',wheel:'circle-gauge',
+ friends:'users',gift:'gift',upgrade:'trending-up',season:'trophy',
  collection:'layout-grid',profile:'user-round',premium:'gem',filter:'sliders-horizontal',
  search:'search',admin:'shield-check',story:'share-2',chevron:'chevron-right',
  down:'chevron-down',plus:'plus',check:'check',x:'x'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico lucide-slot" data-lucide="'+name+'" aria-hidden="true"></i>'}
-function hydrateIcons(){try{window.lucide?.createIcons({attrs:{'stroke-width':'2.2'}})}catch{}}
+let lucideRetry=0;
+function hydrateIcons(){
+ try{
+  if(window.lucide?.createIcons){window.lucide.createIcons({attrs:{'stroke-width':'2.2'}});lucideRetry=0;return}
+ }catch{}
+ if(lucideRetry<20){lucideRetry++;setTimeout(hydrateIcons,100)}
+}
+addEventListener('load',hydrateIcons,{once:true});
 function badge(r){return '<span class="rarity '+String(r).toLowerCase()+'">'+esc(r)+'</span>'}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
@@ -205,9 +212,9 @@ function upgraderView(){
  const source=round?.source||liveSource,p=round?{chance:round.chance,target:round.target}:state.upgradePreview;
  const rawChance=Number(p?.chance||0)*100,chance=p?(rawChance<10?rawChance.toFixed(1):Math.round(rawChance).toString()):'—',angle=p?Math.max(3,Math.min(270,Number(p.chance||0)*360)):0;
  const pointerAngle=round?Number(state.upgradeLandingAngle||0):0;
- return '<div class="upgrade-page"><div class="upgrade-copy"><span>Выбери username — круг сразу покажет шанс апгрейда.</span></div>'+
+ return '<div class="upgrade-page"><div class="upgrade-copy"><span>Выбери username — увидишь цель и шанс апгрейда.</span></div>'+
  '<section class="upgrade-duel"><div class="upgrade-side source"><small>ТВОЙ USERNAME</small><b data-fit-username data-max-size="19" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'Выбери ниже')+'</strong></div><span class="upgrade-arrow">'+icon('chevron')+'</span><div class="upgrade-side target"><small>МОЖНО ПОЛУЧИТЬ</small><b data-fit-username data-max-size="19" data-min-size="12">'+(p?esc(p.target.handle):'—')+'</b><strong>'+(p?fmt(p.target.value):'Подбираем')+'</strong></div></section>'+
- '<section class="upgrade-wheel-card '+(p?'ready':'empty')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer" style="transform:rotate('+pointerAngle+'deg)"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> успех</span><span><i></i> неудача</span></div></section>'+
+ '<section class="upgrade-wheel-card '+(p?'ready':'empty')+' '+(round?(round.success?'round-win':'round-fail'):'')+'"><div class="upgrade-roulette" style="--chance-angle:'+angle+'deg"><div class="upgrade-pointer" id="upgradePointer" style="transform:rotate('+pointerAngle+'deg)"></div><div class="upgrade-ring"><div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div></div></div><div class="upgrade-wheel-legend"><span><i class="win"></i> зона успеха</span><span><i></i> зона неудачи</span></div></section>'+
  (state.upgradeOutcome&&!state.upgradeSpinning?'<section class="upgrade-outcome '+(state.upgradeOutcome.success?'success':'fail')+'"><small>РЕЗУЛЬТАТ</small><b>'+(state.upgradeOutcome.success?esc(state.upgradeOutcome.result.handle):'Не получилось')+'</b><span>'+(state.upgradeOutcome.success?fmt(state.upgradeOutcome.result.value):'Username использован в апгрейде')+'</span><button class="secondary" data-upgrade-continue>Продолжить</button></section>':'')+
  '<div class="upgrade-list-title"><b>Мои usernames</b></div><div class="upgrade-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div><div class="upgrade-footer"><div><span>Шанс</span><b>'+(p?chance+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!selected.length||!state.upgradePreview||state.upgradeSpinning||!!round?'disabled':'')+'>'+(state.upgradeSpinning?'Крутится…':'Апгрейд')+'</button></div></div>';
 }
@@ -368,5 +375,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=4.5.0').catch(()=>{});
+import('/admin-ui.js?v=4.6.0').catch(()=>{});
 load('home');
