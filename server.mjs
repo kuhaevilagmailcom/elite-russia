@@ -11,12 +11,14 @@ import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
 import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
-import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from './src/payments.mjs';
+import {PREMIUM_STARS,SHOP_PRODUCTS,shopCatalog,validPremiumCheckout,validProductCheckout,applyPremiumPayment,applyProductPayment} from './src/payments.mjs';
 import {adminOverview,adminUserDetail,adminSetBalance,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
 import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
 import {labStatus,submitLab} from './src/lab.mjs';
 import {dailyStatus,claimDaily} from './src/daily.mjs';
 import {publicUser} from './src/game.mjs';
+import {achievementsData} from './src/achievements.mjs';
+import {levelRewards,progressionFromXp} from './src/progression.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -132,15 +134,18 @@ async function sendHelpMessage(chatId){
 }
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
-    const q=u.pre_checkout_query,ok=validPremiumCheckout(q);
+    const q=u.pre_checkout_query,ok=validProductCheckout(q);
     await telegramApi('answerPreCheckoutQuery',{pre_checkout_query_id:q.id,ok,...(!ok?{error_message:'Платёж не прошёл проверку. Откройте USERNAME и создайте новый счёт.'}:{})}).catch(e=>console.error('pre_checkout:',e.message));
     return;
   }
   const m=u?.message;if(!m)return;
   const payment=m.successful_payment;
   if(payment){
-    const result=applyPremiumPayment(m,payment);
-    if(result.applied)await telegramApi('sendMessage',{chat_id:m.chat.id,text:'USERNAME+ активирован на 30 дней.'}).catch(()=>{});
+    const result=applyProductPayment(db,m,payment);
+    if(result.applied){
+      const text=result.product?.key==='plus_30'?'USERNAME+ активирован на 30 дней.':('Покупка активирована: '+String(result.product?.title||'косметика')+'.');
+      await telegramApi('sendMessage',{chat_id:m.chat.id,text}).catch(()=>{});
+    }
   }
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
@@ -270,8 +275,35 @@ async function api(req,res,url){
 
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
-    if(req.method==='GET'&&url.pathname==='/api/premium')return json(res,200,{active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:50,features:['Коллекция до 300 usernames','6 слотов витрины'],starsEnabled:!!BOT_TOKEN});
+    if(req.method==='GET'&&url.pathname==='/api/premium'){
+      const owned=db.prepare('SELECT type,key FROM user_cosmetics WHERE user_id=? ORDER BY type,key').all(user.id);
+      const selected=db.prepare('SELECT theme_key,frame_key,card_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
+      return json(res,200,{
+        active:!!user.premium_until&&new Date(user.premium_until)>new Date(),activeUntil:user.premium_until,name:'USERNAME+',stars:PREMIUM_STARS,
+        features:['Коллекция до 300 usernames','6 слотов витрины','Косметика без влияния на шансы'],starsEnabled:!!BOT_TOKEN,
+        products:shopCatalog(),owned,selected
+      })
+    }
     if(req.method==='POST'&&url.pathname==='/api/premium/invoice'){if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});const invoice=await telegramApi('createInvoiceLink',{title:'USERNAME+',description:'USERNAME+ на 30 дней. Не влияет на шансы дропа, колесо или апгрейдер.',payload:`username_plus:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:'USERNAME+ • 30 дней',amount:PREMIUM_STARS}]});return json(res,200,{invoice,stars:PREMIUM_STARS})}
+    if(req.method==='POST'&&url.pathname==='/api/shop/invoice'){
+      if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});
+      const b=await readBody(req),product=SHOP_PRODUCTS[String(b.productKey||'')];if(!product)throw new Error('bad_product');
+      const invoice=await telegramApi('createInvoiceLink',{title:product.title,description:product.description,payload:`username_shop:${product.key}:${user.telegram_id}:${crypto.randomUUID()}`,currency:'XTR',prices:[{label:product.title,amount:product.stars}]});
+      return json(res,200,{invoice,product:{key:product.key,title:product.title,stars:product.stars}})
+    }
+    if(req.method==='POST'&&url.pathname==='/api/cosmetics/select'){
+      const b=await readBody(req),type=String(b.type||''),key=String(b.key||'');
+      if(!['theme','frame','card'].includes(type))throw new Error('bad_cosmetic');
+      if(!db.prepare('SELECT 1 FROM user_cosmetics WHERE user_id=? AND type=? AND key=?').get(user.id,type,key))throw new Error('cosmetic_locked');
+      const col={theme:'theme_key',frame:'frame_key',card:'card_key'}[type],now=new Date().toISOString();
+      db.prepare('INSERT INTO user_cosmetic_settings(user_id,theme_key,frame_key,card_key,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET '+col+'=excluded.'+col+',updated_at=excluded.updated_at')
+        .run(user.id,type==='theme'?key:null,type==='frame'?key:null,type==='card'?key:null,now);
+      return json(res,200,{ok:true,type,key})
+    }
+    if(req.method==='GET'&&url.pathname==='/api/levels'){
+      return json(res,200,{progression:progressionFromXp(user.xp),rewards:levelRewards()})
+    }
+    if(req.method==='GET'&&url.pathname==='/api/achievements')return json(res,200,achievementsData(db,{...user,level:progressionFromXp(user.xp).level}));
 
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
@@ -307,7 +339,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
