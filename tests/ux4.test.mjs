@@ -41,6 +41,27 @@ test('market and collection filters use Hugeicons too',()=>{
   assert.match(appSrc,/function marketFilterIcon\(\)\{return icon\('filter'\)\}/);
   assert.doesNotMatch(appSrc,/market-filter-svg|<path d=/);
 });
+test('navigation keeps the current screen visible while data loads',()=>{
+  const loadFn=appSrc.match(/async function load\(page,\{force=false\}=\{\}\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.ok(loadFn);
+  assert.match(appSrc,/const PAGE_CACHE_TTL=12000/);
+  assert.match(appSrc,/function routeLoading\(on\)/);
+  assert.match(loadFn,/routeLoading\(true\)/);
+  assert.match(loadFn,/pageReady\(page\)/);
+  assert.doesNotMatch(loadFn,/screen-skeleton/);
+});
+test('viewport and username fitting avoid repeated layout thrashing',()=>{
+  assert.match(appSrc,/viewportFrame=requestAnimationFrame/);
+  assert.match(appSrc,/if\(key===lastViewportKey\)return/);
+  const fit=appSrc.match(/function fitUsername\(el,max=48,min=20\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(fit,/for\(let i=0;i<6/);
+  assert.doesNotMatch(fit,/while\(size>min/);
+});
+test('menu opens without rebuilding the whole page',()=>{
+  assert.match(appSrc,/function setMenuOpen\(open\)/);
+  assert.match(appSrc,/menu\.classList\.toggle\('open'/);
+  assert.match(appSrc,/hasAttribute\('data-menu-open'\)\)\{setMenuOpen\(true\)/);
+});
 test('home drop stays centered and fills spare space with useful shortcuts',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.doesNotMatch(home,/Нажми на username/);
