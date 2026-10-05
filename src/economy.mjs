@@ -32,7 +32,7 @@ export function configNumber(db,key,fallback){
 export function txBalance(db,userId,type,amount,metadata={}){
   const u=db.prepare('SELECT * FROM users WHERE id=?').get(userId);if(!u)throw new Error('user_not_found');
   const delta=Number(amount||0),next=u.balance+delta;if(next<0)throw new Error('insufficient_funds');
-  db.prepare('UPDATE users SET balance=? WHERE id=?').run(next,userId);
+  db.prepare('UPDATE users SET balance=?,total_earned=total_earned+? WHERE id=?').run(next,delta>0?Math.round(delta):0,userId);
   db.prepare('INSERT INTO balance_transactions(id,user_id,type,amount,balance_before,balance_after,metadata,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .run(uid(),userId,type,delta,u.balance,next,JSON.stringify(metadata),nowIso());
   return next;
