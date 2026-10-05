@@ -17,6 +17,7 @@ import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from '../src/pay
 
 const appSrc=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const cssSrc=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
+const uxCss=fs.readFileSync(new URL('../public/ux4-core.css',import.meta.url),'utf8');
 const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8');
 const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url),'utf8');
@@ -54,10 +55,10 @@ test('meaningful five to seven character words retain strong market value',()=>{
 test('RARE generation never creates 4 or 5 character handles',()=>{
   for(let i=0;i<5000;i++)assert.ok(buildGeneratedHandle('RARE').length>=6);
 });
-test('system sale is a low salvage payout, especially for premium assets',()=>{
-  assert.equal(systemSellValue(5000),1000);
-  assert.equal(systemSellValue(50000),5000);
-  assert.equal(systemSellValue(1000000),50000);
+test('system sale uses the canonical username value everywhere',()=>{
+  assert.equal(systemSellValue(5000),5000);
+  assert.equal(systemSellValue(50000),50000);
+  assert.equal(systemSellValue(1000000),1000000);
 });
 test('max paid drop still allows COMMON but meaningfully improves the profile mix',()=>{assert.ok(DROP_TIERS.max.weights.COMMON>0);assert.ok(DROP_TIERS.max.weights.COMMON<DROP_TIERS.basic.weights.COMMON);assert.ok(DROP_TIERS.max.weights.EPIC>DROP_TIERS.basic.weights.EPIC);assert.ok(DROP_TIERS.max.weights.LEGEND>DROP_TIERS.basic.weights.LEGEND)});
 test('v3 economy cannot print several paid drops immediately',()=>{
@@ -88,7 +89,13 @@ test('drop card is minimal and story share is an icon-only native action',()=>{
   assert.match(appSrc,/shareToStory/);assert.doesNotMatch(appSrc,/function openStoryFallback/);
   assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/);
 });
-test('menu remains top-driven and readable',()=>{assert.doesNotMatch(appSrc,/function nav\(/);assert.match(appSrc,/menu-group-title/);for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name));assert.match(cssSrc,/\.menu-list b\{font-size:14px/);assert.match(cssSrc,/\.menu-list button\{min-height:62px/)});
+test('menu is a compact labeled 3x3 grid with bottom shortcuts',()=>{
+  assert.doesNotMatch(appSrc,/function nav\(/);
+  assert.match(appSrc,/menu-grid-main/);assert.match(appSrc,/menu-grid-bottom/);assert.match(appSrc,/menu-tile/);
+  for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name));
+  assert.match(uxCss,/\.menu-grid-main,.menu-grid-bottom\{[^}]*grid-template-columns:repeat\(3/);
+  assert.match(uxCss,/\.menu-tile\{[^}]*height:74px/);
+});
 test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
 test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','3.0.0-global-unique','3.1.0-value-rarity','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
 test('premium does not change drop/upgrader odds',()=>{assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i);assert.doesNotMatch(upgraderSrc,/premium/i)});
