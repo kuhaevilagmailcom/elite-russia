@@ -191,29 +191,37 @@ function rootForProfile(profile,rng){
   const pool=ROOTS.filter(x=>x.length>=range[0]&&x.length<=range[1]&&/^[a-z]+$/.test(x));
   return choice(pool.length?pool:ROOTS,rng).slice(0,10);
 }
-export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
-  const root=rootForProfile(profile,rng),roll=rng();let handle=root;
+function telegramStyleVariant(root,profile,rng){
+  const r=rng(),pretty=prettyDigits(rng);
   if(profile==='COMMON'){
-    if(roll<.22)handle=randomLetters(7,10,rng);
-    else if(roll<.30)handle=root;
-    else if(roll<.85)handle=root+randInt(1,999,rng);
-    else handle=choice(PREFIXES.slice(1),rng)+root;
-  }else if(profile==='RARE'){
-    if(roll<.24)handle=randomPronounceable(7,8,rng);
-    else if(roll<.54)handle=root;
-    else if(roll<.88)handle=root+randInt(1,99,rng);
-    else handle=choice(PREFIXES.slice(1,3),rng)+root;
-  }else if(profile==='EPIC'){
-    if(roll<.38)handle=randomPronounceable(6,6,rng);
-    else if(roll<.86)handle=root;
-    else handle=root+choice(['7','77','x'],rng);
-  }else if(profile==='LEGEND'){
-    if(roll<.48)handle=randomPronounceable(5,5,rng);
-    else if(roll<.95)handle=root;
-    else handle=root+'7';
-  }else{
-    handle=roll<.52?randomPronounceable(4,4,rng):root;
+    if(r<.16)return root;
+    if(r<.42)return root+randInt(1,999,rng);
+    if(r<.56)return root+'_'+randInt(1,99,rng);
+    if(r<.69)return root+'_'+pretty;
+    if(r<.82)return choice(['real_','the_','its_'],rng)+root;
+    return root+choice(['7','77','x','01'],rng);
   }
+  if(profile==='RARE'){
+    if(r<.46)return root;
+    if(r<.62)return root+pretty;
+    if(r<.72)return root+'_'+choice(['7','77','01'],rng);
+    if(r<.84)return root+'x';
+    return choice(['real_','the_'],rng)+root;
+  }
+  if(profile==='EPIC'){
+    if(r<.68)return root;
+    if(r<.82)return root+choice(['7','77','x'],rng);
+    if(r<.9)return root+'_'+choice(['7','x'],rng);
+    return randomPronounceable(5,6,rng);
+  }
+  if(profile==='LEGEND')return r<.83?root:(r<.93?root+'7':randomPronounceable(5,5,rng));
+  return r<.76?root:randomPronounceable(4,5,rng);
+}
+export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
+  const root=rootForProfile(profile,rng),roll=rng();let handle;
+  if(profile==='COMMON'&&roll<.12)handle=randomLetters(7,10,rng);
+  else if(profile==='RARE'&&roll<.10)handle=randomPronounceable(6,8,rng);
+  else handle=telegramStyleVariant(root,profile,rng);
   return normalizeGenerated(handle);
 }
 const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,10}$/.test(x)));
