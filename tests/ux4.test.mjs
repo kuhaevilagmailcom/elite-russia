@@ -35,12 +35,14 @@ test('all interface icons use the external Lucide set instead of homemade SVG pa
   assert.match(appSrc,/lucide\?\.createIcons/);
   assert.doesNotMatch(appSrc,/const ICON=\{/);
 });
-test('home drop keeps the username visually centered with no tap instruction',()=>{
+test('home drop stays centered and fills spare space with useful shortcuts',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.doesNotMatch(home,/Нажми на username/);
-  assert.match(uxCss,/\.drop-headline\{[^}]*position:absolute/);
+  assert.match(home,/home-shortcuts/);
+  for(const page of ['collection','market','tasks','wheel'])assert.match(home,new RegExp('data-page="'+page+'"'));
   assert.match(uxCss,/\.handle-stage\.drop-trigger\{[^}]*background:transparent/);
   assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
+  assert.match(uxCss,/\.home-shortcuts\{[^}]*grid-template-columns:repeat\(2/);
 });
 test('upgrader keeps the final rotor position and round until continue',()=>{
   assert.match(appSrc,/upgradeLastRound:null/);
@@ -154,20 +156,22 @@ test('wheel is responsive, centered and uses true SVG weight geometry',()=>{
   assert.match(uxCss,/\.fortune-pointer\{/);
   assert.match(uxCss,/\.fortune-hub\{/);
 });
-test('wheel hides labels from tiny sectors and lists bonuses separately',()=>{
+test('wheel keeps tiny rewards out of the disc labels and uses a framed pointer layout',()=>{
   const view=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(view,/rare=g\.rows\.filter\(x=>x\.span<12\)/);
-  assert.match(appSrc,/x\.span>=11\?\('<text/);
+  assert.match(view,/rare=g\.rows\.filter\(x=>x\.span<10\)/);
+  assert.match(appSrc,/x\.span>=10\?\('<text/);
   assert.match(view,/wheelSvgMarkup\(g\.rows\)/);
-  assert.match(view,/wheel-rare/);
-  assert.match(view,/БОНУСЫ/);
+  assert.match(view,/fortune-rim/);
+  assert.match(view,/fortune-pointer/);
+  assert.match(view,/РЕДКИЕ СЕКТОРЫ/);
 });
-test('wheel result persists locally and spin is driven by server reward',()=>{
+test('wheel result persists locally and lands inside the server-selected reward sector',()=>{
   assert.match(appSrc,/wheelLastResult:null/);
   assert.match(appSrc,/state\.wheelLastResult=r\.reward/);
   assert.match(appSrc,/target=g\.rows\.find\(x=>x\.key===r\.reward\.key\)/);
-  assert.match(appSrc,/3\.6s cubic-bezier/);
-  assert.match(appSrc,/await new Promise\(x=>setTimeout\(x,3650\)\)/);
+  assert.match(appSrc,/landing=target\.start\+margin/);
+  assert.match(appSrc,/3\.45s cubic-bezier/);
+  assert.match(appSrc,/await new Promise\(x=>setTimeout\(x,3500\)\)/);
 });
 test('wheel disabled CTA is visually distinct',()=>{
   assert.match(uxCss,/\.wheel-page-clean \.wheel-spin-button:disabled\{[^}]*background:#e3e6e9[^}]*opacity:1/);
@@ -178,9 +182,11 @@ test('audited CSS has one final UI layer instead of stacked version overrides',(
   for(const old of ['USERNAME 4.7','USERNAME 4.8','USERNAME 4.9','USERNAME 5.0','USERNAME 5.1','USERNAME 5.2','USERNAME 5.3'])assert.doesNotMatch(uxCss,new RegExp(old.replace('.', '\\.')));
   assert.ok((uxCss.match(/!important/g)||[]).length<=10);
 });
-test('upgrader source price reserves enough room for nine-digit values',()=>{
-  assert.match(uxCss,/\.upgrade-source-card\{[^}]*grid-template-columns:minmax\(0,1fr\) 108px/);
-  assert.match(uxCss,/\.upgrade-source-price\{[^}]*width:108px[^}]*white-space:nowrap/);
+test('upgrader source rows stay aligned without fixed desktop-only price columns',()=>{
+  const row=appSrc.match(/function upgradeRowHtml\(x\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(uxCss,/\.upgrade-source-card\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/);
+  assert.match(uxCss,/\.upgrade-source-price\{[^}]*max-width:132px[^}]*white-space:nowrap/);
+  assert.doesNotMatch(row,/data-fit-username/);
 });
 
 test('new players start with exactly 50000 virtual dollars',()=>assert.equal(GAME.startBalance,50000));
@@ -209,9 +215,18 @@ test('all main controls meet mobile touch-target sizing in final CSS layer',()=>
   assert.match(uxCss,/button\{min-height:44px\}/);
   assert.match(uxCss,/story-icon-btn/);
   assert.match(uxCss,/@media\(max-width:370px\)/);
-  assert.match(uxCss,/@media\(min-width:768px\)/);
+  assert.match(uxCss,/@media\(min-width:560px\)/);
   assert.match(adminCss,/admin-search button/);
 });
+test('task claim updates locally without reloading the whole tasks screen',()=>{
+  const handler=appSrc.match(/if\(el\.dataset\.claim\)\{[\s\S]*?render\(\);return\n \}/)?.[0]||'';
+  assert.ok(handler);
+  assert.match(handler,/task\.claimed=true/);
+  assert.match(handler,/applyUserLocal\(r\.user\)/);
+  assert.doesNotMatch(handler,/refreshUser\(|load\('tasks'\)/);
+  assert.match(uxCss,/\.task-claim\.is-claiming/);
+});
+
 test('username action handlers avoid full section reloads',()=>{
   const patterns=[
     /if\(el\.dataset\.resolve\)[\s\S]{0,450}?return/,
