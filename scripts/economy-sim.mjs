@@ -12,13 +12,11 @@ function pickProfile(tier,rng){
   return 'COMMON';
 }
 function percentile(sorted,p){return sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))]||0}
-function starterDropValue(rawValue,min=STARTER_DROP_JACKPOT.normalMin,max=STARTER_DROP_JACKPOT.normalMax){
-  const raw=Math.max(200,Number(rawValue)||200);
-  if(min===STARTER_DROP_JACKPOT.normalMin&&max===STARTER_DROP_JACKPOT.normalMax){
-    const scaled=Math.round((raw/20)/50)*50;return Math.max(min,Math.min(max,scaled));
-  }
-  const span=Math.max(50,max-min),mapped=min+(Math.abs(Math.round(raw))%span);
-  return Math.max(min,Math.min(max,Math.round(mapped/50)*50));
+function starterBand(mode){
+  if(mode==='rare')return [STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax];
+  if(mode==='big')return [STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax];
+  if(mode==='ultra')return [STARTER_DROP_JACKPOT.ultraMin,Number.MAX_SAFE_INTEGER];
+  return [STARTER_DROP_JACKPOT.normalMin,STARTER_DROP_JACKPOT.normalMax];
 }
 function starterMode(rng){
   const r=rng(),u=STARTER_DROP_JACKPOT.ultraChance,b=u+STARTER_DROP_JACKPOT.bigChance,rr=b+STARTER_DROP_JACKPOT.rareChance;
@@ -42,16 +40,13 @@ function simulateTier(tier,samples,seed){
       if(available.length){const sp=available[Math.floor(rng()*available.length)];handle=sp.handle;value=sp.value}
     }
     if(!handle){
-      for(let i=0;i<250;i++){
+      const band=starter?starterBand(mode):null;
+      for(let i=0;i<(starter?650:250);i++){
         const candidate=buildGeneratedHandle(profile,rng);
         if(!isValidHandle(candidate)||used.has(candidate))continue;
-        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);
-        if(starter){
-          if(mode==='rare')value=starterDropValue(value,STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax);
-          else if(mode==='big')value=starterDropValue(value,STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax);
-          else if(mode!=='ultra')value=starterDropValue(value);
-        }
-        break;
+        const candidateValue=scoreHandle(candidate,'COMMON',1,1,rng);
+        if(starter&&(candidateValue<band[0]||candidateValue>band[1]))continue;
+        handle=candidate;value=candidateValue;break;
       }
     }
     if(!handle)continue;
