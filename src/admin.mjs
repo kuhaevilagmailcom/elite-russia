@@ -2,6 +2,14 @@ import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 import {isValidHandle,stableScoreHandle,rarityFromValue} from './generator.mjs';
 
+const MAX_USERNAME_VALUE=1000000000;
+function normalizeUsernameValue(value,fallback=0){
+  const raw=Number(value);
+  const base=Number.isFinite(raw)&&raw>0?raw:Number(fallback||0);
+  if(!Number.isFinite(base)||base<=0)throw new Error('bad_price');
+  return Math.max(200,Math.min(MAX_USERNAME_VALUE,Math.round(base)));
+}
+
 function audit(db,adminId,action,target,metadata={}){
   db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
     .run(uid(),adminId,action,String(target??''),JSON.stringify(metadata),nowIso());
@@ -87,7 +95,7 @@ export function adminAddUsername(db,admin,targetId,handle,value){
   if(db.prepare('SELECT 1 FROM username_instances WHERE handle=?').get(raw))throw new Error('username_exists');
   const target=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!target)throw new Error('user_not_found');
   if(activeCollectionCount(db,target.id)>=collectionLimit(target))throw new Error('recipient_full');
-  const v=Math.max(200,Math.round(Number(value)||stableScoreHandle(raw))),rarity=rarityFromValue(v),ts=nowIso();
+  const v=normalizeUsernameValue(value,stableScoreHandle(raw)),rarity=rarityFromValue(v),ts=nowIso();
   return db.transaction(()=>{
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(raw);
     if(!t){
@@ -104,7 +112,7 @@ export function adminAddUsername(db,admin,targetId,handle,value){
   })();
 }
 export function adminSetUsernameValue(db,admin,instanceId,value){
-  const v=Math.max(200,Math.round(Number(value)||0));if(!v)throw new Error('bad_price');
+  const v=normalizeUsernameValue(value);
   return db.transaction(()=>{
     const i=db.prepare('SELECT * FROM username_instances WHERE id=?').get(instanceId);if(!i)throw new Error('not_owned');
     const rarity=rarityFromValue(v);
