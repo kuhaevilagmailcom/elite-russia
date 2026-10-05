@@ -14,6 +14,7 @@ import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from './src/payments.mjs';
 import {adminOverview,adminUserDetail,adminSetBalance,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
 import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
+import {labStatus,submitLab} from './src/lab.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -233,6 +234,11 @@ async function api(req,res,url){
     }
     if(req.method==='GET'&&url.pathname==='/api/tasks')return json(res,200,{items:tasks(db,user)});
     const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim){const result=claimTask(db,user,claim[1]);invalidateLeaderboard();return json(res,200,result)}
+    if(req.method==='GET'&&url.pathname==='/api/lab')return json(res,200,labStatus(db,user));
+    if(req.method==='POST'&&url.pathname==='/api/lab'){
+      if(!rateLimit(user.id,'username_lab',20,60000))return json(res,429,{error:'rate_limited'});
+      const b=await readBody(req),result=submitLab(db,user,String(b.handle||''));invalidateLeaderboard();return json(res,200,result)
+    }
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const p=profile(db,Number(other[1]));return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
     const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){return json(res,200,setShowcase(db,user,showcase[1]))}
