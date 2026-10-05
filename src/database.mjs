@@ -72,6 +72,9 @@ export function createDatabase(dataDir){
     user_id INTEGER NOT NULL,type TEXT NOT NULL,key TEXT NOT NULL,source TEXT NOT NULL,created_at TEXT NOT NULL,
     PRIMARY KEY(user_id,type,key)
   );
+  CREATE TABLE IF NOT EXISTS user_cosmetic_settings(
+    user_id INTEGER PRIMARY KEY,theme_key TEXT,frame_key TEXT,card_key TEXT,updated_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY,applied_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS runtime_locks(name TEXT PRIMARY KEY,owner TEXT NOT NULL,expires_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS market_listings(id TEXT PRIMARY KEY,instance_id TEXT NOT NULL,seller_id INTEGER NOT NULL,buyer_id INTEGER,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,closed_at TEXT);
