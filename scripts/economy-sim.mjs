@@ -27,7 +27,7 @@ function simulateTier(tier,samples,seed){
       for(let i=0;i<250;i++){
         const candidate=buildGeneratedHandle(profile,rng);
         if(!isValidHandle(candidate)||used.has(candidate))continue;
-        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);break;
+        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);if(tier.key==='basic')value=Math.min(value,2600);break;
       }
     }
     if(!handle)continue;
