@@ -43,7 +43,8 @@ export function wheelStatus(db,user){
   return {available:Date.now()>=nextAt,nextAt:nextAt?new Date(nextAt).toISOString():null,rewards:rows.map(({key,label,type,weight})=>({key,label,type,weight})),wheelUsernamesAvailable:available.length};
 }
 export function spinWheel(db,user,requestId){
-  if(!requestId)throw new Error('bad_request_id');
+  requestId=String(requestId||'');
+  if(!requestId||requestId.length>100)throw new Error('bad_request_id');
   const old=db.prepare('SELECT * FROM wheel_history WHERE user_id=? AND request_id=?').get(user.id,requestId);
   if(old)return {reward:{key:old.reward_key,label:old.reward_label,type:old.reward_type,amount:old.reward_amount},replayed:true};
   return db.transaction(()=>{
