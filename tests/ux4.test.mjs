@@ -243,8 +243,8 @@ test('upgrader source rows stay aligned without fixed desktop-only price columns
 test('settings expose light dark system theme and vibration sound animation switches',()=>{
   assert.match(appSrc,/DEFAULT_SETTINGS=Object\.freeze\(\{theme:'system',vibration:true,sound:true,animations:true\}\)/);
   assert.match(appSrc,/function settingsView\(\)/);
-  for(const v of ['light','dark','system'])assert.match(appSrc,new RegExp("data-setting-theme=.?"+v));
-  for(const k of ['vibration','sound','animations'])assert.match(appSrc,new RegExp("data-setting-toggle=.?['\"]?\\+?"+k));
+  assert.match(appSrc,/\['light','Светлая'/);assert.match(appSrc,/\['dark','Тёмная'/);assert.match(appSrc,/\['system','Системная'/);
+  for(const k of ['vibration','sound','animations'])assert.match(appSrc,new RegExp("toggle\\('"+k+"'"));
   assert.match(appSrc,/function motionEnabled\(\)/);
   assert.match(uxCss,/html\[data-theme="dark"\]/);
   assert.match(uxCss,/html\.no-animations/);
