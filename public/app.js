@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,lab:null,labResult:null,daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0,
@@ -20,6 +20,7 @@ const ERR={
   unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
+  lab_invalid_username:'Username должен быть длиной 4–32 символа: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',network:'Нет соединения с сервером'
 };
@@ -67,13 +68,18 @@ const ICON_NAME=Object.freeze({
  market:'shopping-bag-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
  friends:'user-group',gift:'gift',upgrade:'arrow-up-right-01',season:'award-01',
  collection:'grid-view',profile:'user-circle-02',premium:'gem',filter:'filter',
- search:'search-01',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ search:'search-01',lab:'search-01',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function marketFilterIcon(){return icon('filter')}
 function hydrateIcons(){}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
+function valueClass(x){return ' value-'+(['blue','purple','gold'].includes(String(x?.visual||''))?x.visual:'normal')}
+function xpBar(u){
+ const pct=Math.max(0,Math.min(100,Math.round(Number(u?.levelProgress||0)*100)));
+ return '<div class="xp-block"><div class="xp-head"><b>LVL '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=100?'MAX':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' XP'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
+}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU=[
  ['home','home','Дроп','Испытай удачу'],['market','market','Рынок','Покупай и продавай'],['top','rank','Рейтинг','Кто богаче'],['tasks','tasks','Задания','Ежедневные цели'],['wheel','wheel','Колесо','Бесплатно раз в 24 часа'],
@@ -130,8 +136,10 @@ function buildRollSequence(count,finalHandle=''){const used=new Set();const rows
 function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.length-1;i>0;i--){const j=rollRandomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}return out}
 
 function resultCard(x,pending=false){
- return '<article class="drop-result-card minimal-result">'+
-   '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
+ const score=Number(x?.score||0);
+ return '<article class="drop-result-card minimal-result'+valueClass(x)+'">'+
+   '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1>'+
+   '<div class="username-value-meta"><strong>'+fmt(x.value)+'</strong>'+(score?'<span>Оценка '+score+' / 1000</span>':'')+'</div></div>'+
    (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
  '</article>';
 }
@@ -177,15 +185,20 @@ function dropPricePicker(tiers){
  return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
 function homeView(){
- const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
+ const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier(),daily=state.daily;
  const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
  const quick=[
   ['collection','collection','Коллекция'],['market','market','Рынок'],['tasks','tasks','Задания'],['wheel','wheel','Колесо']
  ].map(([page,ico,label])=>'<button class="home-shortcut" data-page="'+page+'">'+icon(ico)+'<span>'+label+'</span></button>').join('');
- return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
+ const dailyCard=daily?'<section class="daily-card"><div><span>ЕЖЕДНЕВНО</span><b>День '+daily.day+' · '+esc(daily.reward?.label||'Награда')+'</b><small>Серия: '+Number(daily.streak||0)+' дн.</small></div><button '+(!daily.claimable?'disabled':'')+' data-daily-claim>'+(daily.claimable?'Забрать':'Получено')+'</button></section>':'';
+ return '<div class="home">'+dropPricePicker(tiers)+
+ '<div class="home-progress-card">'+xpBar(u)+'<div class="luck-row"><span>Удача после неудач</span><b>'+Number(u.luck||0)+' / 100</b></div></div>'+
+ '<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
+ dailyCard+
+ '<button class="home-lab-banner" data-page="lab">'+icon('lab')+'<div><span>USERNAME LAB</span><b>Придумывай usernames и зарабатывай</b><small>Оценка зависит от качества, а не от случайности</small></div>'+icon('chevron')+'</button>'+
  '<section class="drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
  (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить случайный username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b>'+(cantAfford?'<small>Недостаточно денег</small>':'')+'</button>')+
- '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section>'+
+ '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row'+valueClass(last)+'"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section>'+
  '<section class="home-shortcuts" aria-label="Быстрый доступ">'+quick+'</section></div>';
 }
 async function animateDrop(result){
