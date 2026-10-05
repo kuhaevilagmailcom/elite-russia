@@ -278,9 +278,9 @@ test('Stars shop contains cosmetics only and validates each exact product price'
 test('cosmetic Stars payment grants ownership but never gameplay odds',()=>{
   const p=SHOP_PRODUCTS.theme_ocean,payload='username_shop:'+p.key+':10001:bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee';
   const payment={invoice_payload:payload,currency:'XTR',total_amount:p.stars,telegram_payment_charge_id:'charge-theme',provider_payment_charge_id:'provider-theme'},message={from:{id:10001}};
-  const result=applyProductPayment(db,message,payment);assert.equal(result.applied,true);
+  const before=db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,result=applyProductPayment(db,message,payment);assert.equal(result.applied,true);
   assert.ok(db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key='ocean'").get(seller.id));
-  assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,seller.balance);
+  assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,before);
 });
 
 test('Stars payment charge is applied only once',()=>{
