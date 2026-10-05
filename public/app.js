@@ -487,5 +487,5 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
-import('/admin-ui.js?v=5.3.0').catch(()=>{});
+import('/admin-ui.js?v=5.4.0').catch(()=>{});
 load('home');
