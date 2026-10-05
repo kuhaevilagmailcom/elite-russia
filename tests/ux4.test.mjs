@@ -44,6 +44,15 @@ test('home drop stays centered and fills spare space with useful shortcuts',()=>
   assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
   assert.match(uxCss,/\.home-shortcuts\{[^}]*grid-template-columns:repeat\(2/);
 });
+test('desktop rotation uses Web Animations with a double-RAF fallback',()=>{
+  const fn=appSrc.match(/async function animateRotation\(el,degrees,duration,easing\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.ok(fn);
+  assert.match(fn,/typeof el\.animate==='function'/);
+  assert.match(fn,/animation\.finished/);
+  assert.match(fn,/requestAnimationFrame\(\(\)=>requestAnimationFrame/);
+  assert.match(appSrc,/await animateRotation\(rotor,wheelDegrees,3200/);
+  assert.match(uxCss,/\.upgrade-wheel-rotor\{[^}]*transform-origin:50% 50%/);
+});
 test('upgrader keeps the final rotor position and round until continue',()=>{
   assert.match(appSrc,/upgradeLastRound:null/);
   assert.match(appSrc,/upgradeLandingAngle:0/);
@@ -147,14 +156,16 @@ test('leaderboard UI emphasizes money and has a top-three podium',()=>{
   assert.match(view,/podium/);assert.match(view,/money-rank/);assert.match(view,/fmt\(r\.capital\)/);assert.match(view,/Кто богаче/);
   assert.match(uxCss,/money-rank\.hero/);
 });
-test('wheel is responsive, centered and uses true SVG weight geometry',()=>{
+test('wheel is a true circle with preserved SVG aspect ratio and weighted sectors',()=>{
   assert.match(appSrc,/function wheelGeometry/);
   assert.match(appSrc,/start=cursor\/total\*360/);
   assert.match(appSrc,/function wheelSlicePath/);
   assert.match(appSrc,/function wheelSvgMarkup/);
-  assert.match(uxCss,/\.fortune-stage\{/);
+  assert.match(appSrc,/preserveAspectRatio="xMidYMid meet"/);
+  assert.match(uxCss,/\.fortune-stage\{[^}]*width:min\(300px,calc\(100% - 32px\)\)[^}]*height:auto[^}]*aspect-ratio:1 \/ 1/);
   assert.match(uxCss,/\.fortune-pointer\{/);
   assert.match(uxCss,/\.fortune-hub\{/);
+  assert.doesNotMatch(uxCss,/\.fortune-stage\{[^}]*height:var\(--fortune-size\)/);
 });
 test('wheel keeps tiny rewards out of the disc labels and uses a framed pointer layout',()=>{
   const view=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
@@ -165,13 +176,12 @@ test('wheel keeps tiny rewards out of the disc labels and uses a framed pointer 
   assert.match(view,/fortune-pointer/);
   assert.match(view,/РЕДКИЕ СЕКТОРЫ/);
 });
-test('wheel result persists locally and lands inside the server-selected reward sector',()=>{
+test('wheel result persists locally and desktop animation lands inside the server-selected sector',()=>{
   assert.match(appSrc,/wheelLastResult:null/);
   assert.match(appSrc,/state\.wheelLastResult=r\.reward/);
   assert.match(appSrc,/target=g\.rows\.find\(x=>x\.key===r\.reward\.key\)/);
   assert.match(appSrc,/landing=target\.start\+margin/);
-  assert.match(appSrc,/3\.45s cubic-bezier/);
-  assert.match(appSrc,/await new Promise\(x=>setTimeout\(x,3500\)\)/);
+  assert.match(appSrc,/await animateRotation\(disc,final,3450/);
 });
 test('wheel disabled CTA is visually distinct',()=>{
   assert.match(uxCss,/\.wheel-page-clean \.wheel-spin-button:disabled\{[^}]*background:#e3e6e9[^}]*opacity:1/);
