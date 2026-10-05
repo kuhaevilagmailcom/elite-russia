@@ -136,10 +136,8 @@ function buildRollSequence(count,finalHandle=''){const used=new Set();const rows
 function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.length-1;i>0;i--){const j=rollRandomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}return out}
 
 function resultCard(x,pending=false){
- const score=Number(x?.score||0);
  return '<article class="drop-result-card minimal-result'+valueClass(x)+'">'+
-   '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1>'+
-   '<div class="username-value-meta"><strong>'+fmt(x.value)+'</strong>'+(score?'<span>Оценка '+score+' / 1000</span>':'')+'</div></div>'+
+   '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
    (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
  '</article>';
 }
@@ -187,25 +185,19 @@ function dropPricePicker(tiers){
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier(),daily=state.daily;
  const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
- const quick=[
-  ['collection','collection','Коллекция'],['market','market','Рынок'],['tasks','tasks','Задания'],['wheel','wheel','Колесо']
- ].map(([page,ico,label])=>'<button class="home-shortcut" data-page="'+page+'">'+icon(ico)+'<span>'+label+'</span></button>').join('');
- const dailyCard=daily?'<section class="daily-card"><div><span>ЕЖЕДНЕВНО</span><b>День '+daily.day+' · '+esc(daily.reward?.label||'Награда')+'</b><small>Серия: '+Number(daily.streak||0)+' дн.</small></div><button '+(!daily.claimable?'disabled':'')+' data-daily-claim>'+(daily.claimable?'Забрать':'Получено')+'</button></section>':'';
- return '<div class="home">'+dropPricePicker(tiers)+
- '<div class="home-progress-card">'+xpBar(u)+'<div class="luck-row"><span>Удача после неудач</span><b>'+Number(u.luck||0)+' / 100</b></div></div>'+
- '<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
- dailyCard+
- '<button class="home-lab-banner" data-page="lab">'+icon('lab')+'<div><span>USERNAME LAB</span><b>Придумывай usernames и зарабатывай</b><small>Оценка зависит от качества, а не от случайности</small></div>'+icon('chevron')+'</button>'+
- '<section class="drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
- (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить случайный username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b>'+(cantAfford?'<small>Недостаточно денег</small>':'')+'</button>')+
- '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row'+valueClass(last)+'"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section>'+
- '<section class="home-shortcuts" aria-label="Быстрый доступ">'+quick+'</section></div>';
+ const dailyAction=daily?'<button class="home-mini-action daily" '+(!daily.claimable?'disabled':'')+' data-daily-claim><span>Ежедневно</span><b>'+(daily.claimable?esc(daily.reward?.label||'Забрать'):'Получено')+'</b></button>':'';
+ return '<div class="home home-clean">'+dropPricePicker(tiers)+
+ '<div class="home-progress-card"><div class="home-progress-main">'+xpBar(u)+'</div><div class="home-progress-side"><span>Удача</span><b>'+Number(u.luck||0)+'/100</b></div></div>'+
+ '<section class="home-utility-row">'+dailyAction+'<button class="home-mini-action lab" data-page="lab"><span>Username Lab</span><b>Заработать</b></button></section>'+
+ '<section class="drop-zone home-drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
+ (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="'+(cantAfford?'Недостаточно денег для дропа':'Получить случайный username')+'"><b data-fit-username data-max-size="54" data-min-size="25">@username</b></button>')+
+ '</section><section class="last home-last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row'+valueClass(last)+'"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">Появится после первого дропа.</div>')+'</section></div>';
 }
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,110]:[32,32,36,40,43,47,54,61,68,79,90,104,122,144,166,187,216,252,302,374],samples=buildRollSequence(delays.length,result.handle);let i=0;
- for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++]+'</b><small>Прокрутка…</small>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
- stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b><small>Выпало</small>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
+ for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
+ stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
 }
 function collectionFilterSheet(){
  if(!state.collectionFilterOpen)return '';
