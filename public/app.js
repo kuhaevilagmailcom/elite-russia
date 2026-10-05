@@ -28,7 +28,10 @@ addEventListener('resize',syncViewport);
 function haptic(type='light'){try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
 function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
-function startParam(){return String(TG?.initDataUnsafe?.start_param||new URLSearchParams(location.search).get('ref')||'')}
+function startParam(){
+ const q=new URLSearchParams(location.search);
+ return String(TG?.initDataUnsafe?.start_param||q.get('tgWebAppStartParam')||q.get('startapp')||q.get('ref')||'');
+}
 async function api(url,opts={}){const headers={'Content-Type':'application/json',...(opts.headers||{})};const d=await initData();if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';const sp=startParam();if(sp)headers['X-Start-Param']=sp;const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);try{const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'network');return j}catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}finally{clearTimeout(tm)}}
 const ICON_NAME=Object.freeze({
  home:'house',menu:'menu',close:'x',back:'chevron-left',
@@ -133,7 +136,7 @@ async function shareDropStory(item){
 }
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
-  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$3K',cost:3000};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$25K',cost:25000};
 }
 function dropPricePicker(tiers){
  if(!state.dropPicker)return '';
@@ -141,7 +144,7 @@ function dropPricePicker(tiers){
 }
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
- const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
+ const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||25000),cantAfford=!freeBasic&&u.balance<payCost;
  return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
  '<section class="drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
  (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить случайный username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b>'+(cantAfford?'<small>Недостаточно денег</small>':'')+'</button>')+
