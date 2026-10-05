@@ -3,6 +3,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import {GAME} from './config.mjs';
 import {SPECIALS,stableScoreHandle,rarityFromValue} from './generator.mjs';
+import {analyzeUsername,visualTier} from './valuation.mjs';
 
 export function createDatabase(dataDir){
   fs.mkdirSync(dataDir,{recursive:true});
@@ -22,6 +23,8 @@ export function createDatabase(dataDir){
     id INTEGER PRIMARY KEY AUTOINCREMENT, telegram_id TEXT UNIQUE NOT NULL, username TEXT, first_name TEXT,
     balance INTEGER NOT NULL DEFAULT ${GAME.startBalance}, free_drops INTEGER NOT NULL DEFAULT ${GAME.freeDrops},
     level INTEGER NOT NULL DEFAULT 1, xp INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0,
+    luck_points INTEGER NOT NULL DEFAULT 0, bad_drop_streak INTEGER NOT NULL DEFAULT 0,
+    total_earned INTEGER NOT NULL DEFAULT 0, best_drop_value INTEGER NOT NULL DEFAULT 0,
     premium_until TEXT, created_at TEXT NOT NULL, last_seen TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS game_config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -29,12 +32,15 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS username_templates(
     id INTEGER PRIMARY KEY AUTOINCREMENT, handle TEXT UNIQUE NOT NULL, rarity TEXT NOT NULL, base_value INTEGER NOT NULL,
     max_supply INTEGER NOT NULL, current_supply INTEGER NOT NULL DEFAULT 0, category TEXT NOT NULL DEFAULT 'generated',
-    special INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, season_id INTEGER, created_at TEXT NOT NULL
+    special INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, season_id INTEGER,
+    username_score INTEGER NOT NULL DEFAULT 0, visual_tier TEXT NOT NULL DEFAULT 'normal', quality_json TEXT,
+    created_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS username_instances(
     id TEXT PRIMARY KEY, template_id INTEGER NOT NULL, handle TEXT NOT NULL, rarity TEXT NOT NULL, value INTEGER NOT NULL,
     instance_number INTEGER NOT NULL, max_supply INTEGER NOT NULL, owner_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
     obtained_at TEXT NOT NULL, obtained_type TEXT NOT NULL DEFAULT 'drop', season_id INTEGER,
+    username_score INTEGER NOT NULL DEFAULT 0, visual_tier TEXT NOT NULL DEFAULT 'normal', quality_json TEXT,
     FOREIGN KEY(template_id) REFERENCES username_templates(id), FOREIGN KEY(owner_id) REFERENCES users(id)
   );
   CREATE TABLE IF NOT EXISTS inventory(instance_id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,created_at TEXT NOT NULL,FOREIGN KEY(instance_id) REFERENCES username_instances(id),FOREIGN KEY(user_id) REFERENCES users(id));
@@ -43,6 +49,16 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS balance_transactions(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,type TEXT NOT NULL,amount INTEGER NOT NULL,balance_before INTEGER NOT NULL,balance_after INTEGER NOT NULL,metadata TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS task_progress(user_id INTEGER NOT NULL,progress_date TEXT NOT NULL,task_key TEXT NOT NULL,value INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,progress_date,task_key));
   CREATE TABLE IF NOT EXISTS task_claims(user_id INTEGER NOT NULL,claim_date TEXT NOT NULL,task_key TEXT NOT NULL,PRIMARY KEY(user_id,claim_date,task_key));
+  CREATE TABLE IF NOT EXISTS xp_history(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,amount INTEGER NOT NULL,reason TEXT NOT NULL,metadata TEXT,created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS level_reward_claims(
+    user_id INTEGER NOT NULL,level INTEGER NOT NULL,claimed_at TEXT NOT NULL,PRIMARY KEY(user_id,level)
+  );
+  CREATE TABLE IF NOT EXISTS username_lab_attempts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,attempt_date TEXT NOT NULL,handle TEXT NOT NULL,fingerprint TEXT NOT NULL,
+    theme TEXT NOT NULL,score INTEGER NOT NULL,reward INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,handle)
+  );
   CREATE TABLE IF NOT EXISTS profile_showcase(user_id INTEGER NOT NULL,instance_id TEXT NOT NULL,position INTEGER NOT NULL,PRIMARY KEY(user_id,position),UNIQUE(user_id,instance_id));
   CREATE TABLE IF NOT EXISTS season_history(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,position INTEGER,score INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,season_id));
   CREATE TABLE IF NOT EXISTS premium_subscriptions(user_id INTEGER PRIMARY KEY,active_until TEXT,source TEXT,created_at TEXT NOT NULL);
@@ -91,7 +107,22 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_wheel_user ON wheel_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_season_score ON season_stats(season_id,score DESC);
   CREATE INDEX IF NOT EXISTS idx_upgrade_sessions_user ON upgrade_sessions(user_id,expires_at,used_at);
+  CREATE INDEX IF NOT EXISTS idx_lab_user_day ON username_lab_attempts(user_id,attempt_date,created_at);
+  CREATE INDEX IF NOT EXISTS idx_xp_history_user ON xp_history(user_id,created_at);
   `);
+  const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
+  if(!userCols.has('luck_points'))db.exec("ALTER TABLE users ADD COLUMN luck_points INTEGER NOT NULL DEFAULT 0");
+  if(!userCols.has('bad_drop_streak'))db.exec("ALTER TABLE users ADD COLUMN bad_drop_streak INTEGER NOT NULL DEFAULT 0");
+  if(!userCols.has('total_earned'))db.exec("ALTER TABLE users ADD COLUMN total_earned INTEGER NOT NULL DEFAULT 0");
+  if(!userCols.has('best_drop_value'))db.exec("ALTER TABLE users ADD COLUMN best_drop_value INTEGER NOT NULL DEFAULT 0");
+  const templateCols=new Set(db.prepare('PRAGMA table_info(username_templates)').all().map(x=>x.name));
+  if(!templateCols.has('username_score'))db.exec("ALTER TABLE username_templates ADD COLUMN username_score INTEGER NOT NULL DEFAULT 0");
+  if(!templateCols.has('visual_tier'))db.exec("ALTER TABLE username_templates ADD COLUMN visual_tier TEXT NOT NULL DEFAULT 'normal'");
+  if(!templateCols.has('quality_json'))db.exec("ALTER TABLE username_templates ADD COLUMN quality_json TEXT");
+  const instanceCols=new Set(db.prepare('PRAGMA table_info(username_instances)').all().map(x=>x.name));
+  if(!instanceCols.has('username_score'))db.exec("ALTER TABLE username_instances ADD COLUMN username_score INTEGER NOT NULL DEFAULT 0");
+  if(!instanceCols.has('visual_tier'))db.exec("ALTER TABLE username_instances ADD COLUMN visual_tier TEXT NOT NULL DEFAULT 'normal'");
+  if(!instanceCols.has('quality_json'))db.exec("ALTER TABLE username_instances ADD COLUMN quality_json TEXT");
   const dropCols=new Set(db.prepare('PRAGMA table_info(drop_requests)').all().map(x=>x.name));
   if(!dropCols.has('tier'))db.exec("ALTER TABLE drop_requests ADD COLUMN tier TEXT NOT NULL DEFAULT 'basic'");
   const upgradeCols=new Set(db.prepare('PRAGMA table_info(upgrade_history)').all().map(x=>x.name));
@@ -263,6 +294,26 @@ export function createDatabase(dataDir){
         updHistory.run(rarity,Number(value),handle);
       }
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('5.3.0-special-handles-expanded',now);
+    })();
+  }
+
+  const redesignV6=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('6.0.0-valuation-progression');
+  if(!redesignV6){
+    db.transaction(()=>{
+      const updTemplate=db.prepare('UPDATE username_templates SET base_value=?,rarity=?,username_score=?,visual_tier=?,quality_json=? WHERE id=?');
+      const updInstance=db.prepare('UPDATE username_instances SET value=?,rarity=?,username_score=?,visual_tier=?,quality_json=? WHERE id=?');
+      const templates=db.prepare('SELECT * FROM username_templates').all();
+      const byId=new Map();
+      for(const t of templates){
+        const a=analyzeUsername(t.handle),value=t.special?Number(t.base_value):a.value,rarity=rarityFromValue(value),visual=visualTier(value,a.score),quality=JSON.stringify(a.breakdown||{});
+        updTemplate.run(value,rarity,a.score,visual,quality,t.id);byId.set(t.id,{value,rarity,score:a.score,visual,quality});
+      }
+      const instances=db.prepare('SELECT id,template_id FROM username_instances').all();
+      for(const i of instances){
+        const x=byId.get(i.template_id);if(x)updInstance.run(x.value,x.rarity,x.score,x.visual,x.quality,i.id);
+      }
+      db.prepare('UPDATE users SET level=CASE WHEN level<1 THEN 1 ELSE level END,luck_points=MIN(100,MAX(0,luck_points)),bad_drop_streak=MAX(0,bad_drop_streak)').run();
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('6.0.0-valuation-progression',now);
     })();
   }
 
