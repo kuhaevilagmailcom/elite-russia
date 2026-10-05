@@ -76,8 +76,13 @@ function validateInitData(initData){
   const secret=crypto.createHmac('sha256','WebAppData').update(BOT_TOKEN).digest();
   const calc=crypto.createHmac('sha256',secret).update(lines.join('\n')).digest('hex');
   if(calc.length!==hash.length||!crypto.timingSafeEqual(Buffer.from(calc),Buffer.from(hash)))return null;
-  const authDate=Number(p.get('auth_date')||0);if(!authDate||Math.abs(Date.now()/1000-authDate)>86400)return null;
-  try{return JSON.parse(p.get('user')||'{}')}catch{return null}
+  const authDate=Number(p.get('auth_date')||0),age=Math.floor(Date.now()/1000)-authDate;
+  if(!authDate||age>86400||age<-300)return null;
+  try{
+    const user=JSON.parse(p.get('user')||'{}');
+    if(!user||!Number.isSafeInteger(Number(user.id))||Number(user.id)<=0)return null;
+    return user;
+  }catch{return null}
 }
 function auth(req){
   const raw=String(req.headers['x-telegram-init-data']||''),tg=validateInitData(raw);
