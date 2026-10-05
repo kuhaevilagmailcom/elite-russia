@@ -42,11 +42,12 @@ test('home drop keeps the username visually centered with no tap instruction',()
   assert.match(uxCss,/\.handle-stage\.drop-trigger\{[^}]*background:transparent/);
   assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
 });
-test('upgrader keeps the final pointer position and round until continue',()=>{
+test('upgrader keeps the final rotor position and round until continue',()=>{
   assert.match(appSrc,/upgradeLastRound:null/);
   assert.match(appSrc,/upgradeLandingAngle:0/);
   assert.match(appSrc,/state\.upgradeLastRound=\{source,target:result\.target/);
-  assert.match(appSrc,/style="transform:rotate\('\+pointerAngle\+'deg\)"/);
+  assert.match(appSrc,/style="transform:rotate\('\+wheelAngle\+'deg\)"/);
+  assert.match(appSrc,/upgrade-pointer-static/);
   assert.match(appSrc,/state\.upgradeLastRound=null;state\.upgradeLandingAngle=0;render\(\);return/);
 });
 test('long usernames use responsive fit instead of clipping',()=>{
@@ -83,23 +84,24 @@ test('upgrader uses a probability circle with a real win sector',()=>{
   assert.doesNotMatch(view,/slot-viewport|slot-track/);
   assert.match(appSrc,/winArc/);
   assert.match(uxCss,/conic-gradient/);
-  assert.match(uxCss,/\.upgrade-pointer/);
+  assert.match(uxCss,/\.upgrade-pointer-static/);
 });
-test('upgrader has one screen title and explicitly explains single-item risk',()=>{
+test('upgrader has one screen title and keeps the source step minimal',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  const row=appSrc.match(/function upgradeRowHtml\(x\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(appSrc,/page==='upgrader'\)shell\('Апгрейдер',upgraderView\(\)\)/);
-  assert.match(view,/Выбери username — увидишь цель и шанс апгрейда/);
+  assert.match(view,/Выбери свой username/);
   assert.doesNotMatch(view,/>Апгрейдер</);
   assert.doesNotMatch(view,/Выбери до|от 1 до 5|максимум 5|5 usernames/i);
-  assert.doesNotMatch(appSrc,/Лимит выбора достигнут|Можно выбрать максимум 5 usernames/);
+  assert.match(row,/upgrade-source-handle/);assert.match(row,/upgrade-source-price/);
+  assert.doesNotMatch(row,/rarity|icon\(|chevron/i);
 });
 test('upgrader is single-item, compact and footer is sticky',()=>{
   assert.match(appSrc,/maxItems:1/);
-  assert.match(appSrc,/state\.upgradeSelectedIds=selected\?\[\]:\[id\]/);
-  assert.match(uxCss,/\.upgrade-duel/);
-  assert.match(uxCss,/\.upgrade-pick\{[^}]*height:58px/);
-  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:74px/);
-  assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:54px/);
+  assert.match(appSrc,/state\.upgradeSelectedIds=\[id\]/);
+  assert.match(uxCss,/\.upgrade-source-card\{[^}]*height:56px/);
+  assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:68px/);
+  assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:50px/);
 });
 test('upgrader lazily extends the real inventory without replacing selected usernames',()=>{
   assert.match(appSrc,/upgradeVisibleCount:30/);
@@ -118,12 +120,12 @@ test('drop roll builds fresh unique random usernames instead of cycling a fixed 
   assert.match(appSrc,/samples=buildRollSequence\(delays\.length,result\.handle\)/);
   assert.doesNotMatch(appSrc,/const samples=\['@vision','@storm7'/);
 });
-test('upgrader result keeps price and chance on one compact line',()=>{
+test('upgrader result keeps source and target prices in a compact matchup',()=>{
   const view=appSrc.match(/function upgraderView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(view,/upgrade-side target/);
-  assert.match(view,/fmt\(p\.target\.value\)/);
+  assert.match(view,/upgrade-match-side target/);
+  assert.match(view,/target\?fmt\(target\.value\)/);
   assert.match(view,/chance/);
-  assert.match(uxCss,/\.upgrade-side\{[^}]*height:66px/);
+  assert.match(uxCss,/\.upgrade-matchup\{[^}]*min-height:78px/);
 });
 
 
@@ -143,20 +145,22 @@ test('leaderboard UI emphasizes money and has a top-three podium',()=>{
   assert.match(view,/podium/);assert.match(view,/money-rank/);assert.match(view,/fmt\(r\.capital\)/);assert.match(view,/Кто богаче/);
   assert.match(uxCss,/money-rank\.hero/);
 });
-test('wheel is responsive, centered and uses true weight geometry',()=>{
+test('wheel is responsive, centered and uses true SVG weight geometry',()=>{
   assert.match(appSrc,/function wheelGeometry/);
   assert.match(appSrc,/start=cursor\/total\*360/);
-  assert.match(uxCss,/\.wheel-stage\{--wheel-size:/);
-  assert.match(uxCss,/border-radius:50%/);
-  assert.match(uxCss,/daily-wheel-pointer/);
+  assert.match(appSrc,/function wheelSlicePath/);
+  assert.match(appSrc,/function wheelSvgMarkup/);
+  assert.match(uxCss,/\.fortune-stage\{/);
+  assert.match(uxCss,/\.fortune-pointer\{/);
+  assert.match(uxCss,/\.fortune-hub\{/);
 });
-test('wheel hides labels from tiny sectors and lists rare prizes separately',()=>{
+test('wheel hides labels from tiny sectors and lists bonuses separately',()=>{
   const view=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(view,/rare=g\.rows\.filter\(x=>x\.span<12\)/);
-  assert.match(view,/visible=g\.rows\.filter\(x=>x\.span>=12\)/);
-  assert.match(view,/visible\.map\(x=>'<span class="daily-wheel-label"/);
+  assert.match(appSrc,/x\.span>=11\?\('<text/);
+  assert.match(view,/wheelSvgMarkup\(g\.rows\)/);
   assert.match(view,/wheel-rare/);
-  assert.match(view,/РЕДКИЕ ПРИЗЫ/);
+  assert.match(view,/БОНУСЫ/);
 });
 test('wheel result persists locally and spin is driven by server reward',()=>{
   assert.match(appSrc,/wheelLastResult:null/);
@@ -166,8 +170,19 @@ test('wheel result persists locally and spin is driven by server reward',()=>{
   assert.match(appSrc,/await new Promise\(x=>setTimeout\(x,3650\)\)/);
 });
 test('wheel disabled CTA is visually distinct',()=>{
-  assert.match(uxCss,/\.wheel-spin-button:disabled\{[^}]*background:#d7eefa!important[^}]*opacity:1/);
+  assert.match(uxCss,/\.wheel-page-clean \.wheel-spin-button:disabled\{[^}]*background:#e3e6e9[^}]*opacity:1/);
 });
+
+test('audited CSS has one final UI layer instead of stacked version overrides',()=>{
+  assert.match(uxCss,/USERNAME 5\.4 — audited final UI/);
+  for(const old of ['USERNAME 4.7','USERNAME 4.8','USERNAME 4.9','USERNAME 5.0','USERNAME 5.1','USERNAME 5.2','USERNAME 5.3'])assert.doesNotMatch(uxCss,new RegExp(old.replace('.', '\\.')));
+  assert.ok((uxCss.match(/!important/g)||[]).length<=10);
+});
+test('upgrader source price reserves enough room for nine-digit values',()=>{
+  assert.match(uxCss,/\.upgrade-source-card\{[^}]*grid-template-columns:minmax\(0,1fr\) 108px/);
+  assert.match(uxCss,/\.upgrade-source-price\{[^}]*width:108px[^}]*white-space:nowrap/);
+});
+
 test('new players start with exactly 50000 virtual dollars',()=>assert.equal(GAME.startBalance,50000));
 
 test('referral screen has copy and native Telegram share actions',()=>{
