@@ -145,10 +145,14 @@ function dropPricePicker(tiers){
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
  const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||25000),cantAfford=!freeBasic&&u.balance<payCost;
+ const quick=[
+  ['collection','collection','Коллекция'],['market','market','Рынок'],['tasks','tasks','Задания'],['wheel','wheel','Колесо']
+ ].map(([page,ico,label])=>'<button class="home-shortcut" data-page="'+page+'">'+icon(ico)+'<span>'+label+'</span></button>').join('');
  return '<div class="home">'+dropPricePicker(tiers)+'<div class="home-metrics">'+metric('Капитал',fmt(u.capital))+metric('Место','#'+u.rank)+metric('Usernames',u.collectionCount)+'</div>'+
  '<section class="drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
  (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить случайный username"><b data-fit-username data-max-size="54" data-min-size="25">@username</b>'+(cantAfford?'<small>Недостаточно денег</small>':'')+'</button>')+
- '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section></div>';
+ '</section><section class="last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">История появится после первого дропа.</div>')+'</section>'+
+ '<section class="home-shortcuts" aria-label="Быстрый доступ">'+quick+'</section></div>';
 }
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
@@ -208,26 +212,38 @@ function wheelSlicePath(start,end,r=48){
  const [x1,y1]=wheelPoint(start,r),[x2,y2]=wheelPoint(end,r),large=(end-start)>180?1:0;
  return 'M50 50 L'+x1.toFixed(3)+' '+y1.toFixed(3)+' A'+r+' '+r+' 0 '+large+' 1 '+x2.toFixed(3)+' '+y2.toFixed(3)+' Z';
 }
+function wheelSliceFill(x,i){
+ if(x.type==='username')return '#bfe9fb';
+ if(x.type==='drop')return '#d9f2fc';
+ if(x.type==='xp')return '#e9eef2';
+ return i%2?'#f1f3f5':'#ffffff';
+}
+function wheelLabelRotation(angle){
+ const base=Number(angle)-90;
+ return base>90&&base<270?base+180:base;
+}
 function wheelSvgMarkup(rows){
- const fills=['#ffffff','#eef1f4'];
  return '<svg class="fortune-svg" id="wheelDisc" viewBox="0 0 100 100" aria-hidden="true">'+
+  '<circle cx="50" cy="50" r="48.3" fill="#f8f9fa"></circle>'+
   rows.map((x,i)=>{
-   const [tx,ty]=wheelPoint(x.center,31),label=x.span>=11?('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" text-anchor="middle" dominant-baseline="middle">'+esc(wheelShortLabel(x))+'</text>'):'';
-   return '<path d="'+wheelSlicePath(x.start,x.end)+'" fill="'+fills[i%2]+'"></path>'+label;
+   const [tx,ty]=wheelPoint(x.center,32.5),label=x.span>=10?('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" transform="rotate('+wheelLabelRotation(x.center).toFixed(2)+' '+tx.toFixed(2)+' '+ty.toFixed(2)+')" text-anchor="middle" dominant-baseline="middle">'+esc(wheelShortLabel(x))+'</text>'):'';
+   return '<path class="fortune-slice" d="'+wheelSlicePath(x.start,x.end,47.4)+'" fill="'+wheelSliceFill(x,i)+'" stroke="#ffffff" stroke-width=".7"></path>'+label;
   }).join('')+
-  '<circle cx="50" cy="50" r="48" fill="none" stroke="#dfe3e7" stroke-width=".55"></circle>'+
+  '<circle cx="50" cy="50" r="47.4" fill="none" stroke="#d8dde2" stroke-width=".9"></circle>'+
+  '<circle cx="50" cy="50" r="40.6" fill="none" stroke="rgba(255,255,255,.72)" stroke-width=".45"></circle>'+
  '</svg>';
 }
 function wheelView(){
- const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<12),visible=g.rows.filter(x=>x.span>=12),last=state.wheelLastResult;
+ const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),rare=g.rows.filter(x=>x.span<10),last=state.wheelLastResult;
  return '<div class="wheel-page wheel-page-clean"><section class="wheel-card wheel-card-clean"><div class="fortune-stage">'+
-  '<div class="fortune-pointer"></div>'+
+  '<div class="fortune-rim"></div>'+
   wheelSvgMarkup(g.rows)+
-  '<div class="fortune-hub"><b>@</b></div>'+
+  '<div class="fortune-pointer"><i></i></div>'+
+  '<div class="fortune-hub"><b>@</b><span>USERNAME</span></div>'+
  '</div>'+
- (rare.length?'<div class="wheel-rare"><span>БОНУСЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
+ (rare.length?'<div class="wheel-rare"><span>РЕДКИЕ СЕКТОРЫ</span><div>'+rare.map(x=>'<b>'+esc(wheelShortLabel(x))+'</b>').join('')+'</div></div>':'')+'</section>'+
  '<div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее вращение через '+untilText(w.nextAt)))+'</span></div>'+
- '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить колесо':'Недоступно')+'</button>'+
+ '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить':'Недоступно')+'</button>'+
  '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('Выпало: '+esc(last.label)):'')+'</div></div>';
 }
 function friendsView(){
@@ -255,8 +271,8 @@ function selectedUpgradeTarget(){
 function upgradeRowHtml(x){
  const selected=(state.upgradeSelectedIds||[]).includes(x.id);
  return '<button class="upgrade-pick upgrade-source-card '+(selected?'selected':'')+'" data-up-item="'+x.id+'">'+
-  '<span class="upgrade-source-handle" data-fit-username data-max-size="17" data-min-size="11">'+esc(x.handle)+'</span>'+
-  '<strong class="upgrade-source-price">'+fmt(x.value)+'</strong>'+
+  '<span class="upgrade-source-handle">'+esc(x.handle)+'</span>'+
+  '<span class="upgrade-source-price">'+fmt(x.value)+'</span>'+
  '</button>';
 }
 function upgradeTargetRowHtml(x){
@@ -348,7 +364,14 @@ async function spinWheelUi(){
  try{
   const req=crypto.randomUUID?.()||('w-'+Date.now()),r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
-  if(disc&&target){const final=7*360-target.center;disc.style.transition='transform 3.6s cubic-bezier(.08,.72,.12,1)';requestAnimationFrame(()=>{disc.style.transform='rotate('+final+'deg)'});await new Promise(x=>setTimeout(x,3650))}
+  if(disc&&target){
+   const margin=Math.min(2.2,Math.max(.35,target.span*.12)),room=Math.max(.25,target.span-margin*2),landing=target.start+margin+(rollRandomInt(10000)/10000)*room,final=8*360-landing;
+   disc.style.transition='none';disc.style.transform='rotate(0deg)';disc.getBoundingClientRect();
+   disc.closest('.fortune-stage')?.classList.add('spinning');
+   requestAnimationFrame(()=>{disc.style.transition='transform 3.45s cubic-bezier(.08,.74,.09,1)';disc.style.transform='rotate('+final+'deg)'});
+   await new Promise(x=>setTimeout(x,3500));
+   disc.closest('.fortune-stage')?.classList.remove('spinning');
+  }
   state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
 }
@@ -426,7 +449,13 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.pager){const d=Number(el.dataset.dir);if(el.dataset.pager==='collection'){state.filters.page+=d;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page='+state.filters.page);render()}if(el.dataset.pager==='market'){state.marketFilters.page+=d;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);render()}if(el.dataset.pager==='rank'){state.rankPage+=d;render()}return}
  if(el.dataset.marketBuy){const id=el.dataset.marketBuy,r=await api('/api/market/'+id+'/buy',{method:'POST'});removeMarketLocal(id);toast('Куплено '+r.handle);await refreshUser();render();return}
  if(el.dataset.marketCancel){const id=el.dataset.marketCancel;await api('/api/market/'+id+'/cancel',{method:'POST'});removeMarketLocal(id);toast('Лот снят');render();return}
- if(el.dataset.claim){const r=await api('/api/tasks/'+el.dataset.claim+'/claim',{method:'POST'});toast('+'+fmt(r.reward));await refreshUser();await load('tasks');return}
+ if(el.dataset.claim){
+   const key=String(el.dataset.claim||'');if(!key||el.disabled)return;
+   el.disabled=true;el.classList.add('is-claiming');
+   const r=await api('/api/tasks/'+key+'/claim',{method:'POST'});
+   const task=state.tasks?.items?.find(x=>String(x.key)===key);if(task)task.claimed=true;
+   applyUserLocal(r.user);haptic('light');toast('+'+fmt(r.reward));render();return
+ }
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.backPage='top';state.page='profile';state.profile=r;render();return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
  if(el.dataset.showcase){const r=await api('/api/showcase/'+el.dataset.showcase,{method:'POST'});if(state.detail&&state.detail.id===el.dataset.showcase)state.detail.inShowcase=r.active;const item=state.collection?.items?.find(x=>x.id===el.dataset.showcase);if(item)item.inShowcase=r.active;toast(r.active?'Добавлено на витрину':'Убрано с витрины');render();return}
