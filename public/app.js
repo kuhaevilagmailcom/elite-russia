@@ -223,7 +223,7 @@ function wheelLabelRotation(angle){
  return base>90&&base<270?base+180:base;
 }
 function wheelSvgMarkup(rows){
- return '<svg class="fortune-svg" id="wheelDisc" viewBox="0 0 100 100" aria-hidden="true">'+
+ return '<svg class="fortune-svg" id="wheelDisc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" shape-rendering="geometricPrecision" aria-hidden="true">'+
   '<circle cx="50" cy="50" r="48.3" fill="#f8f9fa"></circle>'+
   rows.map((x,i)=>{
    const [tx,ty]=wheelPoint(x.center,32.5),label=x.span>=10?('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" transform="rotate('+wheelLabelRotation(x.center).toFixed(2)+' '+tx.toFixed(2)+' '+ty.toFixed(2)+')" text-anchor="middle" dominant-baseline="middle">'+esc(wheelShortLabel(x))+'</text>'):'';
@@ -359,6 +359,28 @@ function openSystemSellModal(id,handle,value){
  document.body.appendChild(root);hydrateIcons();
 }
 function closeModal(el){el?.closest('.modal-root')?.remove()}
+async function animateRotation(el,degrees,duration,easing){
+ if(!el)return;
+ const end='rotate('+Number(degrees||0)+'deg)';
+ const reduced=matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+ el.style.transition='none';el.style.transform='rotate(0deg)';void el.offsetWidth;
+ if(reduced){el.style.transform=end;return}
+ if(typeof el.animate==='function'){
+  const animation=el.animate([{transform:'rotate(0deg)'},{transform:end}],{duration,easing,fill:'forwards'});
+  try{await animation.finished}catch{}
+  el.style.transform=end;animation.cancel();return
+ }
+ await new Promise(resolve=>{
+  let settled=false;
+  const finish=()=>{if(settled)return;settled=true;el.removeEventListener('transitionend',finish);el.style.transform=end;resolve()};
+  el.addEventListener('transitionend',finish,{once:true});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   el.style.transition='transform '+duration+'ms '+easing;
+   el.style.transform=end;
+  }));
+  setTimeout(finish,duration+160);
+ });
+}
 async function spinWheelUi(){
  if(state.busy)return;state.busy=true;
  try{
@@ -366,11 +388,9 @@ async function spinWheelUi(){
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
   if(disc&&target){
    const margin=Math.min(2.2,Math.max(.35,target.span*.12)),room=Math.max(.25,target.span-margin*2),landing=target.start+margin+(rollRandomInt(10000)/10000)*room,final=8*360-landing;
-   disc.style.transition='none';disc.style.transform='rotate(0deg)';disc.getBoundingClientRect();
-   disc.closest('.fortune-stage')?.classList.add('spinning');
-   requestAnimationFrame(()=>{disc.style.transition='transform 3.45s cubic-bezier(.08,.74,.09,1)';disc.style.transform='rotate('+final+'deg)'});
-   await new Promise(x=>setTimeout(x,3500));
-   disc.closest('.fortune-stage')?.classList.remove('spinning');
+   const stage=disc.closest('.fortune-stage');stage?.classList.add('spinning');
+   await animateRotation(disc,final,3450,'cubic-bezier(.08,.74,.09,1)');
+   stage?.classList.remove('spinning');
   }
   state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
@@ -394,9 +414,11 @@ async function animateUpgradeWheel(result){
  const rotor=document.querySelector('#upgradeRotor');if(!rotor){state.upgradeSpinning=false;render();return}
  const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(5,winArc/3),unit=rollRandomInt(10000)/10000;
  const landing=result.success?(margin+unit*Math.max(1,winArc-margin*2)):(winArc+margin+unit*Math.max(1,360-winArc-margin*2));
- rotor.style.transition='none';rotor.style.transform='rotate(0deg)';rotor.getBoundingClientRect();
- requestAnimationFrame(()=>{rotor.style.transition='transform 3.2s cubic-bezier(.12,.72,.08,1)';rotor.style.transform='rotate('+(360*6-landing)+'deg)'});
- await new Promise(r=>setTimeout(r,3250));haptic(result.success?'medium':'light');
+ const wheelDegrees=360*6-landing;
+ rotor.closest('.upgrade-roulette-clean')?.classList.add('spinning');
+ await animateRotation(rotor,wheelDegrees,3200,'cubic-bezier(.12,.72,.08,1)');
+ rotor.closest('.upgrade-roulette-clean')?.classList.remove('spinning');
+ haptic(result.success?'medium':'light');
  state.upgradeLandingAngle=landing;state.upgradeLastRound={source,target:result.target,chance:Number(result.chance||0),success:!!result.success};
  state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeTargetSessionId='';
  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
