@@ -23,8 +23,8 @@ test('help explains the core loop and includes commands',()=>{
   for(const token of ['бесплатный дроп','коллекции','апгрейдер','/start','/play','/help'])assert.match(text,new RegExp(token,'i'));
 });
 
-test('game button uses Telegram Web App markup only for a configured URL',()=>{
-  assert.deepEqual(gameKeyboard('https://game.example'),{inline_keyboard:[[{text:'🎮 Открыть игру',web_app:{url:'https://game.example'}}]]});
+test('game button opens the configured Telegram Mini App link',()=>{
+  assert.deepEqual(gameKeyboard('https://t.me/usernamegamebot/usernamegame'),{inline_keyboard:[[{text:'🎮 Начать играть',url:'https://t.me/usernamegamebot/usernamegame'}]]});
   assert.equal(gameKeyboard(''),undefined);
 });
 
@@ -32,7 +32,8 @@ test('bot profile and permanent game menu are configured on startup',()=>{
   assert.ok(BOT_DESCRIPTION.length<=512);
   assert.ok(BOT_SHORT_DESCRIPTION.length<=120);
   for(const method of ['setMyCommands','setMyDescription','setMyShortDescription','setChatMenuButton'])assert.match(serverSrc,new RegExp(method));
-  assert.match(serverSrc,/type:'web_app',text:'🎮 Играть'/);
+  assert.match(serverSrc,/type:'web_app',text:'🎮 Начать играть'/);
+  assert.match(serverSrc,/MINIAPP_LINK=process\.env\.MINIAPP_LINK\|\|'https:\/\/t\.me\/usernamegamebot\/usernamegame'/);
   assert.match(serverSrc,/WEBAPP_URL must be a public HTTPS URL/);
 });
 
