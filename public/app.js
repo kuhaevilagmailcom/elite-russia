@@ -406,7 +406,42 @@ function profileView(p=state.profile?.profile){
  '<div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Заработано',fmt(p.totalEarned||0))+metric('Лучший drop',fmt(p.bestDropValue||0))+metric('Usernames',p.collectionCount)+metric('Lab',Number(p.lab?.bestScore||0)+'/100')+'</div>'+
  '<section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div class="'+valueClass(x).trim()+'">'+x.handle+'</div>').join(''):'<div class="profile-showcase-empty">'+icon('collection')+'<b>Витрина пуста</b><span>Добавь username из коллекции</span></div>')+'</div></section></div>'
 }
-function premiumView(){const p=state.premium;return '<div class="premium-page premium-page-clean"><div class="plus-hero"><h1>'+(p.active?'Подписка активна':'Больше возможностей')+'</h1><p>Подписка не повышает шанс дропа, награды колеса или апгрейдера.</p></div><div class="feature-list">'+p.features.map(x=>'<div>'+icon('check')+'<span>'+esc(x)+'</span></div>').join('')+'</div>'+(p.active?'<div class="plus-active">Активно до '+new Date(p.activeUntil).toLocaleDateString('ru-RU')+'</div>':'<button class="primary" data-premium '+(!p.starsEnabled?'disabled':'')+'>Подключить · '+p.stars+' Stars</button>')+'</div>'}
+function premiumView(){
+ const p=state.premium||{features:[],products:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.type+':'+x.key));
+ const groups=[['subscription','USERNAME+'],['theme','Темы'],['frame','Рамки профиля'],['card','Карточки'],['showcase','Витрина']];
+ const productCard=x=>{
+   const isPlus=x.key==='plus_30',isOwned=isPlus?!!p.active:owned.has(x.type+':'+x.grant),selected=x.type==='theme'?p.selected?.theme_key===x.grant:x.type==='frame'?p.selected?.frame_key===x.grant:x.type==='card'?p.selected?.card_key===x.grant:false;
+   let action='';
+   if(isPlus&&p.active)action='<span class="shop-owned">Активно</span>';
+   else if(isOwned&&['theme','frame','card'].includes(x.type))action='<button class="secondary" data-select-cosmetic="'+x.type+':'+x.grant+'" '+(selected?'disabled':'')+'>'+(selected?'Выбрано':'Применить')+'</button>';
+   else if(isOwned)action='<span class="shop-owned">Куплено</span>';
+   else action='<button class="primary" data-buy-product="'+x.key+'" '+(!p.starsEnabled?'disabled':'')+'>'+x.stars+' Stars</button>';
+   return '<article class="shop-product"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+action+'</article>';
+ };
+ return '<div class="premium-page premium-page-clean"><div class="plus-hero"><h1>USERNAME+</h1><p>Только косметика и удобство. Покупки не повышают шанс дропа, колеса или апгрейдера.</p></div>'+
+ '<div class="feature-list">'+(p.features||[]).map(x=>'<div>'+icon('check')+'<span>'+esc(x)+'</span></div>').join('')+'</div>'+
+ '<div class="shop-groups">'+groups.map(([type,title])=>{const rows=(p.products||[]).filter(x=>x.type===type);return rows.length?'<section class="shop-group"><h3>'+title+'</h3>'+rows.map(productCard).join('')+'</section>':''}).join('')+'</div>'+
+ (p.active?'<div class="plus-active">Plus до '+new Date(p.activeUntil).toLocaleDateString('ru-RU')+'</div>':'')+'</div>'
+}
+function settingsView(){
+ const s=state.settings||DEFAULT_SETTINGS,themeName={light:'Светлая',dark:'Тёмная',system:'Системная'}[s.theme]||'Системная';
+ const toggle=(key,label,ico)=>'<button class="settings-row" data-setting-toggle="'+key+'"><span class="settings-row-icon">'+icon(ico)+'</span><span><b>'+label+'</b><small>'+(s[key]?'Включено':'Выключено')+'</small></span><i class="switch '+(s[key]?'on':'')+'"></i></button>';
+ return '<div class="settings-page"><section class="settings-card"><div class="settings-title"><b>Тема</b><span>'+themeName+'</span></div><div class="theme-segment">'+
+  [['light','Светлая','sun-03'],['dark','Тёмная','moon-02'],['system','Системная','settings-01']].map(([v,t,ic])=>'<button data-setting-theme="'+v+'" class="'+(s.theme===v?'active':'')+'">'+iconRaw(ic)+'<span>'+t+'</span></button>').join('')+
+ '</div></section><section class="settings-card settings-list">'+
+ toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','upgrade')+
+ '</section><div class="settings-note">Настройки хранятся на этом устройстве.</div></div>';
+}
+function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
+function levelsView(){
+ const l=state.levels||{},p=l.progression||state.user||{},rewards=l.rewards||[];
+ return '<div class="levels-page"><section class="levels-hero">'+xpBar(p)+'<div><span>Титул</span><b>'+esc(p.title||state.user?.title||'Новичок')+'</b></div></section>'+
+ '<div class="section-label">Награды уровней</div><div class="level-rewards">'+rewards.map(r=>'<article class="'+(Number(p.level||1)>=r.level?'done':'')+'"><strong>LVL '+r.level+'</strong><span>'+esc(r.title||'')+'</span><b>'+(r.money?fmt(r.money):((r.freeDrops||0)+' free drop'))+'</b></article>').join('')+'</div></div>';
+}
+function achievementsView(){
+ const a=state.achievements||{items:[],completed:0,total:0};
+ return '<div class="achievements-page"><div class="achievement-summary"><span>Выполнено</span><b>'+a.completed+' / '+a.total+'</b></div><div class="achievement-list">'+(a.items||[]).map(x=>{const pct=Math.max(0,Math.min(100,Math.round(Number(x.current||0)/Math.max(1,Number(x.target||1))*100)));return '<article class="'+(x.done?'done':'')+'"><div class="achievement-icon">'+icon('achievements')+'</div><div><b>'+esc(x.title)+'</b><span>'+esc(x.desc)+'</span><div class="achievement-progress"><i style="width:'+pct+'%"></i></div><small>'+Math.min(Number(x.current||0),Number(x.target||0))+' / '+Number(x.target||0)+'</small></div></article>'}).join('')+'</div></div>';
+}
 function detailView(x){
  const q=x.quality||{};
  return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Оценка',(x.score||0)+' / 1000')+metric('Цена',fmt(x.value))+metric('Читаемость',Number(q.pronounceability||0)+'/100')+metric('Чистота',Number(q.cleanliness||0)+'/100')+metric('Краткость',Number(q.length||0)+'/100')+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">'+(x.inShowcase?'Убрать с витрины':'На витрину')+'</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать · '+fmt(x.value)+'</button></div></div>'
