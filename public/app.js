@@ -255,7 +255,7 @@ function marketFilterSheet(){
 }
 function marketView(){
  const m=state.market||{items:[],page:1,pages:1};
- return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card'+valueClass(x)+'"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Игровая оценка '+fmt(x.marketValue||x.value)+' · '+(Number(x.potential||0)>0?'потенциал +'+fmt(x.potential):'без запаса')+'</small><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
+ return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card'+valueClass(x)+'"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Игровая оценка '+fmt(x.marketValue||x.value)+'</small>'+(Number(x.potential||0)>0?'<small class="market-profit">Потенциал +'+fmt(x.potential)+'</small>':'<small>Без запаса</small>')+'<small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
 }
 function topView(){
  const all=state.leaderboard?.items||[],top=all.slice(0,3),rest=all.slice(3),size=10,pages=Math.max(1,Math.ceil(rest.length/size));
@@ -286,10 +286,10 @@ function wheelSlicePath(start,end,r=48){
  return 'M50 50 L'+x1.toFixed(3)+' '+y1.toFixed(3)+' A'+r+' '+r+' 0 '+large+' 1 '+x2.toFixed(3)+' '+y2.toFixed(3)+' Z';
 }
 function wheelSliceFill(x,i){
- if(x.type==='username')return '#bfe9fb';
- if(x.type==='drop')return '#d9f2fc';
- if(x.type==='xp')return '#e9eef2';
- return i%2?'#f1f3f5':'#ffffff';
+ if(x.type==='username')return 'var(--accent-bg)';
+ if(x.type==='drop')return 'var(--surface-subtle)';
+ if(x.type==='xp')return 'var(--surface-subtle)';
+ return i%2?'var(--surface-subtle)':'var(--card)';
 }
 function wheelLabelRotation(angle){
  const base=Number(angle)-90;
@@ -297,13 +297,13 @@ function wheelLabelRotation(angle){
 }
 function wheelSvgMarkup(rows){
  return '<svg class="fortune-svg" id="wheelDisc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" shape-rendering="geometricPrecision" aria-hidden="true">'+
-  '<circle cx="50" cy="50" r="48.3" fill="#f8f9fa"></circle>'+
+  '<circle cx="50" cy="50" r="48.3" fill="var(--card)"></circle>'+
   rows.map((x,i)=>{
    const [tx,ty]=wheelPoint(x.center,32.5),label=x.span>=10?('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" transform="rotate('+wheelLabelRotation(x.center).toFixed(2)+' '+tx.toFixed(2)+' '+ty.toFixed(2)+')" text-anchor="middle" dominant-baseline="middle">'+esc(wheelShortLabel(x))+'</text>'):'';
-   return '<path class="fortune-slice" d="'+wheelSlicePath(x.start,x.end,47.4)+'" fill="'+wheelSliceFill(x,i)+'" stroke="#ffffff" stroke-width=".7"></path>'+label;
+   return '<path class="fortune-slice" d="'+wheelSlicePath(x.start,x.end,47.4)+'" fill="'+wheelSliceFill(x,i)+'" stroke="var(--card)" stroke-width=".7"></path>'+label;
   }).join('')+
-  '<circle cx="50" cy="50" r="47.4" fill="none" stroke="#d8dde2" stroke-width=".9"></circle>'+
-  '<circle cx="50" cy="50" r="40.6" fill="none" stroke="rgba(255,255,255,.72)" stroke-width=".45"></circle>'+
+  '<circle cx="50" cy="50" r="47.4" fill="none" stroke="var(--border)" stroke-width=".9"></circle>'+
+  '<circle cx="50" cy="50" r="40.6" fill="none" stroke="var(--border)" stroke-width=".45"></circle>'+
  '</svg>';
 }
 function wheelView(){
