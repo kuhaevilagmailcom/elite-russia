@@ -214,8 +214,9 @@ test('wheel disabled CTA is visually distinct',()=>{
   assert.match(uxCss,/\.wheel-page-clean \.wheel-spin-button:disabled\{[^}]*background:#e3e6e9[^}]*opacity:1/);
 });
 
-test('audited CSS has one final UI layer instead of stacked version overrides',()=>{
+test('audited CSS keeps the cleaned 5.4 base plus one 6.0 product layer',()=>{
   assert.match(uxCss,/USERNAME 5\.4 — audited final UI/);
+  assert.match(uxCss,/USERNAME 6\.0 — progression, valuation colors and Username Lab/);
   for(const old of ['USERNAME 4.7','USERNAME 4.8','USERNAME 4.9','USERNAME 5.0','USERNAME 5.1','USERNAME 5.2','USERNAME 5.3'])assert.doesNotMatch(uxCss,new RegExp(old.replace('.', '\\.')));
   assert.ok((uxCss.match(/!important/g)||[]).length<=10);
 });
@@ -224,6 +225,43 @@ test('upgrader source rows stay aligned without fixed desktop-only price columns
   assert.match(uxCss,/\.upgrade-source-card\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/);
   assert.match(uxCss,/\.upgrade-source-price\{[^}]*max-width:132px[^}]*white-space:nowrap/);
   assert.doesNotMatch(row,/data-fit-username/);
+});
+
+test('home exposes level progress luck daily income and the skill-based Username Lab',()=>{
+  const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(home,/home-progress-card/);
+  assert.match(home,/xpBar\(u\)/);
+  assert.match(home,/Удача после неудач/);
+  assert.match(home,/data-daily-claim/);
+  assert.match(home,/home-lab-banner/);
+  assert.match(home,/data-page="lab"/);
+});
+test('Username Lab is a first-class cached page with server submission',()=>{
+  assert.match(appSrc,/function labView\(\)/);
+  assert.match(appSrc,/Минимум в игре — 4 символа/);
+  assert.match(appSrc,/\/api\/lab/);
+  assert.match(appSrc,/data-lab-submit/);
+  assert.match(appSrc,/page==='lab'/);
+  assert.match(uxCss,/\.lab-page\{/);
+  assert.match(uxCss,/\.lab-result\.value-purple/);
+});
+test('valuable usernames use blue purple and gold visual language without backend rarity labels',()=>{
+  assert.match(uxCss,/--value-purple:#8B5CF6/);
+  assert.match(uxCss,/--value-gold:#F4B740/);
+  assert.match(uxCss,/\.value-purple\{/);
+  assert.match(uxCss,/\.value-gold\{/);
+  const collection=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(collection,/valueClass\(x\)/);
+  for(const r of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])assert.doesNotMatch(collection,new RegExp(r));
+});
+test('profile shows title XP luck earnings best drop and Lab score',()=>{
+  const view=appSrc.match(/function profileView\([\s\S]*?\n\}/)?.[0]||'';
+  assert.match(view,/xpBar\(p\)/);
+  assert.match(view,/p\.title/);
+  assert.match(view,/p\.luck/);
+  assert.match(view,/p\.totalEarned/);
+  assert.match(view,/p\.bestDropValue/);
+  assert.match(view,/p\.lab\?\.bestScore/);
 });
 
 test('new players start with exactly 50000 virtual dollars',()=>assert.equal(GAME.startBalance,50000));
