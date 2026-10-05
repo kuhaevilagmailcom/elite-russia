@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {RARITY_WEIGHTS} from './config.mjs';
 import {randomUnit} from './economy.mjs';
+import {analyzeUsername} from './valuation.mjs';
 
 const EXTRA_RU_ROOTS=[
   'bratan','bratok','patsan','chelik','maloy','krasava','krutoy','chetko','topchik','privet',
@@ -226,10 +227,7 @@ export function wordQuality(handle){
   if(!ugly&&vowelRatio>=.25&&vowelRatio<=.6)return .42;
   return .22;
 }
-// Fragment behaves much more like a scarce domain market than a cosmetic rarity
-// ladder. Length establishes scarcity; meaning and cleanliness decide where a
-// handle lands inside that length band.
-function lengthBase(len){return ({3:36000000,4:9000000,5:1850000,6:720000,7:300000,8:125000,9:58000,10:28000})[len]||14000}
+// Canonical pricing now comes from the semantic valuation engine.
 export function rarityFromValue(value){
   const v=Math.max(0,Number(value)||0);
   if(v>=2000000)return 'ULTRA';
@@ -238,34 +236,15 @@ export function rarityFromValue(value){
   if(v>=15000)return 'RARE';
   return 'COMMON';
 }
-function scoreCore(handle,jitter=0){
-  const h=String(handle||'').toLowerCase(),len=h.length,quality=wordQuality(h);
-  const q=quality>=1?1:quality>=.7?.58:quality>=.6?.46:quality>=.55?.38:quality>=.4?.24:.11;
-  let score=lengthBase(len)*q;
-  if(/_/.test(h))score*=.58;
-  if(/\d/.test(h)){
-    score*=len===4?.86:.68;
-    if(/777$/.test(h))score*=1.34;
-    else if(/77$/.test(h))score*=1.22;
-    else if(/007$/.test(h))score*=1.18;
-    else if(/(\d)\1{1,}$/.test(h))score*=1.14;
-  }else score*=1.1;
-  // Even arbitrary four-character collectibles are a tiny namespace. Give
-  // them a hard market floor instead of pricing them like long random strings.
-  if(len===4)score=Math.max(score,/\d/.test(h)?2100000:2600000);
-  if(len===3&&TELEGRAM_THREE_LETTER.has(h))score=Math.max(score,32000000);
-  return Math.max(200,Math.round(score*(1+jitter)/100)*100);
-}
-export function scoreHandle(handle,_rarity='COMMON',_instanceNumber=1,_maxSupply=1,rng=randomUnit){
-  return scoreCore(handle,(rng()-.5)*.08);
+export function scoreHandle(handle,_rarity='COMMON',_instanceNumber=1,_maxSupply=1,_rng=randomUnit){
+  return analyzeUsername(handle).value;
 }
 export function stableScoreHandle(handle){
-  const key=String(handle).toLowerCase()+':fragment-market-v5',h=crypto.createHash('sha256').update(key).digest(),unit=h.readUInt32BE(0)/0xffffffff;
-  return scoreCore(handle,(unit-.5)*.08);
+  return analyzeUsername(handle).value;
 }
-export function assessHandle(handle,{stable=false}={}){
-  const value=stable?stableScoreHandle(handle):scoreHandle(handle);
-  return {handle:String(handle).toLowerCase(),value,rarity:rarityFromValue(value),quality:wordQuality(handle),length:String(handle).length};
+export function assessHandle(handle,{stable=false,theme=''}={}){
+  const a=analyzeUsername(handle,{theme});
+  return {handle:a.handle,value:a.value,rarity:rarityFromValue(a.value),quality:a.breakdown?.word||0,length:a.handle.length,score:a.score,visual:a.visual,breakdown:a.breakdown};
 }
 export function generatedSupply(){return 1}
 export function candidateUniverseSize(){return ROOTS.length*SUFFIXES.length+ROOTS.length*(PREFIXES.length-1)}
