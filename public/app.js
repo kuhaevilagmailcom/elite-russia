@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,lab:null,labResult:null,daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,levels:null,achievements:null,lab:null,labResult:null,daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0,
@@ -38,7 +38,42 @@ function syncViewport(){
 }
 try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewportNow();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewportNow()}
 addEventListener('resize',syncViewport,{passive:true});
-function haptic(type='light'){try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
+const SETTINGS_KEY='username.settings.v2';
+const DEFAULT_SETTINGS=Object.freeze({theme:'system',vibration:true,sound:true,animations:true});
+function readSettings(){
+ try{return {...DEFAULT_SETTINGS,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}}catch{return {...DEFAULT_SETTINGS}}
+}
+state.settings=readSettings();
+function effectiveTheme(){
+ if(state.settings.theme==='system')return matchMedia?.('(prefers-color-scheme: dark)')?.matches?'dark':'light';
+ return state.settings.theme==='dark'?'dark':'light';
+}
+function applyPreferences(){
+ const theme=effectiveTheme();root.dataset.theme=theme;
+ root.classList.toggle('no-animations',!state.settings.animations);
+ const accent=state.user?.cosmetics?.theme||'';
+ root.dataset.accentTheme=accent;
+ root.dataset.profileFrame=state.user?.cosmetics?.frame||'';
+ root.dataset.cardStyle=state.user?.cosmetics?.card||'';
+ try{TG?.setHeaderColor?.(theme==='dark'?'#111316':'#F4F5F7');TG?.setBackgroundColor?.(theme==='dark'?'#111316':'#F4F5F7')}catch{}
+}
+function saveSettings(patch){
+ state.settings={...state.settings,...patch};localStorage.setItem(SETTINGS_KEY,JSON.stringify(state.settings));applyPreferences();
+}
+try{matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change',()=>{if(state.settings.theme==='system'){applyPreferences();render()}})}catch{}
+function haptic(type='light'){if(!state.settings.vibration)return;try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
+let audioCtx;
+function sound(kind='tap'){
+ if(!state.settings.sound)return;
+ try{
+  audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;
+  const hz=kind==='reward'?660:kind==='fail'?190:360;o.frequency.setValueAtTime(hz,now);o.type='sine';
+  g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(.035,now+.01);g.gain.exponentialRampToValueAtTime(.0001,now+.09);
+  o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+.1);
+ }catch{}
+}
+function motionEnabled(){return !!state.settings.animations&&!matchMedia?.('(prefers-reduced-motion: reduce)')?.matches}
 function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
 function startParam(){
