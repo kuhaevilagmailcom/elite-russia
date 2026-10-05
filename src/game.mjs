@@ -31,9 +31,17 @@ function handleUnavailable(db,handle){
   if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))return true;
   return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
 }
+function starterDropValue(rawValue){
+  const scaled=Math.round((Math.max(200,Number(rawValue)||200)/20)/50)*50;
+  return Math.max(400,Math.min(3500,scaled));
+}
 function pickTemplate(db,tierKey='basic',rng=randomUnit){
-  const tier=normalizeTier(tierKey),profile=weightedTierProfile(tier,rng),now=nowIso();
-  if(rng()<.18){
+  const tier=normalizeTier(tierKey),starter=tier.key==='basic',profile=starter?'COMMON':weightedTierProfile(tier,rng),now=nowIso();
+
+  // The $3K starter drop is intentionally its own low-value pool.
+  // Event and special templates have canonical prices that can be far above the
+  // entry ticket, so they are reserved for the higher paid tiers.
+  if(!starter&&rng()<.18){
     const eventPool=db.prepare(`SELECT t.* FROM event_templates et
       JOIN events e ON e.id=et.event_id
       JOIN username_templates t ON t.id=et.template_id
@@ -41,22 +49,24 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
       LIMIT 200`).all(now,now,profile);
     const availableEvents=eventPool.filter(x=>!handleUnavailable(db,x.handle));if(availableEvents.length)return availableEvents[Math.floor(rng()*availableEvents.length)];
   }
-  const specialChance={COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0;
-  if(rng()<specialChance){
+  const specialChance=starter?0:({COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0);
+  if(specialChance>0&&rng()<specialChance){
     const specials=db.prepare("SELECT * FROM username_templates WHERE special=1 AND category NOT IN ('wheel','admin') AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200").all(profile);
     const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
-  for(let i=0;i<50;i++){
+  for(let i=0;i<80;i++){
     const handle=buildGeneratedHandle(profile,rng);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
+    if(starter&&t?.special)continue;
     if(!t){
-      const supply=1,rawBase=scoreHandle(handle),base=tierKey==='basic'?Math.min(rawBase,2600):rawBase,rarity=rarityFromValue(base);
+      const supply=1,rawBase=scoreHandle(handle),base=starter?starterDropValue(rawBase):rawBase,rarity=rarityFromValue(base);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)')
         .run(handle,rarity,base,supply,'generated',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
+    if(starter&&t?.special)continue;
     if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle)){
-      const rawBase=t.special?t.base_value:scoreHandle(t.handle),base=!t.special&&tierKey==='basic'?Math.min(rawBase,2600):rawBase,rarity=rarityFromValue(base);
+      const rawBase=t.special?t.base_value:scoreHandle(t.handle),base=starter?starterDropValue(rawBase):rawBase,rarity=rarityFromValue(base);
       if(t.base_value!==base||t.rarity!==rarity){db.prepare('UPDATE username_templates SET base_value=?,rarity=?,max_supply=1 WHERE id=?').run(base,rarity,t.id);t={...t,base_value:base,rarity,max_supply:1}}
       return t;
     }
