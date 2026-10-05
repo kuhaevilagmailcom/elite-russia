@@ -118,8 +118,11 @@ export function createDrop(db,user,requestId,tierKey='basic'){
     else db.prepare('UPDATE users SET free_drops=free_drops-1 WHERE id=?').run(user.id);
     const changed=db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(template.id).changes;
     if(!changed)throw new Error('sold_out');
-    const value=template.special?template.base_value:scoreHandle(template.handle),rarity=rarityFromValue(value);
-    if(template.rarity!==rarity||template.base_value!==value)db.prepare('UPDATE username_templates SET rarity=?,base_value=?,max_supply=1 WHERE id=?').run(rarity,value,template.id);
+    // pickTemplate already resolved the canonical value for this username.
+    // Do not rescore it here: rescoring bypassed the starter-tier value band and
+    // was the reason $3K drops could suddenly become $10K-$15K instances.
+    const value=Math.max(200,Math.round(Number(template.base_value)||200)),rarity=rarityFromValue(value);
+    if(template.rarity!==rarity)db.prepare('UPDATE username_templates SET rarity=?,max_supply=1 WHERE id=?').run(rarity,template.id);
     const instanceId=uid(),season=activeSeason(db);
     db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(instanceId,template.id,template.handle,rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null);
