@@ -13,7 +13,7 @@ import {spinWheel,wheelStatus} from '../src/wheel.mjs';
 import {previewUpgrade,performUpgrade,upgradeInfo} from '../src/upgrader.mjs';
 import {ensureSeasonLifecycle} from '../src/seasons.mjs';
 import {activeCollectionCount,systemSellValue,todayKey} from '../src/economy.mjs';
-import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from '../src/payments.mjs';
+import {PREMIUM_STARS,SHOP_PRODUCTS,validPremiumCheckout,validProductCheckout,applyPremiumPayment,applyProductPayment} from '../src/payments.mjs';
 import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
 import {levelFromXp,progressionFromXp,xpToReachLevel} from '../src/progression.mjs';
 import {labStatus,submitLab} from '../src/lab.mjs';
@@ -28,6 +28,12 @@ const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url)
 
 test('generator has a large readable universe',()=>assert.ok(candidateUniverseSize()>3000));
 test('generator keeps usernames <=10 chars and never numeric-only',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(h.length<=10);assert.ok(isValidHandle(h))}});
+test('generator produces Telegram-style words, digits and underscore variants',()=>{
+  let digits=0,underscores=0,clean=0;
+  for(let i=0;i<20000;i++){const h=buildGeneratedHandle('COMMON');if(/\d/.test(h))digits++;if(/_/.test(h))underscores++;if(/^[a-z]+$/.test(h))clean++}
+  assert.ok(digits>0);assert.ok(underscores>0);assert.ok(clean>0);
+});
+
 test('requested word handles and ultra-short Telegram handles exist',()=>{
   assert.ok(ROOTS.length>=500);
   for(const h of ['card','loly','mama','papa','sosi','sosal','dedyska','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}
@@ -105,12 +111,12 @@ test('drop card is minimal and story share is an icon-only native action',()=>{
   assert.match(appSrc,/shareToStory/);assert.doesNotMatch(appSrc,/function openStoryFallback/);
   assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/);
 });
-test('menu is a compact labeled 3x3 grid with bottom shortcuts',()=>{
+test('menu is split into four clear product sections',()=>{
   assert.doesNotMatch(appSrc,/function nav\(/);
-  assert.match(appSrc,/menu-grid-main/);assert.match(appSrc,/menu-grid-bottom/);assert.match(appSrc,/menu-tile/);
-  for(const name of ['Дроп','Рынок','Рейтинг','Задания','Колесо','Друзья','Подарок','Апгрейдер','Сезоны','Коллекция','Профиль','USERNAME+'])assert.match(appSrc,new RegExp(name));
-  assert.match(uxCss,/\.menu-grid-main,.menu-grid-bottom\{[^}]*grid-template-columns:repeat\(3/);
-  assert.match(uxCss,/\.menu-tile\{[^}]*height:74px/);
+  assert.match(appSrc,/const MENU_SECTIONS=/);assert.match(appSrc,/menu-section-tile/);
+  for(const name of ['Играть','Торговля','Прогресс','Аккаунт','Дроп','Lab','Колесо','Апгрейдер','Рынок','Коллекция','Подарки','Задания','Уровни','Достижения','Топ','Профиль','Plus','Настройки'])assert.match(appSrc,new RegExp(name));
+  assert.match(uxCss,/\.menu-section>div\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(uxCss,/\.menu-section-tile\{[^}]*height:61px/);
 });
 test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
 test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','username_lab_attempts','xp_history','6.0.0-valuation-progression','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
@@ -262,6 +268,21 @@ test('Stars checkout validates product, amount and payer',()=>{
   assert.equal(validPremiumCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:1}),false);
   assert.equal(validPremiumCheckout({invoice_payload:payload,from:{id:999},currency:'XTR',total_amount:PREMIUM_STARS}),false);
 });
+test('Stars shop contains cosmetics only and validates each exact product price',()=>{
+  for(const p of Object.values(SHOP_PRODUCTS))assert.ok(['subscription','theme','frame','card','showcase'].includes(p.type));
+  assert.ok(Object.values(SHOP_PRODUCTS).every(p=>!/(drop|wheel|upgrade|chance|loot)/i.test(p.key+' '+p.title+' '+p.description)));
+  const p=SHOP_PRODUCTS.theme_ocean,payload='username_shop:'+p.key+':10001:12345678-1234-1234-1234-123456789abc';
+  assert.equal(validProductCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:p.stars}),true);
+  assert.equal(validProductCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:p.stars+1}),false);
+});
+test('cosmetic Stars payment grants ownership but never gameplay odds',()=>{
+  const p=SHOP_PRODUCTS.theme_ocean,payload='username_shop:'+p.key+':10001:bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee';
+  const payment={invoice_payload:payload,currency:'XTR',total_amount:p.stars,telegram_payment_charge_id:'charge-theme',provider_payment_charge_id:'provider-theme'},message={from:{id:10001}};
+  const result=applyProductPayment(db,message,payment);assert.equal(result.applied,true);
+  assert.ok(db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key='ocean'").get(seller.id));
+  assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,seller.balance);
+});
+
 test('Stars payment charge is applied only once',()=>{
   const payload='username_plus:10001:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',payment={invoice_payload:payload,currency:'XTR',total_amount:PREMIUM_STARS,telegram_payment_charge_id:'charge-1',provider_payment_charge_id:'provider-1'},message={from:{id:10001}};
   const a=applyPremiumPayment(db,message,payment),after1=db.prepare('SELECT premium_until FROM users WHERE id=?').get(seller.id).premium_until,b=applyPremiumPayment(db,message,payment),after2=db.prepare('SELECT premium_until FROM users WHERE id=?').get(seller.id).premium_until;
