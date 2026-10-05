@@ -139,7 +139,7 @@ function menuHtml(){
 }
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){
- window.__USERNAME_READY=true;
+ window.__USERNAME_READY=true;applyPreferences();
  app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';
  requestAnimationFrame(()=>{fitAllUsernames();hydrateIcons();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
 }
@@ -229,9 +229,9 @@ function homeView(){
 }
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,delays=reduced?[80,110]:[32,32,36,40,43,47,54,61,68,79,90,104,122,144,166,187,216,252,302,374],samples=buildRollSequence(delays.length,result.handle);let i=0;
+ const reduced=!motionEnabled(),delays=reduced?[80,110]:[32,32,36,40,43,47,54,61,68,79,90,104,122,144,166,187,216,252,302,374],samples=buildRollSequence(delays.length,result.handle);let i=0;
  for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
- stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
+ stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');sound('reward');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
 }
 function collectionFilterSheet(){
  if(!state.collectionFilterOpen)return '';
@@ -455,9 +455,9 @@ function labView(){
  '<section class="lab-input-card"><label>@<input id="labHandle" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="turbox"></label><button class="primary" data-lab-submit>Оценить</button></section>'+
  '<div class="lab-daily"><span>Сегодня</span><b>'+fmt(l.earned||0)+' / '+fmt(l.dailyCap||12000)+'</b><small>'+Number(l.attempts||0)+' попыток</small></div>'+result+'</div>';
 }
-function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='lab')shell('Username Lab',labView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
+function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Топ',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='levels')shell('Уровни',levelsView());else if(page==='achievements')shell('Достижения',achievementsView());else if(page==='settings')shell('Настройки',settingsView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарки',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='lab')shell('Username Lab',labView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',lab:'Username Lab',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',lab:'Username Lab',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -466,6 +466,9 @@ function pageReady(page){
   page==='market'?!!state.market:
   page==='top'?!!state.leaderboard:
   page==='tasks'?!!state.tasks:
+  page==='levels'?!!state.levels:
+  page==='achievements'?!!state.achievements:
+  page==='settings'?true:
   page==='wheel'?!!state.wheel:
   page==='friends'?!!state.friends:
   page==='gift'?!!state.gift:
@@ -487,6 +490,8 @@ async function fetchPage(page){
  if(page==='market')state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
  if(page==='top')state.leaderboard=await api('/api/leaderboard');
  if(page==='tasks')state.tasks=await api('/api/tasks');
+ if(page==='levels')state.levels=await api('/api/levels');
+ if(page==='achievements')state.achievements=await api('/api/achievements');
  if(page==='wheel')state.wheel=await api('/api/wheel');
  if(page==='friends')state.friends=await api('/api/friends');
  if(page==='gift')state.gift=await api('/api/gift/options');
@@ -526,7 +531,7 @@ function closeModal(el){el?.closest('.modal-root')?.remove()}
 async function animateRotation(el,degrees,duration,easing){
  if(!el)return;
  const end='rotate('+Number(degrees||0)+'deg)';
- const reduced=matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+ const reduced=!motionEnabled();
  el.style.transition='none';el.style.transform='rotate(0deg)';void el.offsetWidth;
  if(reduced){el.style.transform=end;return}
  if(typeof el.animate==='function'){
@@ -556,7 +561,7 @@ async function spinWheelUi(){
    await animateRotation(disc,final,3450,'cubic-bezier(.08,.74,.09,1)');
    stage?.classList.remove('spinning');
   }
-  state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');await refreshUser();state.wheel=await api('/api/wheel');render();
+  state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');sound('reward');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
 }
 let upgradePreviewSeq=0;
@@ -582,13 +587,13 @@ async function animateUpgradeWheel(result){
  rotor.closest('.upgrade-roulette-clean')?.classList.add('spinning');
  await animateRotation(rotor,wheelDegrees,3200,'cubic-bezier(.12,.72,.08,1)');
  rotor.closest('.upgrade-roulette-clean')?.classList.remove('spinning');
- haptic(result.success?'medium':'light');
+ haptic(result.success?'medium':'light');sound(result.success?'reward':'fail');
  state.upgradeLandingAngle=landing;state.upgradeLastRound={source,target:result.target,chance:Number(result.chance||0),success:!!result.success};
  state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeTargetSessionId='';
  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
 }
 function applyUserLocal(user){
-  if(!user)return;state.user=user;if(state.home)state.home.user=user;
+  if(!user)return;state.user=user;if(state.home)state.home.user=user;applyPreferences();
 }
 function removeCollectionLocal(id){
   if(!state.collection)return;
