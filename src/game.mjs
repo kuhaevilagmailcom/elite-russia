@@ -32,14 +32,12 @@ function handleUnavailable(db,handle){
   if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))return true;
   return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
 }
-function starterDropValue(rawValue,min=STARTER_DROP_JACKPOT.normalMin,max=STARTER_DROP_JACKPOT.normalMax){
-  const raw=Math.max(200,Number(rawValue)||200);
-  if(min===STARTER_DROP_JACKPOT.normalMin&&max===STARTER_DROP_JACKPOT.normalMax){
-    const scaled=Math.round((raw/20)/50)*50;
-    return Math.max(min,Math.min(max,scaled));
-  }
-  const span=Math.max(50,max-min),mapped=min+(Math.abs(Math.round(raw))%span);
-  return Math.max(min,Math.min(max,Math.round(mapped/50)*50));
+function starterValueBand(mode){
+  if(mode==='good')return [STARTER_DROP_JACKPOT.goodMin,STARTER_DROP_JACKPOT.goodMax];
+  if(mode==='rare')return [STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax];
+  if(mode==='big')return [STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax];
+  if(mode==='ultra')return [STARTER_DROP_JACKPOT.ultraMin,Number.MAX_SAFE_INTEGER];
+  return [STARTER_DROP_JACKPOT.normalMin,STARTER_DROP_JACKPOT.normalMax];
 }
 export function starterDropMode(roll=randomUnit()){
   const r=Math.max(0,Math.min(.999999999,Number(roll)||0));
@@ -82,30 +80,21 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
     const specials=db.prepare("SELECT * FROM username_templates WHERE special=1 AND category NOT IN ('wheel','admin') AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200").all(profile);
     const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
-  for(let i=0;i<(starter?220:80);i++){
+  const starterBand=starter?starterValueBand(starterMode):null;
+  for(let i=0;i<(starter?650:80);i++){
     const handle=buildGeneratedHandle(profile,rng);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(starter&&t?.special)continue;
-    const rawBase=t?.base_value||scoreHandle(handle);
-    let base=rawBase;
-    if(starter){
-      if(starterMode==='good')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.goodMin,STARTER_DROP_JACKPOT.goodMax);
-      else if(starterMode==='rare')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax);
-      else if(starterMode==='big')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax);
-      else base=starterDropValue(rawBase);
-    }
-    const rarity=rarityFromValue(base);
+    const base=t?Number(t.base_value):scoreHandle(handle),rarity=rarityFromValue(base);
+    if(starter&&(base<starterBand[0]||base>starterBand[1]))continue;
     if(!t){
-      const supply=1;
-      db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)')
-        .run(handle,rarity,base,supply,'generated',nowIso());
+      const supply=1,assessment=analyzeUsername(handle);
+      db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at) VALUES(?,?,?,?,0,?,0,1,?,?,?,?)')
+        .run(handle,rarity,base,supply,'generated',assessment.score,visualTier(base,assessment.score),JSON.stringify(assessment.breakdown||{}),nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
     if(starter&&t?.special)continue;
-    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle)){
-      if(t.base_value!==base||t.rarity!==rarity){db.prepare('UPDATE username_templates SET base_value=?,rarity=?,max_supply=1 WHERE id=?').run(base,rarity,t.id);t={...t,base_value:base,rarity,max_supply:1}}
-      return t;
-    }
+    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle))return t;
   }
   throw new Error('no_username_available');
 }
