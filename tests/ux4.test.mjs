@@ -39,7 +39,7 @@ test('home drop stays centered and fills spare space with useful shortcuts',()=>
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.doesNotMatch(home,/Нажми на username/);
   assert.match(home,/home-shortcuts/);
-  for(const page of ['collection','market','tasks','wheel'])assert.match(home,new RegExp('data-page="'+page+'"'));
+  for(const page of ['collection','market','tasks','wheel'])assert.match(home,new RegExp("\\['"+page+"','"));
   assert.match(uxCss,/\.handle-stage\.drop-trigger\{[^}]*background:transparent/);
   assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
   assert.match(uxCss,/\.home-shortcuts\{[^}]*grid-template-columns:repeat\(2/);
@@ -101,7 +101,7 @@ test('upgrader has one screen title and keeps the source step minimal',()=>{
 test('upgrader is single-item, compact and footer is sticky',()=>{
   assert.match(appSrc,/maxItems:1/);
   assert.match(appSrc,/state\.upgradeSelectedIds=\[id\]/);
-  assert.match(uxCss,/\.upgrade-source-card\{[^}]*height:56px/);
+  assert.match(uxCss,/\.upgrade-source-card\{[^}]*height:58px/);
   assert.match(uxCss,/\.upgrade-footer\{[^}]*position:sticky[^}]*bottom:0[^}]*height:68px/);
   assert.match(uxCss,/\.upgrade-footer button\{[^}]*height:50px/);
 });
