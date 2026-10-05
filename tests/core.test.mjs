@@ -128,14 +128,17 @@ test('database rejects a second instance with the same username globally',()=>{
 });
 test('drop request is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
 test('3K starter drop never pulls expensive event or special usernames',()=>{
-  const u=ensureUser(db,{id:10004,username:'starter',first_name:'Starter'});
-  db.prepare('UPDATE users SET balance=1000000,free_drops=0 WHERE id=?').run(u.id);
-  for(let i=0;i<120;i++){
-    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-    const r=createDrop(db,fresh,'starter-'+i,'basic');
-    assert.ok(r.instance.value>=400&&r.instance.value<=3500,'starter value '+r.instance.value+' for '+r.instance.handle);
-    resolveDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
-  }
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-starter-test-')),starterDb=createDatabase(dir);
+  try{
+    const u=ensureUser(starterDb,{id:10004,username:'starter',first_name:'Starter'});
+    starterDb.prepare('UPDATE users SET balance=1000000,free_drops=0 WHERE id=?').run(u.id);
+    for(let i=0;i<120;i++){
+      const fresh=starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+      const r=createDrop(starterDb,fresh,'starter-'+i,'basic');
+      assert.ok(r.instance.value>=400&&r.instance.value<=3500,'starter value '+r.instance.value+' for '+r.instance.handle);
+      resolveDrop(starterDb,starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
+    }
+  }finally{starterDb.close();fs.rmSync(dir,{recursive:true,force:true})}
 });
 
 test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
