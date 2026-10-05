@@ -17,6 +17,15 @@ export const GAME={
 };
 export const RARITIES=['COMMON','RARE','EPIC','LEGEND','ULTRA'];
 export const RARITY_WEIGHTS={COMMON:91,RARE:7.8,EPIC:1.05,LEGEND:.14,ULTRA:.01};
+export const STARTER_DROP_JACKPOT=Object.freeze({
+  rareChance:.004,      // 0.40%  ~ 1 in 250
+  bigChance:.0005,      // 0.05%  ~ 1 in 2,000
+  ultraChance:.00001,   // 0.001% ~ 1 in 100,000
+  normalMin:400,normalMax:3500,
+  rareMin:8000,rareMax:30000,
+  bigMin:50000,bigMax:250000,
+  ultraMin:2000000
+});
 export const RARITY_BASE={
   COMMON:[200,14999],
   RARE:[15000,99999],
