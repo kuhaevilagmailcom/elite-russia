@@ -1,11 +1,12 @@
 import {GAME,DROP_TIERS,RARITIES,STARTER_DROP_JACKPOT} from './config.mjs';
 import {buildGeneratedHandle,isValidHandle,scoreHandle,rarityFromValue} from './generator.mjs';
+import {analyzeUsername,visualTier} from './valuation.mjs';
+import {levelFromXp,progressionFromXp,grantXp} from './progression.mjs';
 import {
   uid,nowIso,todayKey,txBalance,bumpTask,bumpSeasonScore,activeSeason,premiumActive,collectionLimit,
   activeCollectionCount,assetStats,systemSellValue,compactShowcase,randomUnit
 } from './economy.mjs';
 
-export function levelFromXp(xp){return Math.max(1,1+Math.floor(Number(xp||0)/250))}
 export const isPremium=premiumActive;
 
 export function ensureUser(db,tg){
@@ -103,10 +104,13 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
   throw new Error('no_username_available');
 }
 export function shapeInstance(r){
-  return r?{
+  if(!r)return null;
+  let quality={};try{quality=r.quality_json?JSON.parse(r.quality_json):{}}catch{}
+  return {
     id:r.id,handle:'@'+r.handle,rawHandle:r.handle,rarity:r.rarity,value:r.value,sellValue:systemSellValue(r.value),
-    instanceNumber:r.instance_number,maxSupply:r.max_supply,status:r.status,obtainedAt:r.obtained_at
-  }:null;
+    score:Number(r.username_score||0),visual:r.visual_tier||visualTier(r.value,r.username_score),
+    quality,instanceNumber:r.instance_number,maxSupply:r.max_supply,status:r.status,obtainedAt:r.obtained_at
+  };
 }
 export function publicUser(db,user){
   const assets=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(user.id);
@@ -117,16 +121,18 @@ export function publicUser(db,user){
     FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
     WHERE u.blocked=0 GROUP BY u.id HAVING capital>?
   )`).get(capital).rank;
+  const prog=progressionFromXp(user.xp);
   return {
     id:user.id,telegramId:user.telegram_id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
-    level:levelFromXp(user.xp),xp:user.xp,premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,
-    collectionValue:assets.value,bestValue:assets.best,capital,rank
+    level:prog.level,xp:prog.xp,title:prog.title,levelXp:prog.levelXp,nextLevelXp:prog.nextLevelXp,levelProgress:prog.progress,xpRemaining:prog.remaining,
+    luck:Number(user.luck_points||0),badDropStreak:Number(user.bad_drop_streak||0),totalEarned:Number(user.total_earned||0),bestDropValue:Number(user.best_drop_value||0),
+    premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,collectionValue:assets.value,bestValue:assets.best,capital,rank
   };
 }
 export function homeData(db,user){
   const pending=shapeInstance(findPending(db,user.id));
   const last=shapeInstance(db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND obtained_type='drop' ORDER BY obtained_at DESC LIMIT 1").get(user.id));
-  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots}};
+  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots,usernameRules:{gameMin:4,basicTelegramMin:5}}};
 }
 export function createDrop(db,user,requestId,tierKey='basic'){
   if(!requestId||requestId.length>100)throw new Error('bad_request_id');
