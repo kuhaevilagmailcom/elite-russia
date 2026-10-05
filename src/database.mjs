@@ -81,6 +81,8 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_drop_user ON drop_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_tx_user ON balance_transactions(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_market_status ON market_listings(status,created_at);
+  CREATE INDEX IF NOT EXISTS idx_market_status_price ON market_listings(status,price,created_at);
+  CREATE INDEX IF NOT EXISTS idx_market_instance_status ON market_listings(instance_id,status);
   CREATE INDEX IF NOT EXISTS idx_templates_handle ON username_templates(handle);
   CREATE INDEX IF NOT EXISTS idx_instances_handle_status ON username_instances(handle,status);
   CREATE INDEX IF NOT EXISTS idx_market_seller ON market_listings(seller_id,status);
