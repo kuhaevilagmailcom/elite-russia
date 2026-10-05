@@ -25,6 +25,7 @@ export function createDatabase(dataDir){
     level INTEGER NOT NULL DEFAULT 1, xp INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0,
     luck_points INTEGER NOT NULL DEFAULT 0, bad_drop_streak INTEGER NOT NULL DEFAULT 0,
     total_earned INTEGER NOT NULL DEFAULT 0, best_drop_value INTEGER NOT NULL DEFAULT 0,
+    daily_streak INTEGER NOT NULL DEFAULT 0, last_daily_date TEXT,
     premium_until TEXT, created_at TEXT NOT NULL, last_seen TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS game_config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -115,6 +116,8 @@ export function createDatabase(dataDir){
   if(!userCols.has('bad_drop_streak'))db.exec("ALTER TABLE users ADD COLUMN bad_drop_streak INTEGER NOT NULL DEFAULT 0");
   if(!userCols.has('total_earned'))db.exec("ALTER TABLE users ADD COLUMN total_earned INTEGER NOT NULL DEFAULT 0");
   if(!userCols.has('best_drop_value'))db.exec("ALTER TABLE users ADD COLUMN best_drop_value INTEGER NOT NULL DEFAULT 0");
+  if(!userCols.has('daily_streak'))db.exec("ALTER TABLE users ADD COLUMN daily_streak INTEGER NOT NULL DEFAULT 0");
+  if(!userCols.has('last_daily_date'))db.exec("ALTER TABLE users ADD COLUMN last_daily_date TEXT");
   const templateCols=new Set(db.prepare('PRAGMA table_info(username_templates)').all().map(x=>x.name));
   if(!templateCols.has('username_score'))db.exec("ALTER TABLE username_templates ADD COLUMN username_score INTEGER NOT NULL DEFAULT 0");
   if(!templateCols.has('visual_tier'))db.exec("ALTER TABLE username_templates ADD COLUMN visual_tier TEXT NOT NULL DEFAULT 'normal'");
