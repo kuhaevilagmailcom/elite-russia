@@ -50,13 +50,13 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
     const handle=buildGeneratedHandle(profile,rng);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
     let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     if(!t){
-      const supply=1,base=scoreHandle(handle),rarity=rarityFromValue(base);
+      const supply=1,rawBase=scoreHandle(handle),base=tierKey==='basic'?Math.min(rawBase,2600):rawBase,rarity=rarityFromValue(base);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,0,?,0,1,?)')
         .run(handle,rarity,base,supply,'generated',nowIso());
       t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
     }
     if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle)){
-      const base=t.special?t.base_value:scoreHandle(t.handle),rarity=rarityFromValue(base);
+      const rawBase=t.special?t.base_value:scoreHandle(t.handle),base=!t.special&&tierKey==='basic'?Math.min(rawBase,2600):rawBase,rarity=rarityFromValue(base);
       if(t.base_value!==base||t.rarity!==rarity){db.prepare('UPDATE username_templates SET base_value=?,rarity=?,max_supply=1 WHERE id=?').run(base,rarity,t.id);t={...t,base_value:base,rarity,max_supply:1}}
       return t;
     }
