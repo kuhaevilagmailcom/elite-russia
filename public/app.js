@@ -216,8 +216,8 @@ function collectionView(){
  const c=state.collection||{items:[],summary:{count:0,value:0},page:1,pages:1};
  return '<div class="page-body collection-page collection-page-clean">'+collectionFilterSheet()+
   '<div class="screen-toolbar collection-toolbar"><div><b>'+(c.summary?.count||0)+' usernames</b><span>Общая стоимость · '+fmt(c.summary?.value||0)+'</span></div><button class="collection-filter-button" data-collection-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div>'+
-  '<div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card collection-card">'+
-   '<button class="user-card-main" data-detail="'+x.id+'"><span data-fit-username data-max-size="18" data-min-size="11">'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b><small>'+(x.inShowcase?'На витрине':'В коллекции')+'</small></button>'+
+  '<div class="collection-grid">'+(c.items.length?c.items.map(x=>'<article class="user-card collection-card'+valueClass(x)+'">'+
+   '<button class="user-card-main" data-detail="'+x.id+'"><span data-fit-username data-max-size="18" data-min-size="11">'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b><small>'+(x.inShowcase?'На витрине':(x.score?'Оценка '+x.score:'В коллекции'))+'</small></button>'+
    '<button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button>'+
   '</article>').join(''):'<div class="empty">По этому фильтру ничего нет.</div>')+'</div>'+pager(c.page,c.pages,'collection')+'</div>';
 }
@@ -229,7 +229,7 @@ function marketFilterSheet(){
 }
 function marketView(){
  const m=state.market||{items:[],page:1,pages:1};
- return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
+ return '<div class="page-body market-page">'+marketFilterSheet()+'<div class="market-search"><label>'+icon('search')+'<input id="marketQuery" value="'+esc(state.marketFilters.q)+'" placeholder="Поиск username..." autocomplete="off"></label><button class="market-filter-button" data-market-filter-open aria-label="Фильтр">'+marketFilterIcon()+'</button></div><div class="market-list">'+(m.items.length?m.items.map(x=>'<article class="market-card'+valueClass(x)+'"><div class="market-main"><span data-fit-username data-max-size="20" data-min-size="13">'+esc(x.handle)+'</span><b>'+fmt(x.price)+'</b><small>Игровая оценка '+fmt(x.marketValue||x.value)+' · '+(Number(x.potential||0)>0?'потенциал +'+fmt(x.potential):'без запаса')+'</small><small>Продавец: '+esc(x.sellerName)+'</small></div>'+(x.sellerId===state.user?.id?'<button class="secondary" data-market-cancel="'+x.id+'">Снять с продажи</button>':'<button class="primary" data-market-buy="'+x.id+'">Купить</button>')+'</article>').join(''):'<div class="empty">Ничего не найдено.</div>')+'</div>'+pager(m.page,m.pages,'market')+'</div>';
 }
 function topView(){
  const all=state.leaderboard?.items||[],top=all.slice(0,3),rest=all.slice(3),size=10,pages=Math.max(1,Math.ceil(rest.length/size));
@@ -373,12 +373,30 @@ function upgraderView(){
  '</div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
-function profileView(p=state.profile?.profile){if(!p)return '<div class="empty">Профиль не найден.</div>';return '<div class="page-body profile-page-clean"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · уровень '+p.level+' · #'+p.rank+'</span></div><div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Коллекция',fmt(p.collectionValue))+metric('Usernames',p.collectionCount)+metric('Друзей',p.friendsCount||0)+metric('Сделок',p.marketDeals||0)+'</div><section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div>'+x.handle+'</div>').join(''):'<div class="profile-showcase-empty">'+icon('collection')+'<b>Витрина пуста</b><span>Добавь username из коллекции</span></div>')+'</div></section></div>'}
+function profileView(p=state.profile?.profile){
+ if(!p)return '<div class="empty">Профиль не найден.</div>';
+ return '<div class="page-body profile-page-clean"><div class="profile-hero"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><b>'+esc(p.firstName||'Игрок')+'</b><span>'+(p.username?'@'+esc(p.username):'')+' · '+esc(p.title||'Новичок')+' · #'+p.rank+'</span></div>'+
+ '<section class="profile-progress">'+xpBar(p)+'<div class="profile-luck"><span>Удача после неудач</span><b>'+Number(p.luck||0)+' / 100</b></div></section>'+
+ '<div class="profile-metrics">'+metric('Капитал',fmt(p.balance+p.collectionValue))+metric('Баланс',fmt(p.balance))+metric('Заработано',fmt(p.totalEarned||0))+metric('Лучший drop',fmt(p.bestDropValue||0))+metric('Usernames',p.collectionCount)+metric('Lab',Number(p.lab?.bestScore||0)+'/100')+'</div>'+
+ '<section class="showcase"><div class="section-title"><span>Витрина</span></div><div class="showcase-row">'+(p.showcase?.length?p.showcase.map(x=>'<div class="'+valueClass(x).trim()+'">'+x.handle+'</div>').join(''):'<div class="profile-showcase-empty">'+icon('collection')+'<b>Витрина пуста</b><span>Добавь username из коллекции</span></div>')+'</div></section></div>'
+}
 function premiumView(){const p=state.premium;return '<div class="premium-page premium-page-clean"><div class="plus-hero"><h1>'+(p.active?'Подписка активна':'Больше возможностей')+'</h1><p>Подписка не повышает шанс дропа, награды колеса или апгрейдера.</p></div><div class="feature-list">'+p.features.map(x=>'<div>'+icon('check')+'<span>'+esc(x)+'</span></div>').join('')+'</div>'+(p.active?'<div class="plus-active">Активно до '+new Date(p.activeUntil).toLocaleDateString('ru-RU')+'</div>':'<button class="primary" data-premium '+(!p.starsEnabled?'disabled':'')+'>Подключить · '+p.stars+' Stars</button>')+'</div>'}
-function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Экземпляр','#'+x.instanceNumber+' / '+x.maxSupply)+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+metric('Длина',String((x.rawHandle||x.handle.slice(1)).length))+metric('Цена',fmt(x.value))+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">'+(x.inShowcase?'Убрать с витрины':'На витрину')+'</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать системе · '+fmt(x.value)+'</button></div></div>'}
-function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
+function detailView(x){
+ const q=x.quality||{};
+ return '<div class="detail-page">'+resultCard(x,false)+'<div class="detail-grid">'+metric('Оценка',(x.score||0)+' / 1000')+metric('Цена',fmt(x.value))+metric('Читаемость',Number(q.pronounceability||0)+'/100')+metric('Чистота',Number(q.cleanliness||0)+'/100')+metric('Краткость',Number(q.length||0)+'/100')+metric('Получен',new Date(x.obtainedAt).toLocaleDateString('ru-RU'))+'</div><div class="detail-actions three"><button data-showcase="'+x.id+'">'+(x.inShowcase?'Убрать с витрины':'На витрину')+'</button><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="sell-system" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать · '+fmt(x.value)+'</button></div></div>'
+}
+function labView(){
+ const l=state.lab||{theme:{label:'Username',hint:'4–10 символов'},attempts:0,earned:0,dailyCap:12000},r=state.labResult;
+ const result=r?'<section class="lab-result value-'+esc(r.assessment?.visual||'normal')+'"><div class="lab-score"><span>'+esc(r.handle)+'</span><b>'+r.score+' / 100</b></div><div class="lab-breakdown">'+
+  metric('Читаемость',r.assessment.readability)+metric('Тема',r.assessment.theme)+metric('Краткость',r.assessment.brevity)+metric('Оригинальность',r.assessment.originality)+
+  '</div><div class="lab-reward"><span>Награда</span><b>+'+fmt(r.reward)+' · +'+r.xp+' XP</b></div></section>':'';
+ return '<div class="lab-page"><section class="lab-hero"><span>USERNAME LAB</span><h2>Придумай сильный username</h2><p>Тема: <b>'+esc(l.theme?.label||'Свободная')+'</b> · '+esc(l.theme?.hint||'4–32 символа')+'</p><small>Минимум в игре — 4 символа. Награда зависит от качества имени.</small></section>'+
+ '<section class="lab-input-card"><label>@<input id="labHandle" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="turbox"></label><button class="primary" data-lab-submit>Оценить</button></section>'+
+ '<div class="lab-daily"><span>Сегодня</span><b>'+fmt(l.earned||0)+' / '+fmt(l.dailyCap||12000)+'</b><small>'+Number(l.attempts||0)+' попыток</small></div>'+result+'</div>';
+}
+function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='lab')shell('Username Lab',labView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',lab:'Username Lab',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -394,6 +412,7 @@ function pageReady(page){
   page==='seasons'?!!state.season:
   page==='profile'?!!state.profile:
   page==='premium'?!!state.premium:
+  page==='lab'?!!state.lab:
   page==='admin'?!!state.admin:true;
 }
 function routeLoading(on){
@@ -417,6 +436,8 @@ async function fetchPage(page){
  if(page==='seasons')state.season=await api('/api/seasons');
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='premium')state.premium=await api('/api/premium');
+ if(page==='lab')state.lab=await api('/api/lab');
+ if(page==='home')state.daily=await api('/api/daily');
  if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
@@ -531,6 +552,19 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
+ if(el.hasAttribute('data-daily-claim')){
+   if(el.disabled)return;el.disabled=true;
+   const r=await api('/api/daily/claim',{method:'POST'});state.daily=r.status;applyUserLocal(r.user);haptic('light');toast('Ежедневная награда: '+esc(r.reward?.label||'получена'));render();return
+ }
+ if(el.hasAttribute('data-lab-submit')){
+   const input=document.querySelector('#labHandle'),handle=String(input?.value||'').trim();if(!handle)return;
+   el.disabled=true;
+   try{
+     const r=await api('/api/lab',{method:'POST',body:JSON.stringify({handle})});
+     state.labResult=r;state.lab=r.status;applyUserLocal(r.user);haptic('light');toast('+'+fmt(r.reward)+' · +'+r.xp+' XP');render();
+   }finally{el.disabled=false}
+   return
+ }
  if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page=1');render();return}
  if(el.dataset.marketFilter){state.marketFilters[el.dataset.marketFilter]=el.dataset.filterValue;state.marketFilters.page=1;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();return}
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
