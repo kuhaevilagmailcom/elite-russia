@@ -127,6 +127,17 @@ test('database rejects a second instance with the same username globally',()=>{
     .run('duplicate-instance',row.template_id,row.handle,row.rarity,row.value,1,1,buyer.id,'owned',new Date().toISOString(),'test'),/UNIQUE/);
 });
 test('drop request is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
+test('3K starter drop never pulls expensive event or special usernames',()=>{
+  const u=ensureUser(db,{id:10004,username:'starter',first_name:'Starter'});
+  db.prepare('UPDATE users SET balance=1000000,free_drops=0 WHERE id=?').run(u.id);
+  for(let i=0;i<120;i++){
+    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+    const r=createDrop(db,fresh,'starter-'+i,'basic');
+    assert.ok(r.instance.value>=400&&r.instance.value<=3500,'starter value '+r.instance.value+' for '+r.instance.handle);
+    resolveDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
+  }
+});
+
 test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
 test('gift transfer cannot be repeated by old owner',()=>{db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());const id=owned(seller,'giftname');giftUsername(db,seller,id,friend.id);assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/)});
 test('wheel is idempotent and exposes real weights',()=>{const st=wheelStatus(db,buyer);assert.equal(st.rewards.reduce((s,x)=>s+x.weight,0),100);const a=spinWheel(db,buyer,'wheel-1'),b=spinWheel(db,buyer,'wheel-1');assert.equal(a.reward.key,b.reward.key)});
