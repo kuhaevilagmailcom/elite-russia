@@ -1,9 +1,8 @@
-.lucide-slot:not(svg){display:inline-block;width:20px;height:20px}
 /* USERNAME 4.5 — typography + icon normalization */
 body{font-weight:560}
 button,input,select{font-weight:650}
-.ico{width:20px;height:20px;display:block;stroke-width:2.2}
-.lucide-slot{display:inline-block}
+.ico{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;line-height:1;font-style:normal;flex:0 0 auto}
+.hugeicon{font-family:"Hugeicons",sans-serif;speak:none}
 .top-title b{font-weight:820}
 .top-actions>span{font-weight:760}
 .metric span,.section-title,.section-label{font-weight:650}
@@ -123,10 +122,9 @@ button,input,select{font-weight:650}
 .home-shortcut span{font-size:10.5px;font-weight:690;white-space:nowrap}
 .home-shortcut:active{background:#f1f5f7;border-color:#d5e6ef}
 
-/* Shared filter button never depends on Lucide hydration. */
+/* Shared Hugeicons filter button. */
 .market-filter-button,.collection-filter-button{display:grid;place-items:center;color:#252a30}
-.market-filter-svg{display:block;width:21px;height:21px;overflow:visible}
-.market-filter-glyph{display:none}
+.market-filter-button .ico,.collection-filter-button .ico{width:21px;height:21px;font-size:21px}
 
 /* Collection. */
 .collection-page-clean{height:calc(100% - 48px);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding-top:2px}
@@ -445,3 +443,20 @@ button,input,select{font-weight:650}
   .shell{max-width:520px}
 }
 
+
+
+/* Hugeicons font glyph sizing follows the visual icon box. */
+.top-actions button .ico,.top-back .ico{font-size:20px}
+.menu-list em .ico{font-size:17px}
+.drop-cost-trigger em .ico{font-size:15px}
+.menu-head-icon .ico{font-size:18px}
+.menu-admin-shortcut .ico{font-size:16px}
+.menu-tile .ico{font-size:22px}
+.home-shortcut .ico{font-size:18px}
+.task-status .ico{font-size:13px}
+.upgrade-back-step .ico{font-size:14px}
+.upgrade-target-pick>i .ico{font-size:16px}
+.upgrade-match-arrow .ico{font-size:16px}
+.profile-showcase-empty .ico{font-size:20px}
+.premium-page-clean .feature-list .ico{font-size:18px}
+@media(max-width:370px){.menu-tile .ico{font-size:20px}}
