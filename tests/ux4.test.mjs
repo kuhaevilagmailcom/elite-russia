@@ -60,7 +60,7 @@ test('viewport and username fitting avoid repeated layout thrashing',()=>{
 test('menu opens without rebuilding the whole page',()=>{
   assert.match(appSrc,/function setMenuOpen\(open\)/);
   assert.match(appSrc,/menu\.classList\.toggle\('open'/);
-  assert.match(appSrc,/hasAttribute\('data-menu-open'\)\)\{setMenuOpen\(true\)/);
+  assert.match(appSrc,/hasAttribute\('data-menu-open'\)\)\{sound\('tap'\);setMenuOpen\(true\)/);
 });
 test('home drop stays centered without redundant shortcut and metric clutter',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
@@ -226,9 +226,10 @@ test('wheel disabled CTA is visually distinct',()=>{
   assert.match(uxCss,/\.wheel-page-clean \.wheel-spin-button:disabled\{[^}]*background:#e3e6e9[^}]*opacity:1/);
 });
 
-test('audited CSS keeps the cleaned 5.4 base plus one 6.0 product layer',()=>{
+test('audited CSS keeps cleaned base and the current 6.1 product layer',()=>{
   assert.match(uxCss,/USERNAME 5\.4 — audited final UI/);
   assert.match(uxCss,/USERNAME 6\.0 — progression, valuation colors and Username Lab/);
+  assert.match(uxCss,/USERNAME 6\.1 — settings, section menu, cosmetics and text-only value colors/);
   for(const old of ['USERNAME 4.7','USERNAME 4.8','USERNAME 4.9','USERNAME 5.0','USERNAME 5.1','USERNAME 5.2','USERNAME 5.3'])assert.doesNotMatch(uxCss,new RegExp(old.replace('.', '\\.')));
   assert.ok((uxCss.match(/!important/g)||[]).length<=10);
 });
@@ -239,6 +240,35 @@ test('upgrader source rows stay aligned without fixed desktop-only price columns
   assert.doesNotMatch(row,/data-fit-username/);
 });
 
+test('settings expose light dark system theme and vibration sound animation switches',()=>{
+  assert.match(appSrc,/DEFAULT_SETTINGS=Object\.freeze\(\{theme:'system',vibration:true,sound:true,animations:true\}\)/);
+  assert.match(appSrc,/function settingsView\(\)/);
+  for(const v of ['light','dark','system'])assert.match(appSrc,new RegExp("data-setting-theme=.?"+v));
+  for(const k of ['vibration','sound','animations'])assert.match(appSrc,new RegExp("data-setting-toggle=.?['\"]?\\+?"+k));
+  assert.match(appSrc,/function motionEnabled\(\)/);
+  assert.match(uxCss,/html\[data-theme="dark"\]/);
+  assert.match(uxCss,/html\.no-animations/);
+});
+test('menu has exactly the four requested sections and Hugeicons tiles',()=>{
+  for(const group of ['Играть','Торговля','Прогресс','Аккаунт'])assert.match(appSrc,new RegExp("title:'"+group+"'"));
+  assert.match(appSrc,/menu-section-tile/);
+  assert.match(appSrc,/hgi-stroke hgi-/);
+  assert.match(uxCss,/\.menu-sections-sheet\{/);
+});
+test('levels and achievements are first-class pages',()=>{
+  assert.match(appSrc,/function levelsView\(\)/);
+  assert.match(appSrc,/function achievementsView\(\)/);
+  assert.match(appSrc,/\/api\/levels/);assert.match(appSrc,/\/api\/achievements/);
+  assert.match(appSrc,/page==='levels'/);assert.match(appSrc,/page==='achievements'/);
+});
+test('Stars shop sells only Plus and cosmetic/convenience products',()=>{
+  const view=appSrc.match(/function premiumView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(view,/data-buy-product/);
+  assert.match(view,/data-select-cosmetic/);
+  assert.match(view,/не повышают шанс дропа, колеса или апгрейдера/);
+  assert.match(serverSrc,/\/api\/shop\/invoice/);
+  assert.match(serverSrc,/\/api\/cosmetics\/select/);
+});
 test('home exposes compact level luck daily and Username Lab actions',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(home,/home-progress-card/);
@@ -258,11 +288,12 @@ test('Username Lab is a first-class cached page with server submission',()=>{
   assert.match(uxCss,/\.lab-page\{/);
   assert.match(uxCss,/\.lab-result\.value-purple/);
 });
-test('valuable usernames use blue purple and gold visual language without backend rarity labels',()=>{
+test('valuable usernames change text color only, never the card surface',()=>{
   assert.match(uxCss,/--value-purple:#8B5CF6/);
   assert.match(uxCss,/--value-gold:#F4B740/);
-  assert.match(uxCss,/\.value-purple\{/);
-  assert.match(uxCss,/\.value-gold\{/);
+  assert.match(uxCss,/collection-card\.value-purple \.user-card-main>span/);
+  assert.match(uxCss,/collection-card\.value-gold \.user-card-main>span/);
+  assert.match(uxCss,/collection-card\.value-blue[\s\S]*background:var\(--card\);border-color:var\(--border\)/);
   const collection=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(collection,/valueClass\(x\)/);
   for(const r of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])assert.doesNotMatch(collection,new RegExp(r));
