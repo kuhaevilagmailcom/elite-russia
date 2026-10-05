@@ -19,21 +19,27 @@ const wheelSrc=fs.readFileSync(new URL('../src/wheel.mjs',import.meta.url),'utf8
 const gameSrc=fs.readFileSync(new URL('../src/game.mjs',import.meta.url),'utf8');
 const indexSrc=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 
-test('CSP explicitly allows the Lucide CDN',()=>{
-  assert.match(serverSrc,/script-src 'self' https:\/\/telegram\.org https:\/\/unpkg\.com/);
-  assert.match(indexSrc,/unpkg\.com\/lucide@1\.50\.0\/dist\/umd\/lucide\.min\.js/);
+test('CSP explicitly allows the official Hugeicons font CDN',()=>{
+  assert.match(serverSrc,/style-src 'self' 'unsafe-inline' https:\/\/use\.hugeicons\.com/);
+  assert.match(serverSrc,/font-src 'self' https:\/\/use\.hugeicons\.com data:/);
+  assert.doesNotMatch(serverSrc,/unpkg\.com/);
+  assert.match(indexSrc,/https:\/\/use\.hugeicons\.com\/font\/icons\.css/);
 });
-test('Lucide hydration retries if the library loads after app render',()=>{
-  assert.match(appSrc,/let lucideRetry=0/);
-  assert.match(appSrc,/setTimeout\(hydrateIcons,100\)/);
-  assert.match(appSrc,/addEventListener\('load',hydrateIcons/);
-});
-test('all interface icons use the external Lucide set instead of homemade SVG paths',()=>{
-  assert.match(indexSrc,/unpkg\.com\/lucide@1\.50\.0\/dist\/umd\/lucide\.min\.js/);
+test('all interface icons use Hugeicons Stroke Rounded without runtime hydration',()=>{
+  assert.match(indexSrc,/use\.hugeicons\.com\/font\/icons\.css/);
   assert.match(appSrc,/const ICON_NAME=Object\.freeze/);
-  assert.match(appSrc,/data-lucide=/);
-  assert.match(appSrc,/lucide\?\.createIcons/);
-  assert.doesNotMatch(appSrc,/const ICON=\{/);
+  assert.match(appSrc,/hgi-stroke hgi-/);
+  assert.match(appSrc,/home:'home-01'/);
+  assert.match(appSrc,/market:'shopping-bag-01'/);
+  assert.match(appSrc,/wheel:'circle-gauge'/);
+  assert.match(appSrc,/collection:'grid-view'/);
+  assert.match(appSrc,/profile:'user-circle-02'/);
+  assert.match(appSrc,/filter:'filter'/);
+  assert.doesNotMatch(appSrc,/data-lucide=|window\.lucide|lucideRetry/);
+});
+test('market and collection filters use Hugeicons too',()=>{
+  assert.match(appSrc,/function marketFilterIcon\(\)\{return icon\('filter'\)\}/);
+  assert.doesNotMatch(appSrc,/market-filter-svg|<path d=/);
 });
 test('home drop stays centered and fills spare space with useful shortcuts',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
