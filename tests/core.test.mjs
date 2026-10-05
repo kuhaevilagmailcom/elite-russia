@@ -85,7 +85,7 @@ test('four-character generation is reserved for ultra class',()=>{
     assert.ok(buildGeneratedHandle('ULTRA').length>=4);
   }
 });
-test('UI uses dollars and weighted wheel geometry',()=>{assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/);assert.match(appSrc,/function wheelGeometry/);assert.match(appSrc,/target\.center/);assert.match(cssSrc,/--wheel-bg/)});
+test('UI uses dollars and weighted wheel geometry',()=>{assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/);assert.match(appSrc,/function wheelGeometry/);assert.match(appSrc,/landing=target\.start\+margin/);assert.match(cssSrc,/--wheel-bg/)});
 test('drop card is minimal and story share is an icon-only native action',()=>{
   const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);
   assert.match(m[0],/esc\(x\.handle\)/);assert.doesNotMatch(m[0],/badge\(/);
