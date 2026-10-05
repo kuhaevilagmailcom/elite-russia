@@ -118,6 +118,15 @@ export function shapeInstance(r){
     quality,instanceNumber:r.instance_number,maxSupply:r.max_supply,status:r.status,obtainedAt:r.obtained_at
   };
 }
+function showcaseSlotLimit(db,user){
+  const base=isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots;
+  const extra=db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='showcase' AND key='plus2'").get(user.id)?2:0;
+  return base+extra;
+}
+function activeCosmetics(db,userId){
+  const row=db.prepare('SELECT theme_key,frame_key,card_key FROM user_cosmetic_settings WHERE user_id=?').get(userId)||{};
+  return {theme:row.theme_key||'',frame:row.frame_key||'',card:row.card_key||''};
+}
 export function publicUser(db,user){
   const assets=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(user.id);
   const owned=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id).c;
@@ -132,13 +141,14 @@ export function publicUser(db,user){
     id:user.id,telegramId:user.telegram_id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
     level:prog.level,xp:prog.xp,title:prog.title,levelXp:prog.levelXp,nextLevelXp:prog.nextLevelXp,levelProgress:prog.progress,xpRemaining:prog.remaining,
     luck:Number(user.luck_points||0),badDropStreak:Number(user.bad_drop_streak||0),totalEarned:Number(user.total_earned||0),bestDropValue:Number(user.best_drop_value||0),
-    premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,collectionValue:assets.value,bestValue:assets.best,capital,rank
+    premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,collectionValue:assets.value,bestValue:assets.best,capital,rank,
+    cosmetics:activeCosmetics(db,user.id),showcaseSlots:showcaseSlotLimit(db,user)
   };
 }
 export function homeData(db,user){
   const pending=shapeInstance(findPending(db,user.id));
   const last=shapeInstance(db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND obtained_type='drop' ORDER BY obtained_at DESC LIMIT 1").get(user.id));
-  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots,usernameRules:{gameMin:4,basicTelegramMin:5}}};
+  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:showcaseSlotLimit(db,user),usernameRules:{gameMin:4,basicTelegramMin:5}}};
 }
 export function createDrop(db,user,requestId,tierKey='basic'){
   if(!requestId||requestId.length>100)throw new Error('bad_request_id');
@@ -276,9 +286,9 @@ export function profile(db,userId){
   const gifts=db.prepare('SELECT COUNT(*) c FROM username_transfers WHERE from_user_id=?').get(userId).c;
   const deals=db.prepare('SELECT COUNT(*) c FROM market_transactions WHERE buyer_id=? OR seller_id=?').get(userId,userId).c;
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
-  const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId);
+  const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId),activeCosmeticState=activeCosmetics(db,userId);
   const lab=db.prepare('SELECT COUNT(*) attempts,COALESCE(MAX(score),0) bestScore,COALESCE(SUM(reward),0) earned FROM username_lab_attempts WHERE user_id=?').get(userId);
-  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,lab:{attempts:Number(lab?.attempts||0),bestScore:Number(lab?.bestScore||0),earned:Number(lab?.earned||0)}};
+  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,lab:{attempts:Number(lab?.attempts||0),bestScore:Number(lab?.bestScore||0),earned:Number(lab?.earned||0)}};
 }
 export function sellOwnedUsername(db,user,instanceId){
   const result=db.transaction(()=>{
@@ -299,7 +309,7 @@ export function setShowcase(db,user,instanceId){
   const exists=db.prepare('SELECT 1 FROM profile_showcase WHERE user_id=? AND instance_id=?').get(user.id,instanceId);
   if(exists){db.prepare('DELETE FROM profile_showcase WHERE user_id=? AND instance_id=?').run(user.id,instanceId);compactShowcase(db,user.id);return {ok:true,active:false}}
   compactShowcase(db,user.id);
-  const max=isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots,current=db.prepare('SELECT COUNT(*) c FROM profile_showcase WHERE user_id=?').get(user.id).c;
+  const max=showcaseSlotLimit(db,user),current=db.prepare('SELECT COUNT(*) c FROM profile_showcase WHERE user_id=?').get(user.id).c;
   if(current>=max)throw new Error('showcase_full');
   const pos=(db.prepare('SELECT COALESCE(MAX(position),0)+1 p FROM profile_showcase WHERE user_id=?').get(user.id).p)||1;
   db.prepare('INSERT INTO profile_showcase(user_id,instance_id,position) VALUES(?,?,?)').run(user.id,instanceId,pos);
