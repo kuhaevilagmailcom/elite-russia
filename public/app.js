@@ -34,23 +34,16 @@ function startParam(){
 }
 async function api(url,opts={}){const headers={'Content-Type':'application/json',...(opts.headers||{})};const d=await initData();if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';const sp=startParam();if(sp)headers['X-Start-Param']=sp;const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);try{const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'network');return j}catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}finally{clearTimeout(tm)}}
 const ICON_NAME=Object.freeze({
- home:'house',menu:'menu',close:'x',back:'chevron-left',
- market:'store',rank:'chart-bar-increasing',tasks:'list-checks',wheel:'circle-gauge',
- friends:'users',gift:'gift',upgrade:'trending-up',season:'trophy',
- collection:'layout-grid',profile:'user-round',premium:'gem',filter:'sliders-horizontal',
- search:'search',admin:'shield-check',story:'share-2',chevron:'chevron-right',
- down:'chevron-down',plus:'plus',check:'check',x:'x'
+ home:'home-01',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
+ market:'shopping-bag-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
+ friends:'user-group',gift:'gift',upgrade:'arrow-up-right-01',season:'award-01',
+ collection:'grid-view',profile:'user-circle-02',premium:'gem',filter:'filter',
+ search:'search-01',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
-function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico lucide-slot" data-lucide="'+name+'" aria-hidden="true"></i>'}
-function marketFilterIcon(){return '<svg class="market-filter-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="14" cy="7" r="2.3" fill="#fff" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.3" fill="#fff" stroke="currentColor" stroke-width="2"/></svg>'}
-let lucideRetry=0;
-function hydrateIcons(){
- try{
-  if(window.lucide?.createIcons){window.lucide.createIcons({attrs:{'stroke-width':'2.2'}});lucideRetry=0;return}
- }catch{}
- if(lucideRetry<20){lucideRetry++;setTimeout(hydrateIcons,100)}
-}
-addEventListener('load',hydrateIcons,{once:true});
+function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
+function marketFilterIcon(){return icon('filter')}
+function hydrateIcons(){}
 function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU=[
