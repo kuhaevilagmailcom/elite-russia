@@ -103,7 +103,8 @@ const ICON_NAME=Object.freeze({
  market:'shopping-bag-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
  friends:'user-group',gift:'gift',upgrade:'arrow-up-right-01',season:'award-01',
  collection:'grid-view',profile:'user-circle-02',premium:'gem',filter:'filter',
- search:'search-01',lab:'search-01',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ search:'search-01',lab:'search-01',levels:'medal-01',achievements:'award-01',settings:'settings-01',
+ theme:'moon-02',sound:'volume-high',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
@@ -116,11 +117,12 @@ function xpBar(u){
  return '<div class="xp-block"><div class="xp-head"><b>LVL '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=100?'MAX':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' XP'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
 }
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
-const MENU=[
- ['home','home','Дроп','Испытай удачу'],['market','market','Рынок','Покупай и продавай'],['top','rank','Рейтинг','Кто богаче'],['tasks','tasks','Задания','Ежедневные цели'],['wheel','wheel','Колесо','Бесплатно раз в 24 часа'],
- ['friends','friends','Друзья','Приглашения и награды'],['gift','gift','Подарок','Передать username'],['upgrader','upgrade','Апгрейдер','Рискнуть коллекцией'],['seasons','season','Сезоны','Рейтинг сезона']
+const MENU_SECTIONS=[
+ {title:'Играть',items:[['home','home','Дроп'],['lab','lab','Lab'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
+ {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
+ {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
+ {title:'Аккаунт',items:[['profile','profile','Профиль'],['premium','premium','Plus'],['settings','settings','Настройки']]}
 ];
-const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
 function setMenuOpen(open){
  state.menu=!!open;
  const menu=document.querySelector('.menu-backdrop');
@@ -128,14 +130,11 @@ function setMenuOpen(open){
  render();
 }
 function menuHtml(){
- const main=[...MENU],bottom=[...MENU_BOTTOM];
- const shortLabel=t=>({'Рейтинг':'Топ','USERNAME+':'Plus'}[t]||t);
- const tiles=list=>list.map(([p,i,t])=>'<button class="menu-tile" data-page="'+p+'" aria-label="'+esc(t)+'" title="'+esc(t)+'">'+icon(i)+'<span>'+esc(shortLabel(t))+'</span></button>').join('');
- return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-grid-sheet" data-menu-sheet>'+
-  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin" aria-label="Админка" title="Админка">'+icon('admin')+'<span>Админ</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
-  '<div class="menu-grid-main">'+tiles(main)+'</div>'+
-  '<div class="menu-grid-divider"></div>'+
-  '<div class="menu-grid-bottom">'+tiles(bottom)+'</div>'+
+ const tiles=list=>list.map(([p,i,t])=>'<button class="menu-section-tile" data-page="'+p+'" aria-label="'+esc(t)+'">'+icon(i)+'<span>'+esc(t)+'</span></button>').join('');
+ const groups=MENU_SECTIONS.map(s=>'<section class="menu-section"><b>'+esc(s.title)+'</b><div>'+tiles(s.items)+'</div></section>').join('');
+ return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-sections-sheet" data-menu-sheet>'+
+  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin">'+icon('admin')+'<span>Админ</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+  '<div class="menu-sections-scroll">'+groups+'</div>'+
  '</aside></div>'
 }
 function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
