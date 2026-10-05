@@ -49,9 +49,14 @@ export function starterDropMode(roll=randomUnit()){
   if(r<rare)return 'rare';
   return 'normal';
 }
-function pickTemplate(db,tierKey='basic',rng=randomUnit){
+function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
   const tier=normalizeTier(tierKey),starter=tier.key==='basic';
   let starterMode=starter?starterDropMode(rng()):null;
+  const streak=Math.max(0,Number(player?.bad_drop_streak||0)),luck=Math.max(0,Math.min(100,Number(player?.luck_points||0)));
+  if(starter&&starterMode==='normal'){
+    if(streak>=20)starterMode='rare';
+    else if(streak>=10||luck>=75)starterMode='good';
+  }
   const profile=starter?(starterMode==='ultra'?'ULTRA':starterMode==='big'?'RARE':starterMode==='rare'?'RARE':'COMMON'):weightedTierProfile(tier,rng),now=nowIso();
 
   // The $3K tier is cheap most of the time, but keeps tiny real jackpot chances.
@@ -84,7 +89,8 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit){
     const rawBase=t?.base_value||scoreHandle(handle);
     let base=rawBase;
     if(starter){
-      if(starterMode==='rare')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax);
+      if(starterMode==='good')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.goodMin,STARTER_DROP_JACKPOT.goodMax);
+      else if(starterMode==='rare')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax);
       else if(starterMode==='big')base=starterDropValue(rawBase,STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax);
       else base=starterDropValue(rawBase);
     }
@@ -146,7 +152,7 @@ export function createDrop(db,user,requestId,tierKey='basic'){
   const made=db.transaction(()=>{
     const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
     if(activeCollectionCount(db,user.id)>=collectionLimit(fresh))throw new Error('collection_full');
-    const tier=normalizeTier(tierKey),effectiveTier=tier.key,template=pickTemplate(db,effectiveTier),instanceNumber=1;
+    const tier=normalizeTier(tierKey),effectiveTier=tier.key,template=pickTemplate(db,effectiveTier,randomUnit,fresh),instanceNumber=1;
     if(template.current_supply>=1||handleUnavailable(db,template.handle))throw new Error('sold_out');
     const useFree=fresh.free_drops>0&&effectiveTier==='basic',cost=useFree?0:tier.cost;
     if(cost>0)txBalance(db,user.id,'drop',-cost,{requestId,tier:effectiveTier});
@@ -156,16 +162,24 @@ export function createDrop(db,user,requestId,tierKey='basic'){
     // pickTemplate already resolved the canonical value for this username.
     // Do not rescore it here: rescoring bypassed the starter-tier value band and
     // was the reason $3K drops could suddenly become $10K-$15K instances.
-    const value=Math.max(200,Math.round(Number(template.base_value)||200)),rarity=rarityFromValue(value);
-    if(template.rarity!==rarity)db.prepare('UPDATE username_templates SET rarity=?,max_supply=1 WHERE id=?').run(rarity,template.id);
+    const value=Math.max(200,Math.round(Number(template.base_value)||200)),rarity=rarityFromValue(value),assessment=analyzeUsername(template.handle);
+    const score=Number(template.username_score||assessment.score||0),visual=visualTier(value,score),quality=JSON.stringify(assessment.breakdown||{});
+    if(template.rarity!==rarity||template.username_score!==score||template.visual_tier!==visual)
+      db.prepare('UPDATE username_templates SET rarity=?,max_supply=1,username_score=?,visual_tier=?,quality_json=? WHERE id=?').run(rarity,score,visual,quality,template.id);
     const instanceId=uid(),season=activeSeason(db);
-    db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(instanceId,template.id,template.handle,rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null);
+    db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id,username_score,visual_tier,quality_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(instanceId,template.id,template.handle,rarity,value,1,1,user.id,'pending',nowIso(),'drop',season?.id||null,score,visual,quality);
     db.prepare('INSERT INTO drop_requests(request_id,user_id,instance_id,cost,tier,created_at) VALUES(?,?,?,?,?,?)').run(requestId,user.id,instanceId,cost,effectiveTier,nowIso());
     db.prepare('INSERT INTO drop_history(id,user_id,instance_id,handle,rarity,value,action,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,instanceId,template.handle,rarity,value,'pending',nowIso());
-    db.prepare('UPDATE users SET xp=xp+15 WHERE id=?').run(user.id);
+
+    const paid=cost>0,loss=paid&&value<cost;
+    let luck=Math.max(0,Math.min(100,Number(fresh.luck_points||0))),streak=Math.max(0,Number(fresh.bad_drop_streak||0));
+    if(loss){streak+=1;luck=Math.min(100,luck+(value<cost*.5?5:3))}
+    else if(paid){streak=0;luck=Math.max(0,luck-(value>=cost*3?25:10))}
+    db.prepare('UPDATE users SET luck_points=?,bad_drop_streak=?,best_drop_value=MAX(best_drop_value,?) WHERE id=?').run(luck,streak,value,user.id);
+    grantXp(db,user.id,15,'drop',{tier:effectiveTier,value,visual});
     bumpTask(db,user.id,'drop',1);bumpSeasonScore(db,user.id,15);
-    if(['RARE','EPIC','LEGEND','ULTRA'].includes(rarity))bumpTask(db,user.id,'rare',1);
+    if(value>=15000)bumpTask(db,user.id,'rare',1);
     if(!/\d/.test(template.handle))bumpTask(db,user.id,'nodigits',1);
     return {instanceId,effectiveTier,cost};
   })();
@@ -179,12 +193,14 @@ export function resolveDrop(db,user,instanceId,action){
       db.prepare("UPDATE username_instances SET status='owned' WHERE id=?").run(inst.id);
       db.prepare('INSERT OR IGNORE INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(inst.id,user.id,nowIso());
       db.prepare("UPDATE drop_history SET action='kept' WHERE instance_id=?").run(inst.id);
+      grantXp(db,user.id,8,'keep_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'keep',1);bumpSeasonScore(db,user.id,8);
     }else if(action==='sell'){
       const payout=systemSellValue(inst.value);
       db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(inst.id);
       db.prepare("UPDATE drop_history SET action='sold' WHERE instance_id=?").run(inst.id);
       txBalance(db,user.id,'system_sale',payout,{instanceId:inst.id,handle:inst.handle,estimatedValue:inst.value});
+      grantXp(db,user.id,6,'sell_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'sell',1);bumpSeasonScore(db,user.id,5);
     }else throw new Error('bad_action');
   })();
@@ -227,13 +243,14 @@ export function leaderboard(db){
 }
 export function tasks(db,user){
   const defs=[
-    {key:'drop3',label:'Получить 3 usernames',target:3,reward:600,source:'drop'},
-    {key:'rare1',label:'Получить username от $15,000',target:1,reward:900,source:'rare'},
-    {key:'sell1',label:'Продать username',target:1,reward:300,source:'sell'},
-    {key:'market1',label:'Купить username на рынке',target:1,reward:500,source:'market_buy'},
-    {key:'keep2',label:'Оставить 2 usernames',target:2,reward:350,source:'keep'},
-    {key:'nodigits1',label:'Получить username без цифр',target:1,reward:450,source:'nodigits'},
-    {key:'invite1',label:'Пригласить друга',target:1,reward:700,source:'invite'}
+    {key:'lab3',label:'Придумать 3 usernames',target:3,reward:1000,source:'lab'},
+    {key:'drop2',label:'Открыть 2 drops',target:2,reward:800,source:'drop'},
+    {key:'rare1',label:'Получить username от $15,000',target:1,reward:1200,source:'rare'},
+    {key:'sell1',label:'Продать username',target:1,reward:750,source:'sell'},
+    {key:'market1',label:'Купить username на рынке',target:1,reward:700,source:'market_buy'},
+    {key:'keep2',label:'Оставить 2 usernames',target:2,reward:600,source:'keep'},
+    {key:'nodigits1',label:'Получить username без цифр',target:1,reward:550,source:'nodigits'},
+    {key:'invite1',label:'Пригласить друга',target:1,reward:1000,source:'invite'}
   ];
   return defs.map(t=>{
     const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,todayKey(),t.source)?.value||0;
@@ -246,7 +263,7 @@ export function claimTask(db,user,key){
   db.transaction(()=>{
     db.prepare('INSERT INTO task_claims(user_id,claim_date,task_key) VALUES(?,?,?)').run(user.id,todayKey(),key);
     txBalance(db,user.id,'task_reward',t.reward,{key});
-    db.prepare('UPDATE users SET xp=xp+25 WHERE id=?').run(user.id);bumpSeasonScore(db,user.id,25);
+    grantXp(db,user.id,25,'task',{key});bumpSeasonScore(db,user.id,25);
   })();
   return {reward:t.reward,user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id))};
 }
@@ -260,7 +277,8 @@ export function profile(db,userId){
   const deals=db.prepare('SELECT COUNT(*) c FROM market_transactions WHERE buyer_id=? OR seller_id=?').get(userId,userId).c;
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
   const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId);
-  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics};
+  const lab=db.prepare('SELECT COUNT(*) attempts,COALESCE(MAX(score),0) bestScore,COALESCE(SUM(reward),0) earned FROM username_lab_attempts WHERE user_id=?').get(userId);
+  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,lab:{attempts:Number(lab?.attempts||0),bestScore:Number(lab?.bestScore||0),earned:Number(lab?.earned||0)}};
 }
 export function sellOwnedUsername(db,user,instanceId){
   const result=db.transaction(()=>{
