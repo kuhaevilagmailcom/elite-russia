@@ -5,19 +5,19 @@ import {stableScoreHandle,rarityFromValue} from './generator.mjs';
 
 export const WHEEL_USERNAMES=['abuser','wheel','daily','lucky','spin','winner','fortune'];
 const BASE_REWARDS=[
-  {key:'cash100',label:'$100',type:'money',amount:100,weight:35},
-  {key:'cash250',label:'$250',type:'money',amount:250,weight:28},
-  {key:'xp25',label:'25 XP',type:'xp',amount:25,weight:18},
-  {key:'cash500',label:'$500',type:'money',amount:500,weight:12},
-  {key:'drop1',label:'1 бесплатный дроп',type:'drop',amount:1,weight:3},
-  {key:'cash1500',label:'$1 500',type:'money',amount:1500,weight:1},
+  {key:'cash3000',label:'$3K',type:'money',amount:3000,weight:38},
+  {key:'cash5000',label:'$5K',type:'money',amount:5000,weight:25},
+  {key:'cash10000',label:'$10K',type:'money',amount:10000,weight:15},
+  {key:'xp100',label:'100 XP',type:'xp',amount:100,weight:10},
+  {key:'drop1',label:'1 бесплатный дроп',type:'drop',amount:1,weight:6},
+  {key:'cash25000',label:'$25K',type:'money',amount:25000,weight:3},
   {key:'username',label:'1/1 USERNAME',type:'username',amount:0,weight:3}
 ];
 function availableWheelHandles(db){return WHEEL_USERNAMES.filter(h=>!db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(h))}
 function rewardsFor(db,user){
   const canReceive=activeCollectionCount(db,user.id)<collectionLimit(user),available=canReceive?availableWheelHandles(db):[];
   const rows=BASE_REWARDS.map(x=>({...x}));
-  if(!available.length){const special=rows.find(x=>x.type==='username'),cash=rows.find(x=>x.key==='cash100');cash.weight+=special.weight;return {rows:rows.filter(x=>x.type!=='username'),available}}
+  if(!available.length){const special=rows.find(x=>x.type==='username'),cash=rows.find(x=>x.key==='cash3000');cash.weight+=special.weight;return {rows:rows.filter(x=>x.type!=='username'),available}}
   return {rows,available};
 }
 function pick(rows){const total=rows.reduce((s,x)=>s+x.weight,0),n=crypto.randomInt(0,total);let a=0;for(const r of rows){a+=r.weight;if(n<a)return r}return rows[0]}
