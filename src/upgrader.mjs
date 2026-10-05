@@ -1,5 +1,6 @@
 import {buildGeneratedHandle,scoreHandle,isValidHandle,rarityFromValue} from './generator.mjs';
 import {uid,nowIso,bumpSeasonScore,randomUnit} from './economy.mjs';
+import {grantXp} from './progression.mjs';
 
 export const UPGRADE_RULES=Object.freeze({
   COMMON:{next:'RARE',minMultiplier:1.35},
