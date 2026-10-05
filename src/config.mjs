@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'5.4.6',
+  version:'6.0.0',
   startBalance:50000,
   freeDrops:1,
   dropCost:3000,
@@ -22,7 +22,8 @@ export const STARTER_DROP_JACKPOT=Object.freeze({
   bigChance:.0005,      // 0.05%  ~ 1 in 2,000
   ultraChance:.00001,   // 0.001% ~ 1 in 100,000
   normalMin:400,normalMax:3500,
-  rareMin:8000,rareMax:30000,
+  goodMin:3500,goodMax:9000,
+  rareMin:9000,rareMax:50000,
   bigMin:50000,bigMax:250000,
   ultraMin:2000000
 });
