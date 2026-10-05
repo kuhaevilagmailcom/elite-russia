@@ -12,12 +12,13 @@ function pickProfile(tier,rng){
   return 'COMMON';
 }
 function percentile(sorted,p){return sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))]||0}
+function starterDropValue(rawValue){const scaled=Math.round((Math.max(200,Number(rawValue)||200)/20)/50)*50;return Math.max(400,Math.min(3500,scaled))}
 function simulateTier(tier,samples,seed){
   const rng=rngFactory(seed),used=new Set(),specials=SPECIALS.map(x=>({handle:x[0],rarity:x[1],value:Number(x[2])}));
   let sumValue=0,sumSell=0,breakEven=0,len4=0,len5=0;
   const rarities=Object.fromEntries(RARITIES.map(x=>[x,0])),values=[];
   for(let n=0;n<samples;n++){
-    const profile=pickProfile(tier,rng),specialChance={COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0;
+    const starter=tier.key==='basic',profile=starter?'COMMON':pickProfile(tier,rng),specialChance=starter?0:({COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0);
     let handle='',value=0;
     if(rng()<specialChance){
       const available=specials.filter(x=>x.rarity===profile&&!used.has(x.handle));
@@ -27,7 +28,7 @@ function simulateTier(tier,samples,seed){
       for(let i=0;i<250;i++){
         const candidate=buildGeneratedHandle(profile,rng);
         if(!isValidHandle(candidate)||used.has(candidate))continue;
-        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);if(tier.key==='basic')value=Math.min(value,2600);break;
+        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);if(starter)value=starterDropValue(value);break;
       }
     }
     if(!handle)continue;
