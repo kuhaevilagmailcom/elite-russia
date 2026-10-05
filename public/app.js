@@ -4,7 +4,8 @@ const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
-  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0,
+  pageLoadedAt:{}
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
 function untilText(iso){
@@ -22,9 +23,20 @@ const ERR={
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',network:'Нет соединения с сервером'
 };
-function syncViewport(){const h=TG?.viewportStableHeight||TG?.viewportHeight||innerHeight;if(h)root.style.setProperty('--app-h',Math.round(h)+'px');const s=TG?.safeAreaInset||{},c=TG?.contentSafeAreaInset||{};root.style.setProperty('--safe-t',Math.max(s.top||0,c.top||0)+'px');root.style.setProperty('--safe-b',Math.max(s.bottom||0,c.bottom||0)+'px')}
-try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewport();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewport()}
-addEventListener('resize',syncViewport);
+let viewportFrame=0,lastViewportKey='';
+function syncViewportNow(){
+ const h=Math.round(TG?.viewportStableHeight||TG?.viewportHeight||innerHeight||0),s=TG?.safeAreaInset||{},safe=TG?.contentSafeAreaInset||{};
+ const top=Math.max(s.top||0,safe.top||0),bottom=Math.max(s.bottom||0,safe.bottom||0),key=h+':'+top+':'+bottom;
+ if(key===lastViewportKey)return;lastViewportKey=key;
+ if(h)root.style.setProperty('--app-h',h+'px');
+ root.style.setProperty('--safe-t',top+'px');root.style.setProperty('--safe-b',bottom+'px');
+}
+function syncViewport(){
+ if(viewportFrame)return;
+ viewportFrame=requestAnimationFrame(()=>{viewportFrame=0;syncViewportNow()});
+}
+try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewportNow();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewportNow()}
+addEventListener('resize',syncViewport,{passive:true});
 function haptic(type='light'){try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
 function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
@@ -32,7 +44,24 @@ function startParam(){
  const q=new URLSearchParams(location.search);
  return String(TG?.initDataUnsafe?.start_param||q.get('tgWebAppStartParam')||q.get('startapp')||q.get('ref')||'');
 }
-async function api(url,opts={}){const headers={'Content-Type':'application/json',...(opts.headers||{})};const d=await initData();if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';const sp=startParam();if(sp)headers['X-Start-Param']=sp;const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);try{const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'network');return j}catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}finally{clearTimeout(tm)}}
+const inflightGet=new Map();
+async function api(url,opts={}){
+ const method=String(opts.method||'GET').toUpperCase(),key=method==='GET'?url:'';
+ if(key&&inflightGet.has(key))return inflightGet.get(key);
+ const run=(async()=>{
+  const headers={'Content-Type':'application/json',...(opts.headers||{})},d=await initData();
+  if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';
+  const sp=startParam();if(sp)headers['X-Start-Param']=sp;
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);
+  try{
+   const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal}),j=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(j.error||'network');return j
+  }catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}
+  finally{clearTimeout(tm)}
+ })();
+ if(key)inflightGet.set(key,run);
+ try{return await run}finally{if(key&&inflightGet.get(key)===run)inflightGet.delete(key)}
+}
 const ICON_NAME=Object.freeze({
  home:'home-01',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
  market:'shopping-bag-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
@@ -68,7 +97,13 @@ function shell(title,html,opts={}){
  app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';
  requestAnimationFrame(()=>{fitAllUsernames();hydrateIcons();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
 }
-function fitUsername(el,max=48,min=20){if(!el)return;el.style.fontSize='';let size=Math.min(max,parseFloat(getComputedStyle(el).fontSize)||max);const room=Math.max(1,el.parentElement?.clientWidth||el.clientWidth);while(size>min&&el.scrollWidth>room-8){size-=1;el.style.fontSize=size+'px'}}
+function fitUsername(el,max=48,min=20){
+ if(!el)return;const room=Math.max(1,(el.parentElement?.clientWidth||el.clientWidth)-8),hiMax=Math.max(min,Number(max)||48);
+ el.style.fontSize=hiMax+'px';if(el.scrollWidth<=room)return;
+ let lo=Math.max(8,Number(min)||20),hi=hiMax;
+ for(let i=0;i<6&&hi-lo>.5;i++){const mid=(lo+hi)/2;el.style.fontSize=mid+'px';if(el.scrollWidth<=room)lo=mid;else hi=mid}
+ el.style.fontSize=Math.floor(lo*10)/10+'px';
+}
 function fitAllUsernames(){document.querySelectorAll('[data-fit-username]').forEach(el=>fitUsername(el,Number(el.dataset.maxSize||48),Number(el.dataset.minSize||20)))}
 const ROLL_BASES=['velorian','coldvibe','nightfall','serenity','monarch','privated','lunaris','hazewave','nightcore','rareline','daylight','blackout','phantom','vision','storm','dealer','master','prime','street','matrix','lucky','silent','crimson','shadow','winter','aurora','glacier','moonwave','novaline','royal'];
 function rollRandomInt(max){if(max<=1)return 0;try{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%max}catch{return Math.floor(Math.random()*max)}}
@@ -129,7 +164,7 @@ async function shareDropStory(item){
 }
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
-  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$25K',cost:25000};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$3K',cost:3000};
 }
 function dropPricePicker(tiers){
  if(!state.dropPicker)return '';
@@ -137,7 +172,7 @@ function dropPricePicker(tiers){
 }
 function homeView(){
  const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier();
- const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||25000),cantAfford=!freeBasic&&u.balance<payCost;
+ const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
  const quick=[
   ['collection','collection','Коллекция'],['market','market','Рынок'],['tasks','tasks','Задания'],['wheel','wheel','Колесо']
  ].map(([page,ico,label])=>'<button class="home-shortcut" data-page="'+page+'">'+icon(ico)+'<span>'+label+'</span></button>').join('');
@@ -325,25 +360,60 @@ function detailView(x){return '<div class="detail-page">'+resultCard(x,false)+'<
 function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Рейтинг',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарок',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
 const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Рейтинг',tasks:'Задания',wheel:'Колесо',friends:'Друзья',gift:'Подарок',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',admin:'Админка'};
-async function load(page){
- state.page=page;state.menu=false;
- shell(PAGE_TITLE[page]||'USERNAME','<div class="screen-skeleton"><i></i><i></i><i></i><i></i></div>');
+const PAGE_CACHE_TTL=12000;
+let routeSeq=0;
+function pageReady(page){
+ return page==='home'?!!state.home:
+  page==='collection'?!!state.collection:
+  page==='market'?!!state.market:
+  page==='top'?!!state.leaderboard:
+  page==='tasks'?!!state.tasks:
+  page==='wheel'?!!state.wheel:
+  page==='friends'?!!state.friends:
+  page==='gift'?!!state.gift:
+  page==='upgrader'?!!state.upgrader:
+  page==='seasons'?!!state.season:
+  page==='profile'?!!state.profile:
+  page==='premium'?!!state.premium:
+  page==='admin'?!!state.admin:true;
+}
+function routeLoading(on){
+ app.classList.toggle('route-loading',!!on);
+ app.setAttribute('aria-busy',on?'true':'false');
+ if(on){const menu=document.querySelector('.menu-backdrop.open');if(menu)menu.classList.remove('open')}
+}
+async function fetchPage(page){
+ if(!state.user||page==='home')await refreshUser();
+ if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page='+state.filters.page);
+ if(page==='market')state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
+ if(page==='top')state.leaderboard=await api('/api/leaderboard');
+ if(page==='tasks')state.tasks=await api('/api/tasks');
+ if(page==='wheel')state.wheel=await api('/api/wheel');
+ if(page==='friends')state.friends=await api('/api/friends');
+ if(page==='gift')state.gift=await api('/api/gift/options');
+ if(page==='upgrader'){
+  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);
+  state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0
+ }
+ if(page==='seasons')state.season=await api('/api/seasons');
+ if(page==='profile')state.profile=await api('/api/profile');
+ if(page==='premium')state.premium=await api('/api/premium');
+ if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
+}
+async function load(page,{force=false}={}){
+ const seq=++routeSeq,initial=!window.__USERNAME_READY||!state.user;
+ state.menu=false;state.dropPicker=false;
+ const fresh=pageReady(page)&&Date.now()-Number(state.pageLoadedAt[page]||0)<PAGE_CACHE_TTL;
+ if(fresh&&!force){state.page=page;render();return}
+ if(!initial)routeLoading(true);
  try{
-  if(!state.user||page==='home')await refreshUser();
-  if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page='+state.filters.page);
-  if(page==='market')state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
-  if(page==='top')state.leaderboard=await api('/api/leaderboard');
-  if(page==='tasks')state.tasks=await api('/api/tasks');
-  if(page==='wheel')state.wheel=await api('/api/wheel');
-  if(page==='friends')state.friends=await api('/api/friends');
-  if(page==='gift')state.gift=await api('/api/gift/options');
-  if(page==='upgrader'){state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0}
-  if(page==='seasons')state.season=await api('/api/seasons');
-  if(page==='profile')state.profile=await api('/api/profile');
-  if(page==='premium')state.premium=await api('/api/premium');
-  if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
-  render();
- }catch(e){shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||'Что-то пошло не так')+'</b><button data-page="'+page+'">Повторить</button></div>')}
+  await fetchPage(page);if(seq!==routeSeq)return;
+  state.page=page;state.pageLoadedAt[page]=Date.now();render();
+ }catch(e){
+  if(seq!==routeSeq)return;
+  if(initial){state.page=page;shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||'Что-то пошло не так')+'</b><button data-page="'+page+'">Повторить</button></div>')}
+  else toast(ERR[e.message]||'Не удалось загрузить раздел');
+ }finally{if(seq===routeSeq)routeLoading(false)}
 }
 function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function openSystemSellModal(id,handle,value){
