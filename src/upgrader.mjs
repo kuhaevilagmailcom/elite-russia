@@ -136,6 +136,7 @@ export function performUpgrade(db,user,ids,sessionId,rng=randomUnit){
     db.prepare('INSERT INTO upgrade_progress(user_id,points,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET points=points+excluded.points,updated_at=excluded.updated_at').run(user.id,rows.length,used);
     db.prepare('INSERT INTO upgrade_history(id,user_id,request_id,source_ids,target_instance_id,from_rarity,to_rarity,success,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
       .run(uid(),user.id,String(session.id),JSON.stringify(rows.map(r=>r.id)),result?.id||'',session.from_rarity,session.target_rarity,success?1:0,used);
+    grantXp(db,user.id,success?40:8,'upgrade',{success:!!success,chance:Number(session.chance),targetValue:session.target_value});
     bumpSeasonScore(db,user.id,success?50:5);
     return {ok:true,replayed:false,success,result,sources:rows.map(shape),chance:Number(session.chance),from:session.from_rarity,to:session.target_rarity,target:{handle:'@'+session.target_handle,rarity:session.target_rarity,value:session.target_value}};
   })();
