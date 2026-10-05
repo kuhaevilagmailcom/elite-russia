@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createDatabase} from '../src/database.mjs';
-import {GAME,DROP_TIERS} from '../src/config.mjs';
+import {GAME,DROP_TIERS,STARTER_DROP_JACKPOT} from '../src/config.mjs';
 import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,stableScoreHandle,wordQuality,generatedSupply,rarityFromValue} from '../src/generator.mjs';
-import {ensureUser,createDrop,resolveDrop,leaderboard,publicUser,sellOwnedUsername,setShowcase} from '../src/game.mjs';
+import {ensureUser,createDrop,resolveDrop,leaderboard,publicUser,sellOwnedUsername,setShowcase,starterDropMode} from '../src/game.mjs';
 import {createListing,buyListing,cancelListing,listMarket} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
 import {spinWheel,wheelStatus} from '../src/wheel.mjs';
@@ -127,15 +127,26 @@ test('database rejects a second instance with the same username globally',()=>{
     .run('duplicate-instance',row.template_id,row.handle,row.rarity,row.value,1,1,buyer.id,'owned',new Date().toISOString(),'test'),/UNIQUE/);
 });
 test('drop request is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
-test('3K starter drop never pulls expensive event or special usernames',()=>{
+test('3K starter drop has low-value normals plus tiny jackpot bands',()=>{
+  assert.equal(starterDropMode(0),'ultra');
+  assert.equal(starterDropMode(STARTER_DROP_JACKPOT.ultraChance+STARTER_DROP_JACKPOT.bigChance/2),'big');
+  assert.equal(starterDropMode(STARTER_DROP_JACKPOT.ultraChance+STARTER_DROP_JACKPOT.bigChance+STARTER_DROP_JACKPOT.rareChance/2),'rare');
+  assert.equal(starterDropMode(.5),'normal');
+  assert.ok(STARTER_DROP_JACKPOT.rareChance<.01);
+  assert.ok(STARTER_DROP_JACKPOT.bigChance<.001);
+  assert.ok(STARTER_DROP_JACKPOT.ultraChance<=.00001);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-starter-test-')),starterDb=createDatabase(dir);
   try{
     const u=ensureUser(starterDb,{id:10004,username:'starter',first_name:'Starter'});
     starterDb.prepare('UPDATE users SET balance=1000000,free_drops=0 WHERE id=?').run(u.id);
-    for(let i=0;i<120;i++){
+    for(let i=0;i<80;i++){
       const fresh=starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-      const r=createDrop(starterDb,fresh,'starter-'+i,'basic');
-      assert.ok(r.instance.value>=400&&r.instance.value<=3500,'starter value '+r.instance.value+' for '+r.instance.handle);
+      const r=createDrop(starterDb,fresh,'starter-'+i,'basic'),v=r.instance.value;
+      const allowed=(v>=STARTER_DROP_JACKPOT.normalMin&&v<=STARTER_DROP_JACKPOT.normalMax)||
+        (v>=STARTER_DROP_JACKPOT.rareMin&&v<=STARTER_DROP_JACKPOT.rareMax)||
+        (v>=STARTER_DROP_JACKPOT.bigMin&&v<=STARTER_DROP_JACKPOT.bigMax)||
+        v>=STARTER_DROP_JACKPOT.ultraMin;
+      assert.ok(allowed,'starter value '+v+' for '+r.instance.handle);
       resolveDrop(starterDb,starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
     }
   }finally{starterDb.close();fs.rmSync(dir,{recursive:true,force:true})}
@@ -143,7 +154,15 @@ test('3K starter drop never pulls expensive event or special usernames',()=>{
 
 test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
 test('gift transfer cannot be repeated by old owner',()=>{db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());const id=owned(seller,'giftname');giftUsername(db,seller,id,friend.id);assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/)});
-test('wheel is idempotent and exposes real weights',()=>{const st=wheelStatus(db,buyer);assert.equal(st.rewards.reduce((s,x)=>s+x.weight,0),100);const a=spinWheel(db,buyer,'wheel-1'),b=spinWheel(db,buyer,'wheel-1');assert.equal(a.reward.key,b.reward.key)});
+test('wheel is idempotent and exposes worthwhile real-weight rewards',()=>{
+  const st=wheelStatus(db,buyer);assert.equal(st.rewards.reduce((s,x)=>s+x.weight,0),100);
+  const byKey=Object.fromEntries(st.rewards.map(x=>[x.key,x]));
+  assert.equal(byKey.cash3000.label,'$3K');
+  assert.equal(byKey.cash10000.label,'$10K');
+  assert.equal(byKey.cash25000.label,'$25K');
+  assert.ok(byKey.username.weight>0);
+  const a=spinWheel(db,buyer,'wheel-1'),b=spinWheel(db,buyer,'wheel-1');assert.equal(a.reward.key,b.reward.key)
+});
 test('direct collection sale pays system sell value, not estimate',()=>{const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),before=fresh.balance,id=owned(seller,'directsell','RARE',4200);const r=sellOwnedUsername(db,fresh,id);assert.equal(r.value,4200);assert.equal(r.sellValue,systemSellValue(4200));assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,before+r.sellValue)});
 
 test('market status still counts toward collection limit',()=>{
