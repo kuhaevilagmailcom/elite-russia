@@ -80,6 +80,12 @@ const MENU=[
  ['friends','friends','Друзья','Приглашения и награды'],['gift','gift','Подарок','Передать username'],['upgrader','upgrade','Апгрейдер','Рискнуть коллекцией'],['seasons','season','Сезоны','Рейтинг сезона']
 ];
 const MENU_BOTTOM=[['collection','collection','Коллекция'],['profile','profile','Профиль'],['premium','premium','USERNAME+']];
+function setMenuOpen(open){
+ state.menu=!!open;
+ const menu=document.querySelector('.menu-backdrop');
+ if(menu){menu.classList.toggle('open',state.menu);menu.setAttribute('aria-hidden',state.menu?'false':'true');return}
+ render();
+}
 function menuHtml(){
  const main=[...MENU],bottom=[...MENU_BOTTOM];
  const shortLabel=t=>({'Рейтинг':'Топ','USERNAME+':'Plus'}[t]||t);
@@ -506,9 +512,9 @@ function removeMarketLocal(id){
   const before=state.market.items.length;state.market.items=state.market.items.filter(x=>String(x.id)!==String(id));
   if(state.market.items.length!==before)state.market.total=Math.max(0,(state.market.total||0)-1);
 }
-document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){state.menu=false;render();return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
- if(el.hasAttribute('data-menu-open')){state.menu=true;render();return}
- if(el.hasAttribute('data-menu-close')){state.menu=false;render();return}
+document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){setMenuOpen(false);return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
+ if(el.hasAttribute('data-menu-open')){setMenuOpen(true);return}
+ if(el.hasAttribute('data-menu-close')){setMenuOpen(false);return}
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
