@@ -192,8 +192,13 @@ button,input,select{font-weight:650}
   display:flex;flex-direction:column;align-items:center;overflow:visible;box-shadow:none
 }
 .fortune-stage{
-  --fortune-size:min(300px,calc(100% - 32px),38vh);
-  position:relative;width:var(--fortune-size);height:var(--fortune-size);flex:0 0 var(--fortune-size);margin:7px auto 1px
+  position:relative;
+  width:min(300px,calc(100% - 32px));
+  height:auto;
+  aspect-ratio:1 / 1;
+  flex:0 0 auto;
+  margin:7px auto 1px;
+  overflow:visible
 }
 .fortune-rim{
   position:absolute;inset:-8px;z-index:0;border-radius:50%;background:#f0f2f4;border:1px solid #d7dce1;
@@ -201,7 +206,7 @@ button,input,select{font-weight:650}
 }
 .fortune-rim:after{content:"";position:absolute;inset:7px;border-radius:50%;border:1px solid #d8dde2;pointer-events:none}
 .fortune-svg{
-  position:absolute;z-index:2;inset:0;width:100%;height:100%;display:block;overflow:visible;border-radius:50%;
+  position:absolute;z-index:2;inset:0;width:100%;height:100%;aspect-ratio:1 / 1;display:block;overflow:visible;border-radius:50%;
   transform-origin:50% 50%;transform-box:fill-box;will-change:transform
 }
 .fortune-slice{vector-effect:non-scaling-stroke}
@@ -328,7 +333,7 @@ button,input,select{font-weight:650}
 .upgrade-wheel-card.round-win{border-color:#b8e2f5}
 .upgrade-wheel-card.round-fail{border-color:#e1e4e7}
 .upgrade-roulette-clean{width:min(238px,35vh,calc(100% - 80px));aspect-ratio:1;position:relative;display:grid;place-items:center}
-.upgrade-wheel-rotor{position:absolute;inset:0;border-radius:50%;will-change:transform}
+.upgrade-wheel-rotor{position:absolute;inset:0;border-radius:50%;transform-origin:50% 50%;will-change:transform;backface-visibility:hidden}
 .upgrade-wheel-rotor .upgrade-ring{position:absolute;inset:8px;border-radius:50%;background:conic-gradient(from 0deg,var(--upgrade-win) 0 var(--chance-angle),var(--upgrade-loss) var(--chance-angle) 360deg);box-shadow:0 0 0 1px #e0e4e7}
 .upgrade-wheel-rotor .upgrade-ring:before{content:"";position:absolute;inset:21px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #e9ecef}
 .upgrade-pointer-static{position:absolute;z-index:12;left:50%;top:-3px;width:24px;height:21px;transform:translateX(-50%);background:#171a1f;clip-path:polygon(12% 0,88% 0,100% 34%,50% 100%,0 34%);filter:drop-shadow(0 3px 4px rgba(0,0,0,.15))}
@@ -395,7 +400,7 @@ button,input,select{font-weight:650}
   .collection-card .user-card-main>span{font-size:14px}
   .collection-card .user-card-sell{height:32px;min-height:32px}
   .market-card{grid-template-columns:minmax(0,1fr) 94px}
-  .fortune-stage{--fortune-size:min(254px,calc(100% - 28px),36vh)}
+  .fortune-stage{width:min(254px,calc(100% - 28px))}
   .fortune-hub{width:70px;height:70px}
   .fortune-hub b{font-size:23px}
   .fortune-svg text{font-size:3.75px}
@@ -413,7 +418,7 @@ button,input,select{font-weight:650}
   .home-metrics{min-height:54px}
   .home-metrics .metric{min-height:54px}
   .drop-zone{height:245px;min-height:245px}
-  .fortune-stage{--fortune-size:min(224px,calc(100% - 34px),34vh)}
+  .fortune-stage{width:min(224px,calc(100% - 34px))}
   .upgrade-source-card,.upgrade-target-pick{height:52px;min-height:52px;flex-basis:52px}
   .upgrade-roulette-clean{width:min(205px,31vh,calc(100% - 68px))}
 }
@@ -423,7 +428,7 @@ button,input,select{font-weight:650}
   .collection-toolbar{height:48px;min-height:48px}
   .collection-page-clean .collection-grid{grid-auto-rows:104px}
   .collection-card{height:104px}
-  .fortune-stage{--fortune-size:min(194px,calc(100% - 42px),30vh)}
+  .fortune-stage{width:min(194px,calc(100% - 42px))}
   .wheel-page-clean{gap:6px;padding-top:5px}
   .upgrade-matchup{min-height:64px}
   .upgrade-roulette-clean{width:min(178px,28vh,calc(100% - 76px))}
@@ -432,7 +437,7 @@ button,input,select{font-weight:650}
   .shell{max-width:520px}
   .screen{width:100%;max-width:480px;margin:0 auto}
   .home,.upgrade-page,.wheel-page-clean,.task-list,.collection-page-clean,.market-page{width:100%}
-  .fortune-stage{--fortune-size:min(292px,70%,38vh)}
+  .fortune-stage{width:min(292px,70%)}
   .wheel-card-clean{max-width:430px}
   .upgrade-source-stage{max-width:460px}
 }
