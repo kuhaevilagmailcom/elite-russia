@@ -1,4 +1,5 @@
 import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
+import {grantXp,levelFromXp} from './progression.mjs';
 
 const REFERRAL_REWARDS=[[1,'money',500],[3,'money',1500],[5,'drop',1],[10,'money',5000]];
 function rewardThreshold(db,referrerId,count){
@@ -19,7 +20,7 @@ export function registerReferral(db,user,startParam){
     db.prepare('INSERT INTO referrals(id,referrer_id,referred_id,created_at,activated_at) VALUES(?,?,?,?,?)').run(uid(),referrerId,user.id,nowIso(),nowIso());
     db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(referrerId,user.id,nowIso());
     db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(user.id,referrerId,nowIso());
-    bumpTask(db,referrerId,'invite',1);bumpSeasonScore(db,referrerId,30);
+    bumpTask(db,referrerId,'invite',1);grantXp(db,referrerId,30,'referral',{referredId:user.id});bumpSeasonScore(db,referrerId,30);
     const count=db.prepare('SELECT COUNT(*) c FROM referrals WHERE referrer_id=? AND activated_at IS NOT NULL').get(referrerId).c;
     rewardThreshold(db,referrerId,count);
   })();
@@ -28,7 +29,7 @@ export function friendsData(db,user,botUsername){
   const invited=db.prepare('SELECT COUNT(*) c FROM referrals WHERE referrer_id=?').get(user.id).c;
   const active=db.prepare('SELECT COUNT(*) c FROM referrals WHERE referrer_id=? AND activated_at IS NOT NULL').get(user.id).c;
   const friends=db.prepare(`SELECT u.id,u.username,u.first_name,u.xp,u.last_seen FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.last_seen DESC LIMIT 100`).all(user.id)
-    .map(x=>({...x,level:Math.max(1,1+Math.floor(Number(x.xp||0)/250))}));
+    .map(x=>({...x,level:levelFromXp(x.xp)}));
   const rewards=db.prepare('SELECT reward_key,reward_type,reward_amount FROM referral_rewards WHERE user_id=? ORDER BY CAST(reward_key AS INTEGER)').all(user.id);
   const next=REFERRAL_REWARDS.find(x=>invited<x[0]);
   return {
@@ -49,7 +50,7 @@ export function giftUsername(db,user,instanceId,friendId){
     db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(friendId,instanceId);
     db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(instanceId);compactShowcase(db,user.id);
     db.prepare('INSERT INTO username_transfers(id,instance_id,from_user_id,to_user_id,type,created_at) VALUES(?,?,?,?,?,?)').run(uid(),instanceId,user.id,friendId,'gift',nowIso());
-    bumpTask(db,user.id,'gift',1);bumpSeasonScore(db,user.id,10);
+    bumpTask(db,user.id,'gift',1);grantXp(db,user.id,12,'gift',{instanceId,friendId});bumpSeasonScore(db,user.id,10);
     return {handle:'@'+inst.handle,recipient:recipient.first_name||recipient.username||'Игрок'};
   })();
   return {ok:true,...result};
