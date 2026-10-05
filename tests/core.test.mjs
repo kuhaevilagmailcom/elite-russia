@@ -24,7 +24,11 @@ const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url)
 
 test('generator has a large readable universe',()=>assert.ok(candidateUniverseSize()>3000));
 test('generator keeps usernames <=10 chars and never numeric-only',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(h.length<=10);assert.ok(isValidHandle(h))}});
-test('requested word handles exist',()=>{for(const h of ['card','loly','mama','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}});
+test('requested word handles and ultra-short Telegram handles exist',()=>{
+  assert.ok(ROOTS.length>=500);
+  for(const h of ['card','loly','mama','papa','sosi','sosal','dedyska','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}
+  for(const h of ['nft','ufc','gif','vid','pic'])assert.ok(SPECIALS.some(x=>x[0]===h&&x[2]>=60000000));
+});
 test('short real words are in a different value class than long or junk handles',()=>{
   assert.ok(scoreHandle('card','ULTRA')>scoreHandle('sigma','ULTRA')*4);
   assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*3);
