@@ -613,8 +613,27 @@ function removeMarketLocal(id){
   if(state.market.items.length!==before)state.market.total=Math.max(0,(state.market.total||0)-1);
 }
 document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){setMenuOpen(false);return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
- if(el.hasAttribute('data-menu-open')){setMenuOpen(true);return}
+ if(el.hasAttribute('data-menu-open')){sound('tap');setMenuOpen(true);return}
  if(el.hasAttribute('data-menu-close')){setMenuOpen(false);return}
+ if(el.dataset.settingTheme){
+   const theme=['light','dark','system'].includes(el.dataset.settingTheme)?el.dataset.settingTheme:'system';
+   saveSettings({theme});sound('tap');render();return
+ }
+ if(el.dataset.settingToggle){
+   const key=String(el.dataset.settingToggle||'');if(!['vibration','sound','animations'].includes(key))return;
+   const value=!state.settings[key];saveSettings({[key]:value});if(key!=='sound'||value)sound('tap');haptic('light');render();return
+ }
+ if(el.dataset.buyProduct){
+   if(!TG?.openInvoice)throw new Error('premium_unavailable');
+   const r=await api('/api/shop/invoice',{method:'POST',body:JSON.stringify({productKey:el.dataset.buyProduct})});
+   TG.openInvoice(r.invoice,async status=>{if(status==='paid'){sound('reward');haptic('medium');toast('Покупка активирована');state.pageLoadedAt.premium=0;await load('premium',{force:true})}});
+   return
+ }
+ if(el.dataset.selectCosmetic){
+   const [type,key]=String(el.dataset.selectCosmetic).split(':');await api('/api/cosmetics/select',{method:'POST',body:JSON.stringify({type,key})});
+   if(state.premium){state.premium.selected=state.premium.selected||{};state.premium.selected[{theme:'theme_key',frame:'frame_key',card:'card_key'}[type]]=key}
+   await refreshUser();sound('tap');haptic('light');render();return
+ }
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
@@ -720,5 +739,6 @@ document.addEventListener('scroll',e=>{
  if(remaining<310)appendUpgradeBatch();
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
+applyPreferences();
 import('/admin-ui.js?v=6.0.1').catch(()=>{});
 load('home');
