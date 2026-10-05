@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,bumpSeasonScore,collectionLimit,activeCollectionCount} from './economy.mjs';
 import {stableScoreHandle,rarityFromValue} from './generator.mjs';
+import {analyzeUsername,visualTier} from './valuation.mjs';
+import {grantXp} from './progression.mjs';
 
 export const WHEEL_USERNAMES=['abuser','wheel','daily','lucky','spin','winner','fortune'];
 const BASE_REWARDS=[
@@ -23,19 +25,19 @@ function rewardsFor(db,user){
 function pick(rows){const total=rows.reduce((s,x)=>s+x.weight,0),n=crypto.randomInt(0,total);let a=0;for(const r of rows){a+=r.weight;if(n<a)return r}return rows[0]}
 function grantUsername(db,user,available){
   if(!available.length)throw new Error('wheel_username_unavailable');
-  const handle=available[crypto.randomInt(0,available.length)],value=stableScoreHandle(handle),rarity=rarityFromValue(value),ts=nowIso();
+  const handle=available[crypto.randomInt(0,available.length)],value=stableScoreHandle(handle),rarity=rarityFromValue(value),ts=nowIso(),assessment=analyzeUsername(handle),score=assessment.score,visual=visualTier(value,score),quality=JSON.stringify(assessment.breakdown||{});
   let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
   if(!t){
-    const id=db.prepare("INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,'wheel',1,1,?)").run(handle,rarity,value,1,ts).lastInsertRowid;
+    const id=db.prepare("INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at) VALUES(?,?,?,?,1,'wheel',1,1,?,?,?,?)").run(handle,rarity,value,1,score,visual,quality,ts).lastInsertRowid;
     t=db.prepare('SELECT * FROM username_templates WHERE id=?').get(id);
   }else{
     if(t.current_supply>=1||db.prepare('SELECT 1 FROM username_instances WHERE handle=?').get(handle))throw new Error('wheel_username_unavailable');
-    db.prepare("UPDATE username_templates SET rarity=?,base_value=?,max_supply=1,current_supply=1,category='wheel',special=1,active=1 WHERE id=?").run(rarity,value,t.id);
+    db.prepare("UPDATE username_templates SET rarity=?,base_value=?,max_supply=1,current_supply=1,category='wheel',special=1,active=1,username_score=?,visual_tier=?,quality_json=? WHERE id=?").run(rarity,value,score,visual,quality,t.id);
   }
   const id=uid();
-  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,1,1,?,'owned',?,'wheel')").run(id,t.id,handle,rarity,value,user.id,ts);
+  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,username_score,visual_tier,quality_json) VALUES(?,?,?,?,?,1,1,?,'owned',?,'wheel',?,?,?)").run(id,t.id,handle,rarity,value,user.id,ts,score,visual,quality);
   db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,ts);
-  return {id,handle:'@'+handle,value,rarity};
+  return {id,handle:'@'+handle,value,rarity,score,visual};
 }
 export function wheelStatus(db,user){
   const claim=db.prepare('SELECT last_claim_at FROM wheel_claims WHERE user_id=?').get(user.id);
@@ -54,11 +56,12 @@ export function spinWheel(db,user,requestId){
     if(Date.now()<nextAt)throw new Error('wheel_cooldown');
     const {rows,available}=rewardsFor(db,user),r=pick(rows),ts=nowIso();let reward={...r};
     if(r.type==='money')txBalance(db,user.id,'wheel',r.amount,{reward:r.key});
-    if(r.type==='xp')db.prepare('UPDATE users SET xp=xp+? WHERE id=?').run(r.amount,user.id);
+    if(r.type==='xp')grantXp(db,user.id,r.amount,'wheel_reward',{reward:r.key});
     if(r.type==='drop')db.prepare('UPDATE users SET free_drops=free_drops+? WHERE id=?').run(r.amount,user.id);
     if(r.type==='username'){const item=grantUsername(db,user,available);reward={...r,label:item.handle,item};}
     db.prepare('INSERT INTO wheel_claims(user_id,last_claim_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET last_claim_at=excluded.last_claim_at').run(user.id,ts);
     db.prepare('INSERT INTO wheel_history(id,user_id,request_id,reward_key,reward_label,reward_type,reward_amount,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,requestId,r.key,reward.label,r.type,r.amount,ts);
+    grantXp(db,user.id,5,'wheel_spin',{reward:r.key});
     bumpSeasonScore(db,user.id,5);
     return {reward,replayed:false};
   })();
