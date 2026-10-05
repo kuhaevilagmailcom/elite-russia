@@ -772,3 +772,239 @@ button,input,select{font-weight:650}
   .home-drop-zone{min-height:190px}
   .home-last{flex-basis:50px;min-height:50px;height:50px}
 }
+
+
+/* USERNAME 6.1 — settings, section menu, cosmetics and text-only value colors */
+:root{
+  --surface-subtle:#f3f5f6;
+  --surface-raised:#fff;
+  --profit:#22A867;
+  --loss:#E55353;
+}
+html[data-theme="dark"]{
+  --bg:#111316;
+  --card:#181B20;
+  --text:#F4F6F8;
+  --muted:#8F98A3;
+  --border:#2A2F36;
+  --accent-bg:#182D39;
+  --surface-subtle:#20242A;
+  --surface-raised:#1B1F25;
+  color-scheme:dark;
+}
+html[data-accent-theme="ocean"]{--accent:#168FC8;--accent-bg:#E7F5FC}
+html[data-accent-theme="violet"]{--accent:#8B5CF6;--accent-bg:#F1ECFE}
+html[data-theme="dark"][data-accent-theme="ocean"]{--accent:#45B8EA;--accent-bg:#172B35}
+html[data-theme="dark"][data-accent-theme="violet"]{--accent:#A78BFA;--accent-bg:#271F3C}
+
+/* One Hugeicons stroke language. */
+.ico,
+.top-actions button .ico,.top-back .ico,.menu-head-icon .ico,.menu-admin-shortcut .ico,
+.menu-section-tile .ico,.market-filter-button .ico,.collection-filter-button .ico,
+.upgrade-back-step .ico,.upgrade-target-pick>i .ico,.upgrade-match-arrow .ico,
+.profile-showcase-empty .ico,.premium-page-clean .feature-list .ico{
+  width:20px;height:20px;font-size:20px;line-height:1;flex:0 0 20px
+}
+
+/* Sectioned menu. */
+.menu-sections-sheet{
+  top:50%;
+  width:min(430px,calc(100% - 22px));
+  max-height:min(680px,calc(var(--app-h) - var(--safe-t) - var(--safe-b) - 22px));
+  transform:translate(-50%,calc(-50% - 7px));
+  padding:10px;
+  border-radius:20px;
+  overflow:hidden;
+}
+.menu-backdrop.open .menu-sections-sheet{transform:translate(-50%,-50%)}
+.menu-sections-scroll{max-height:calc(var(--app-h) - var(--safe-t) - var(--safe-b) - 86px);overflow:auto;scrollbar-width:none}
+.menu-sections-scroll::-webkit-scrollbar{display:none}
+.menu-section{padding:8px 0 3px;border-top:1px solid var(--border)}
+.menu-section:first-child{padding-top:1px;border-top:0}
+.menu-section>b{
+  display:block;margin:0 3px 7px;font-size:8px;line-height:1;font-weight:760;letter-spacing:.75px;text-transform:uppercase;color:var(--muted)
+}
+.menu-section>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.menu-section:nth-child(2)>div,.menu-section:nth-child(4)>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+.menu-section-tile{
+  width:100%;height:61px;min-height:61px;padding:0 3px;border:1px solid var(--border);border-radius:13px;
+  background:var(--surface-subtle);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--text)
+}
+.menu-section-tile:active{background:var(--accent-bg);border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}
+.menu-section-tile>span{max-width:100%;font-size:8.5px;line-height:1;font-weight:690;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-grid-top{margin-bottom:5px}
+.menu-head-icon,.menu-admin-shortcut{background:var(--surface-subtle);color:var(--text)}
+
+/* Settings. */
+.settings-page,.levels-page,.achievements-page{
+  height:calc(100% - 48px);min-height:0;overflow:auto;padding:5px 0 14px
+}
+.settings-card{
+  padding:12px;border:1px solid var(--border);border-radius:15px;background:var(--card);margin-bottom:8px
+}
+.settings-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.settings-title b{font-size:11px;font-weight:740}
+.settings-title span{font-size:9px;font-weight:600;color:var(--muted)}
+.theme-segment{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.theme-segment button{
+  height:58px;min-height:58px;border:1px solid var(--border);border-radius:12px;background:var(--surface-subtle);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--muted)
+}
+.theme-segment button.active{border-color:var(--accent);background:var(--accent-bg);color:var(--accent)}
+.theme-segment button span{font-size:8.5px;font-weight:680}
+.settings-list{padding:4px 10px}
+.settings-row{
+  width:100%;height:58px;min-height:58px;padding:0 2px;border-bottom:1px solid var(--border);background:transparent;
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left
+}
+.settings-row:last-child{border-bottom:0}
+.settings-row-icon{width:32px;height:32px;border-radius:9px;background:var(--surface-subtle);display:grid;place-items:center}
+.settings-row>span:nth-child(2) b{display:block;font-size:10.5px;font-weight:700}
+.settings-row>span:nth-child(2) small{display:block;margin-top:3px;font-size:8.5px;color:var(--muted)}
+.switch{width:34px;height:20px;border-radius:999px;background:#D6DADE;position:relative}
+.switch:after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.16);transition:transform .16s}
+.switch.on{background:var(--accent)}
+.switch.on:after{transform:translateX(14px)}
+.settings-note{padding:2px 5px;font-size:8.5px;line-height:1.4;color:var(--muted)}
+
+/* Levels and achievements. */
+.levels-hero{padding:12px;border:1px solid var(--border);border-radius:15px;background:var(--card)}
+.levels-hero>div:last-child{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px}
+.levels-hero>div:last-child span{font-size:9px;color:var(--muted)}
+.levels-hero>div:last-child b{font-size:10px}
+.level-rewards{display:grid;gap:6px;margin-top:7px}
+.level-rewards article{
+  min-height:54px;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+  display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:8px;align-items:center
+}
+.level-rewards article>strong{font-size:9px;color:var(--muted)}
+.level-rewards article>span{font-size:10px;font-weight:650}
+.level-rewards article>b{font-size:9px;white-space:nowrap}
+.level-rewards article.done>strong,.level-rewards article.done>b{color:var(--profit)}
+.achievement-summary{
+  min-height:58px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:var(--card);
+  display:flex;align-items:center;justify-content:space-between
+}
+.achievement-summary span{font-size:9px;color:var(--muted)}
+.achievement-summary b{font-size:14px}
+.achievement-list{display:grid;gap:6px;margin-top:7px}
+.achievement-list article{
+  min-height:72px;padding:9px 10px;border:1px solid var(--border);border-radius:13px;background:var(--card);
+  display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px
+}
+.achievement-icon{width:32px;height:32px;border-radius:9px;background:var(--surface-subtle);display:grid;place-items:center;color:var(--muted)}
+.achievement-list article.done .achievement-icon{background:var(--accent-bg);color:var(--accent)}
+.achievement-list article b{display:block;font-size:10.5px}
+.achievement-list article span{display:block;margin-top:3px;font-size:8.5px;color:var(--muted)}
+.achievement-progress{height:4px;margin-top:7px;border-radius:99px;background:var(--surface-subtle);overflow:hidden}
+.achievement-progress i{display:block;height:100%;background:var(--accent)}
+.achievement-list article small{display:block;margin-top:4px;font-size:8px;color:var(--muted)}
+
+/* Stars shop — cosmetic only. */
+.shop-groups{display:grid;gap:12px;margin-top:9px}
+.shop-group h3{margin:0 0 6px 2px;font-size:9px;color:var(--muted);font-weight:700}
+.shop-product{
+  min-height:62px;padding:9px 10px;border:1px solid var(--border);border-radius:13px;background:var(--card);
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;margin-bottom:6px
+}
+.shop-product>div b{display:block;font-size:10.5px}
+.shop-product>div span{display:block;margin-top:4px;font-size:8.5px;line-height:1.35;color:var(--muted)}
+.shop-product button{width:auto;min-width:76px;height:36px;min-height:36px;padding:0 9px;font-size:9px;border-radius:9px}
+.shop-owned{font-size:9px;font-weight:690;color:var(--profit)}
+
+/* User value affects text only — cards never change background or border. */
+.collection-card.value-blue,.collection-card.value-purple,.collection-card.value-gold,
+.market-card.value-blue,.market-card.value-purple,.market-card.value-gold,
+.drop-result-card.value-blue,.drop-result-card.value-purple,.drop-result-card.value-gold,
+.lab-result.value-blue,.lab-result.value-purple,.lab-result.value-gold{
+  background:var(--card);border-color:var(--border)
+}
+.collection-card.value-blue .user-card-main>span,.collection-card.value-blue .user-card-main>b,
+.market-card.value-blue .market-main>span,.market-card.value-blue .market-main>b,
+.drop-result-card.value-blue h1,.last-row.value-blue b,.last-row.value-blue strong{color:var(--value-blue)}
+.collection-card.value-purple .user-card-main>span,.collection-card.value-purple .user-card-main>b,
+.market-card.value-purple .market-main>span,.market-card.value-purple .market-main>b,
+.drop-result-card.value-purple h1,.last-row.value-purple b,.last-row.value-purple strong,
+.lab-result.value-purple .lab-score b{color:var(--value-purple)}
+.collection-card.value-gold .user-card-main>span,.collection-card.value-gold .user-card-main>b,
+.market-card.value-gold .market-main>span,.market-card.value-gold .market-main>b,
+.drop-result-card.value-gold h1,.last-row.value-gold b,.last-row.value-gold strong,
+.lab-result.value-gold .lab-score b{color:var(--value-gold)}
+.profile-page-clean .showcase-row>div.value-purple,
+.profile-page-clean .showcase-row>div.value-gold{
+  background:var(--surface-subtle);border-color:transparent
+}
+.profile-page-clean .showcase-row>div.value-purple{color:var(--value-purple)}
+.profile-page-clean .showcase-row>div.value-gold{color:var(--value-gold)}
+
+/* Paid cosmetics never affect odds. */
+html[data-profile-frame="gold"] .profile-page-clean .avatar{box-shadow:0 0 0 2px var(--value-gold)}
+html[data-profile-frame="purple"] .profile-page-clean .avatar{box-shadow:0 0 0 2px var(--value-purple)}
+html[data-card-style="minimal"] .collection-card,
+html[data-card-style="minimal"] .market-card{border-radius:8px}
+
+/* Dark theme. */
+html[data-theme="dark"] body,
+html[data-theme="dark"] #app,
+html[data-theme="dark"] .shell{background:var(--bg);color:var(--text)}
+html[data-theme="dark"] .top-actions button,
+html[data-theme="dark"] .top-back,
+html[data-theme="dark"] .menu-sheet,
+html[data-theme="dark"] .metric,
+html[data-theme="dark"] .drop-zone,
+html[data-theme="dark"] .last,
+html[data-theme="dark"] .user-card,
+html[data-theme="dark"] .market-card,
+html[data-theme="dark"] .task,
+html[data-theme="dark"] .wheel-card-clean,
+html[data-theme="dark"] .form-card,
+html[data-theme="dark"] .upgrade-step-head,
+html[data-theme="dark"] .upgrade-source-card,
+html[data-theme="dark"] .upgrade-target-pick,
+html[data-theme="dark"] .upgrade-matchup,
+html[data-theme="dark"] .upgrade-wheel-card,
+html[data-theme="dark"] .profile-progress,
+html[data-theme="dark"] .showcase,
+html[data-theme="dark"] .premium-page-clean .feature-list>div,
+html[data-theme="dark"] .lab-hero,
+html[data-theme="dark"] .lab-input-card,
+html[data-theme="dark"] .lab-result,
+html[data-theme="dark"] .home-progress-card,
+html[data-theme="dark"] .home-mini-action,
+html[data-theme="dark"] .settings-card,
+html[data-theme="dark"] .levels-hero,
+html[data-theme="dark"] .level-rewards article,
+html[data-theme="dark"] .achievement-summary,
+html[data-theme="dark"] .achievement-list article,
+html[data-theme="dark"] .shop-product{background:var(--card);border-color:var(--border);color:var(--text)}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] .lab-input-card label{background:var(--surface-subtle);border-color:var(--border);color:var(--text)}
+html[data-theme="dark"] .notice,
+html[data-theme="dark"] .profile-showcase-empty,
+html[data-theme="dark"] .showcase-row>div,
+html[data-theme="dark"] .menu-section-tile,
+html[data-theme="dark"] .settings-row-icon{background:var(--surface-subtle);color:var(--text)}
+html[data-theme="dark"] .top-title b,
+html[data-theme="dark"] .market-main,
+html[data-theme="dark"] .user-card-main,
+html[data-theme="dark"] .lab-hero h2{color:var(--text)}
+html[data-theme="dark"] .modal{background:var(--card);color:var(--text)}
+html[data-theme="dark"] .modal input{background:var(--surface-subtle);color:var(--text)}
+html[data-theme="dark"] .menu-backdrop{background:rgba(0,0,0,.54)}
+
+/* Local accessibility setting. */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after{animation-duration:.001ms;animation-iteration-count:1;transition-duration:.001ms;scroll-behavior:auto}
+
+@media(max-width:370px){
+  .menu-section>div{gap:5px}
+  .menu-section-tile{height:56px;min-height:56px}
+  .menu-section-tile>span{font-size:7.8px}
+}
+@media(max-height:680px){
+  .settings-page,.levels-page,.achievements-page{height:calc(100% - 42px)}
+  .menu-section{padding-top:5px}
+  .menu-section-tile{height:52px;min-height:52px;gap:4px}
+}
