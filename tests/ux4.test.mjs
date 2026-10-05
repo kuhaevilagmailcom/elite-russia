@@ -62,14 +62,14 @@ test('menu opens without rebuilding the whole page',()=>{
   assert.match(appSrc,/menu\.classList\.toggle\('open'/);
   assert.match(appSrc,/hasAttribute\('data-menu-open'\)\)\{setMenuOpen\(true\)/);
 });
-test('home drop stays centered and fills spare space with useful shortcuts',()=>{
+test('home drop stays centered without redundant shortcut and metric clutter',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.doesNotMatch(home,/Нажми на username/);
-  assert.match(home,/home-shortcuts/);
-  for(const page of ['collection','market','tasks','wheel'])assert.match(home,new RegExp("\\['"+page+"','"));
-  assert.match(uxCss,/\.handle-stage\.drop-trigger\{[^}]*background:transparent/);
-  assert.match(uxCss,/\.handle-stage\.drop-trigger b\{[^}]*text-align:center/);
-  assert.match(uxCss,/\.home-shortcuts\{[^}]*grid-template-columns:repeat\(2/);
+  assert.doesNotMatch(home,/home-shortcuts|home-metrics/);
+  assert.match(home,/home-utility-row/);
+  assert.match(home,/home-drop-zone/);
+  assert.match(uxCss,/\.home-drop-zone \.handle-stage\.drop-trigger\{[^}]*position:absolute[^}]*inset:0/);
+  assert.match(uxCss,/\.home-drop-zone \.drop-result-main\.minimal h1\{[^}]*text-align:center/);
 });
 test('desktop rotation uses Web Animations with a double-RAF fallback',()=>{
   const fn=appSrc.match(/async function animateRotation\(el,degrees,duration,easing\)\{[\s\S]*?\n\}/)?.[0]||'';
@@ -87,6 +87,18 @@ test('upgrader keeps the final rotor position and round until continue',()=>{
   assert.match(appSrc,/style="transform:rotate\('\+wheelAngle\+'deg\)"/);
   assert.match(appSrc,/upgrade-pointer-static/);
   assert.match(appSrc,/state\.upgradeLastRound=null;state\.upgradeLandingAngle=0;render\(\);return/);
+});
+test('drop result keeps only the centered username and removes overlapping value text',()=>{
+  const card=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.ok(card);
+  assert.match(card,/drop-result-main minimal/);
+  assert.doesNotMatch(card,/username-value-meta|Оценка/);
+  assert.match(uxCss,/\.username-value-meta\{display:none\}/);
+});
+test('drop roll does not overlay status text under the username',()=>{
+  const fn=appSrc.match(/async function animateDrop\(result\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.ok(fn);
+  assert.doesNotMatch(fn,/Прокрутка|Выпало/);
 });
 test('long usernames use responsive fit instead of clipping',()=>{
   assert.match(appSrc,/function fitUsername/);
@@ -227,14 +239,15 @@ test('upgrader source rows stay aligned without fixed desktop-only price columns
   assert.doesNotMatch(row,/data-fit-username/);
 });
 
-test('home exposes level progress luck daily income and the skill-based Username Lab',()=>{
+test('home exposes compact level luck daily and Username Lab actions',()=>{
   const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(home,/home-progress-card/);
   assert.match(home,/xpBar\(u\)/);
-  assert.match(home,/Удача после неудач/);
+  assert.match(home,/home-progress-side/);
   assert.match(home,/data-daily-claim/);
-  assert.match(home,/home-lab-banner/);
+  assert.match(home,/home-mini-action lab/);
   assert.match(home,/data-page="lab"/);
+  assert.doesNotMatch(home,/home-lab-banner/);
 });
 test('Username Lab is a first-class cached page with server submission',()=>{
   assert.match(appSrc,/function labView\(\)/);
