@@ -64,7 +64,7 @@ test('max paid drop still allows COMMON but meaningfully improves the profile mi
 test('v3 economy cannot print several paid drops immediately',()=>{
   assert.equal(GAME.freeDrops,1);
   assert.equal(GAME.startBalance,50000);
-  assert.equal(DROP_TIERS.basic.cost,3000);
+  assert.equal(DROP_TIERS.basic.cost,25000);
   assert.ok(DROP_TIERS.basic.weights.ULTRA<=.001);
   assert.ok(DROP_TIERS.max.weights.ULTRA<=.5);
 });
