@@ -58,10 +58,22 @@ function createSession(db,user,rows,preview,targetMinValue=preview.targetMinValu
   return db.prepare('SELECT * FROM upgrade_sessions WHERE id=?').get(id);
 }
 function targetOptions(db,user,rows,preview){
-  const key=JSON.stringify(rows.map(r=>r.id).sort()),range=TARGET_RANGE[preview.to];
+  const key=JSON.stringify(rows.map(r=>r.id).sort()),range=TARGET_RANGE[preview.to],now=nowIso();
   if(!range)throw new Error('upgrade_unavailable');
-  // A fresh source selection gets a deterministic ladder of target prices.
-  // That guarantees visibly different chances instead of several near-identical rows.
+
+  // Reuse an active preview for the same source. Repeated renders / retries must
+  // not reroll the target ladder or invalidate a button the user already saw.
+  const existing=db.prepare(`SELECT s.*
+    FROM upgrade_sessions s
+    JOIN username_templates t ON t.id=s.target_template_id
+    WHERE s.user_id=? AND s.source_ids=? AND s.used_at IS NULL AND s.expires_at>?
+      AND t.active=1 AND t.current_supply<1
+      AND NOT EXISTS(SELECT 1 FROM username_instances i WHERE i.handle=s.target_handle)
+    ORDER BY s.target_value ASC,s.created_at ASC`).all(user.id,key,now);
+  if(existing.length){
+    return existing.slice(0,TARGET_OPTION_COUNT).map(sessionPayload);
+  }
+
   db.prepare('DELETE FROM upgrade_sessions WHERE user_id=? AND source_ids=? AND used_at IS NULL').run(user.id,key);
   const floor=Math.max(Number(preview.targetMinValue),range[0]),upper=Math.min(range[1],Math.max(floor+350,Math.round(floor*6)));
   const floors=[];
