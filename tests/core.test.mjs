@@ -14,6 +14,10 @@ import {previewUpgrade,performUpgrade,upgradeInfo} from '../src/upgrader.mjs';
 import {ensureSeasonLifecycle} from '../src/seasons.mjs';
 import {activeCollectionCount,systemSellValue,todayKey} from '../src/economy.mjs';
 import {PREMIUM_STARS,validPremiumCheckout,applyPremiumPayment} from '../src/payments.mjs';
+import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
+import {levelFromXp,progressionFromXp,xpToReachLevel} from '../src/progression.mjs';
+import {labStatus,submitLab} from '../src/lab.mjs';
+import {dailyStatus,claimDaily} from '../src/daily.mjs';
 
 const appSrc=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const cssSrc=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
@@ -29,32 +33,40 @@ test('requested word handles and ultra-short Telegram handles exist',()=>{
   for(const h of ['card','loly','mama','papa','sosi','sosal','dedyska','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}
   for(const h of ['nft','ufc','gif','vid','pic'])assert.ok(SPECIALS.some(x=>x[0]===h&&x[2]>=60000000));
 });
-test('short real words are in a different value class than long or junk handles',()=>{
-  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('sigma','ULTRA')*4);
-  assert.ok(scoreHandle('card','ULTRA')>scoreHandle('qzvr','ULTRA')*3);
+test('semantic valuation rewards readable words over junk instead of length alone',()=>{
+  const word=analyzeUsername('ghost'),junk=analyzeUsername('qzvr910');
+  assert.ok(word.score>junk.score);
+  assert.ok(word.value>junk.value);
+  assert.ok(analyzeUsername('mama').score>analyzeUsername('qxzrv').score);
   assert.ok(wordQuality('mama')>wordQuality('qzvra'));
 });
-test('rarity is derived from value, not from a requested rarity label',()=>{
-  const rng=()=>.5,a=scoreHandle('card','COMMON',1,1,rng),b=scoreHandle('card','ULTRA',1,1,rng);
+test('requested rarity label never changes the canonical username value',()=>{
+  const a=scoreHandle('card','COMMON',1,1,()=>.5),b=scoreHandle('card','ULTRA',1,1,()=>.5);
   assert.equal(a,b);
-  assert.equal(rarityFromValue(a),'ULTRA');
-  assert.ok(rarityFromValue(scoreHandle('qzvra','COMMON',1,1,()=>.5))!=='ULTRA');
+  assert.equal(rarityFromValue(a),rarityFromValue(scoreHandle('card')));
 });
-test('five-character real words beat long junk by a wide margin',()=>{
-  assert.ok(scoreHandle('ghost','COMMON',1,1,()=>.5)>scoreHandle('qzxvbnm123','ULTRA',1,1,()=>.5)*20);
+test('clean usernames beat noisy variants with digits and underscores',()=>{
+  assert.ok(scoreHandle('ghost')>scoreHandle('ghost_77'));
+  assert.ok(analyzeUsername('king777').breakdown.pattern>analyzeUsername('king483').breakdown.pattern);
 });
-test('three-character usernames are excluded from ordinary generation',()=>{
-  assert.equal(isValidHandle('abc'),false);assert.equal(isValidHandle('nft'),true);
-  for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])for(let i=0;i<1000;i++)assert.ok(buildGeneratedHandle(profile).length>=4);
+test('game generation starts at four characters while ordinary three-letter generation stays excluded',()=>{
+  assert.equal(isGameUsername('abcd'),true);
+  assert.equal(isGameUsername('abc'),false);
+  assert.equal(isValidHandle('abc'),false);
+  assert.equal(isValidHandle('nft'),true);
+  for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])for(let i=0;i<500;i++)assert.ok(buildGeneratedHandle(profile).length>=4);
 });
-test('Fragment-style scarcity gives every clean four-character handle a premium floor',()=>{
-  assert.ok(scoreHandle('qzvr','COMMON',1,1,()=>.5)>=2600000);
-  assert.ok(scoreHandle('a7x9','COMMON',1,1,()=>.5)>=2100000);
+test('four-character value depends on meaning and cleanliness, not a blanket multi-million floor',()=>{
+  const meaningful=analyzeUsername('mama'),junk=analyzeUsername('qzvr'),numbered=analyzeUsername('a7x9');
+  assert.ok(meaningful.score>junk.score);
+  assert.ok(meaningful.value>junk.value);
+  assert.ok(junk.value>0&&numbered.value>0);
 });
-test('meaningful five to seven character words retain strong market value',()=>{
-  assert.ok(scoreHandle('ghost','COMMON',1,1,()=>.5)>=1500000);
-  assert.ok(scoreHandle('vision','COMMON',1,1,()=>.5)>=700000);
-  assert.ok(scoreHandle('million','COMMON',1,1,()=>.5)>=300000);
+test('visual value tiers map to neutral blue purple and gold presentation',()=>{
+  assert.equal(visualTier(1500,200),'normal');
+  assert.equal(visualTier(25000,500),'blue');
+  assert.equal(visualTier(250000,700),'purple');
+  assert.equal(visualTier(2000000,850),'gold');
 });
 test('RARE generation never creates 4 or 5 character handles',()=>{
   for(let i=0;i<5000;i++)assert.ok(buildGeneratedHandle('RARE').length>=6);
@@ -101,7 +113,7 @@ test('menu is a compact labeled 3x3 grid with bottom shortcuts',()=>{
   assert.match(uxCss,/\.menu-tile\{[^}]*height:74px/);
 });
 test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
-test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','3.0.0-global-unique','3.1.0-value-rarity','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
+test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','username_lab_attempts','xp_history','6.0.0-valuation-progression','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
 test('premium does not change drop/upgrader odds',()=>{assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i);assert.doesNotMatch(upgraderSrc,/premium/i)});
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username27-test-')),db=createDatabase(tmp);
@@ -143,6 +155,7 @@ test('3K starter drop has low-value normals plus tiny jackpot bands',()=>{
       const fresh=starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id);
       const r=createDrop(starterDb,fresh,'starter-'+i,'basic'),v=r.instance.value;
       const allowed=(v>=STARTER_DROP_JACKPOT.normalMin&&v<=STARTER_DROP_JACKPOT.normalMax)||
+        (v>=STARTER_DROP_JACKPOT.goodMin&&v<=STARTER_DROP_JACKPOT.goodMax)||
         (v>=STARTER_DROP_JACKPOT.rareMin&&v<=STARTER_DROP_JACKPOT.rareMax)||
         (v>=STARTER_DROP_JACKPOT.bigMin&&v<=STARTER_DROP_JACKPOT.bigMax)||
         v>=STARTER_DROP_JACKPOT.ultraMin;
@@ -150,6 +163,37 @@ test('3K starter drop has low-value normals plus tiny jackpot bands',()=>{
       resolveDrop(starterDb,starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
     }
   }finally{starterDb.close();fs.rmSync(dir,{recursive:true,force:true})}
+});
+
+test('level progression is nonlinear and capped at level 100',()=>{
+  assert.equal(levelFromXp(0),1);
+  assert.ok(xpToReachLevel(10)>xpToReachLevel(5));
+  assert.ok(xpToReachLevel(50)-xpToReachLevel(49)>xpToReachLevel(5)-xpToReachLevel(4));
+  assert.equal(levelFromXp(Number.MAX_SAFE_INTEGER),100);
+  const p=progressionFromXp(xpToReachLevel(17)+100);
+  assert.equal(p.level,17);assert.ok(p.progress>0&&p.progress<1);assert.ok(p.remaining>0);
+});
+test('Username Lab is a server-side skill earning path with 4-character minimum',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-lab-test-')),labDb=createDatabase(dir);
+  try{
+    const u=ensureUser(labDb,{id:31001,username:'labuser',first_name:'Lab'}),before=labDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance;
+    const status=labStatus(labDb,u);assert.equal(status.attempts,0);assert.ok(status.dailyCap>0);
+    const r=submitLab(labDb,u,'turbox');
+    assert.ok(r.score>=0&&r.score<=100);assert.ok(r.reward>0);assert.ok(r.xp>0);
+    assert.equal(labStatus(labDb,labDb.prepare('SELECT * FROM users WHERE id=?').get(u.id)).attempts,1);
+    assert.ok(labDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance>before);
+    assert.equal(labDb.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(u.id,todayKey(),'lab').value,1);
+  }finally{labDb.close();fs.rmSync(dir,{recursive:true,force:true})}
+});
+test('daily income gives a deterministic recovery path and cannot be claimed twice',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-daily-test-')),dailyDb=createDatabase(dir);
+  try{
+    const u=ensureUser(dailyDb,{id:31002,username:'dailyuser',first_name:'Daily'}),before=dailyDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance;
+    assert.equal(dailyStatus(dailyDb,u).claimable,true);
+    const r=claimDaily(dailyDb,u);assert.equal(r.day,1);assert.equal(r.reward.money,1000);
+    assert.equal(dailyDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance,before+1000);
+    assert.throws(()=>claimDaily(dailyDb,dailyDb.prepare('SELECT * FROM users WHERE id=?').get(u.id)),/daily_already_claimed/);
+  }finally{dailyDb.close();fs.rmSync(dir,{recursive:true,force:true})}
 });
 
 test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
