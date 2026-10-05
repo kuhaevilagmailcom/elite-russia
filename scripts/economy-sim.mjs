@@ -1,4 +1,4 @@
-import {DROP_TIERS,RARITIES} from '../src/config.mjs';
+import {DROP_TIERS,RARITIES,STARTER_DROP_JACKPOT} from '../src/config.mjs';
 import {SPECIALS,buildGeneratedHandle,isValidHandle,scoreHandle,rarityFromValue} from '../src/generator.mjs';
 import {systemSellValue} from '../src/economy.mjs';
 
@@ -12,15 +12,32 @@ function pickProfile(tier,rng){
   return 'COMMON';
 }
 function percentile(sorted,p){return sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))]||0}
-function starterDropValue(rawValue){const scaled=Math.round((Math.max(200,Number(rawValue)||200)/20)/50)*50;return Math.max(400,Math.min(3500,scaled))}
+function starterDropValue(rawValue,min=STARTER_DROP_JACKPOT.normalMin,max=STARTER_DROP_JACKPOT.normalMax){
+  const raw=Math.max(200,Number(rawValue)||200);
+  if(min===STARTER_DROP_JACKPOT.normalMin&&max===STARTER_DROP_JACKPOT.normalMax){
+    const scaled=Math.round((raw/20)/50)*50;return Math.max(min,Math.min(max,scaled));
+  }
+  const span=Math.max(50,max-min),mapped=min+(Math.abs(Math.round(raw))%span);
+  return Math.max(min,Math.min(max,Math.round(mapped/50)*50));
+}
+function starterMode(rng){
+  const r=rng(),u=STARTER_DROP_JACKPOT.ultraChance,b=u+STARTER_DROP_JACKPOT.bigChance,rr=b+STARTER_DROP_JACKPOT.rareChance;
+  return r<u?'ultra':r<b?'big':r<rr?'rare':'normal';
+}
 function simulateTier(tier,samples,seed){
   const rng=rngFactory(seed),used=new Set(),specials=SPECIALS.map(x=>({handle:x[0],rarity:x[1],value:Number(x[2])}));
   let sumValue=0,sumSell=0,breakEven=0,len4=0,len5=0;
   const rarities=Object.fromEntries(RARITIES.map(x=>[x,0])),values=[];
   for(let n=0;n<samples;n++){
-    const starter=tier.key==='basic',profile=starter?'COMMON':pickProfile(tier,rng),specialChance=starter?0:({COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0);
+    const starter=tier.key==='basic',mode=starter?starterMode(rng):null,profile=starter?(mode==='ultra'?'ULTRA':mode==='big'||mode==='rare'?'RARE':'COMMON'):pickProfile(tier,rng);
+    const specialChance=starter?0:({COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0);
     let handle='',value=0;
-    if(rng()<specialChance){
+    if(starter&&(mode==='ultra'||mode==='big')){
+      const min=mode==='ultra'?STARTER_DROP_JACKPOT.ultraMin:STARTER_DROP_JACKPOT.bigMin;
+      const max=mode==='ultra'?Number.MAX_SAFE_INTEGER:STARTER_DROP_JACKPOT.bigMax;
+      const available=specials.filter(x=>x.value>=min&&x.value<=max&&!used.has(x.handle));
+      if(available.length){const sp=available[Math.floor(rng()*available.length)];handle=sp.handle;value=sp.value}
+    }else if(rng()<specialChance){
       const available=specials.filter(x=>x.rarity===profile&&!used.has(x.handle));
       if(available.length){const sp=available[Math.floor(rng()*available.length)];handle=sp.handle;value=sp.value}
     }
@@ -28,7 +45,13 @@ function simulateTier(tier,samples,seed){
       for(let i=0;i<250;i++){
         const candidate=buildGeneratedHandle(profile,rng);
         if(!isValidHandle(candidate)||used.has(candidate))continue;
-        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);if(starter)value=starterDropValue(value);break;
+        handle=candidate;value=scoreHandle(handle,'COMMON',1,1,rng);
+        if(starter){
+          if(mode==='rare')value=starterDropValue(value,STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax);
+          else if(mode==='big')value=starterDropValue(value,STARTER_DROP_JACKPOT.bigMin,STARTER_DROP_JACKPOT.bigMax);
+          else if(mode!=='ultra')value=starterDropValue(value);
+        }
+        break;
       }
     }
     if(!handle)continue;
