@@ -311,8 +311,8 @@ export function profile(db,userId){
   const deals=db.prepare('SELECT COUNT(*) c FROM market_transactions WHERE buyer_id=? OR seller_id=?').get(userId,userId).c;
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
   const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId),activeCosmeticState=activeCosmetics(db,userId);
-  const lab=db.prepare('SELECT COUNT(*) attempts,COALESCE(MAX(score),0) bestScore,COALESCE(SUM(reward),0) earned FROM username_lab_attempts WHERE user_id=?').get(userId);
-  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,lab:{attempts:Number(lab?.attempts||0),bestScore:Number(lab?.bestScore||0),earned:Number(lab?.earned||0)}};
+  const achievements=db.prepare('SELECT achievement_key,xp_reward,unlocked_at FROM achievement_unlocks WHERE user_id=? ORDER BY unlocked_at DESC LIMIT 3').all(userId);
+  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,achievements};
 }
 export function sellOwnedUsername(db,user,instanceId){
   const result=db.transaction(()=>{
