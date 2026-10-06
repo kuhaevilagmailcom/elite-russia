@@ -49,13 +49,15 @@ function effectiveTheme(){
  return state.settings.theme==='dark'?'dark':'light';
 }
 function applyPreferences(){
- const theme=effectiveTheme();root.dataset.theme=theme;
+ const theme=effectiveTheme();root.dataset.theme=theme;root.style.colorScheme=theme;
  root.classList.toggle('no-animations',!state.settings.animations);
  const accent=state.user?.cosmetics?.theme||'';
  root.dataset.accentTheme=accent;
  root.dataset.profileFrame=state.user?.cosmetics?.frame||'';
  root.dataset.cardStyle=state.user?.cosmetics?.card||'';
- try{TG?.setHeaderColor?.(theme==='dark'?'#111316':'#F4F5F7');TG?.setBackgroundColor?.(theme==='dark'?'#111316':'#F4F5F7')}catch{}
+ const themeColor=theme==='dark'?'#111316':'#F4F5F7',meta=document.querySelector('meta[name="theme-color"]');
+ if(meta)meta.setAttribute('content',themeColor);
+ try{TG?.setHeaderColor?.(themeColor);TG?.setBackgroundColor?.(themeColor);TG?.setBottomBarColor?.(themeColor)}catch{}
 }
 function saveSettings(patch){
  state.settings={...state.settings,...patch};localStorage.setItem(SETTINGS_KEY,JSON.stringify(state.settings));applyPreferences();
