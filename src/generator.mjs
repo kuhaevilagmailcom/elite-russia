@@ -79,13 +79,13 @@ const LEXICON_CATEGORY_ROOTS=Object.freeze({
 
 const MASS_LEXICON_TARGET=120000;
 function cleanLexiconRoot(value){
-  return String(value||'').toLowerCase().replace(/[^a-z]/g,'').slice(0,32);
+  return String(value||'').toLowerCase().replace(/[^a-z]/g,'').slice(0,15);
 }
 function buildMassLexicon(base,target=MASS_LEXICON_TARGET){
   const out=new Set();
   const add=value=>{
     const root=cleanLexiconRoot(value);
-    if(root.length>=3&&root.length<=32)out.add(root);
+    if(root.length>=3&&root.length<=15)out.add(root);
   };
   for(const value of base)add(value);
   for(const group of Object.values(LEXICON_CATEGORY_ROOTS))for(const value of group)add(value);
@@ -111,9 +111,9 @@ function buildMassLexicon(base,target=MASS_LEXICON_TARGET){
     for(let j=0;j<seeds.length&&out.size<target;j++){
       const b=seeds[j];
       if(a===b)continue;
-      if(a.length+b.length<=24)add(a+b);
+      if(a.length+b.length<=15)add(a+b);
       if(out.size>=target)break;
-      if((i+j)%3===0&&a.length+b.length<=24)add(b+a);
+      if((i+j)%3===0&&a.length+b.length<=15)add(b+a);
     }
   }
   if(out.size<target)throw new Error('username_lexicon_too_small:'+out.size);
@@ -248,7 +248,7 @@ export function hasLetter(handle){return /[a-z]/i.test(String(handle||''))}
 export function isValidHandle(handle){
   const h=String(handle||'').toLowerCase();
   if(TELEGRAM_THREE_LETTER.has(h))return true;
-  return /^[a-z][a-z0-9_]{3,31}$/i.test(h)&&hasLetter(h);
+  return /^[a-z][a-z0-9_]{3,14}$/i.test(h)&&hasLetter(h);
 }
 const clampUnit=x=>Math.max(0,Math.min(.999999999,Number(x)||0));
 export function randInt(min,max,rng=randomUnit){return min+Math.floor(clampUnit(rng())*(max-min+1))}
@@ -275,17 +275,17 @@ function randomPronounceable(min=4,max=8,rng=randomUnit){
   return s;
 }
 function normalizeGenerated(handle){
-  let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,32);
+  let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,15);
   if(h.length<4)h=(h+'name').slice(0,4);
-  if(!hasLetter(h))h='u'+h.slice(0,31);
+  if(!hasLetter(h))h='u'+h.slice(0,14);
   return h;
 }
 const ROOTS_BY_LENGTH=Array.from({length:33},()=>[]);
 for(const root of ROOTS)if(/^[a-z]+$/.test(root)&&root.length<ROOTS_BY_LENGTH.length)ROOTS_BY_LENGTH[root.length].push(root);
 function rootForProfile(profile,rng){
-  const range={COMMON:[7,18],RARE:[6,14],EPIC:[5,10],LEGEND:[4,8],ULTRA:[4,6]}[profile]||[7,18];
+  const range={COMMON:[7,15],RARE:[6,14],EPIC:[5,10],LEGEND:[4,8],ULTRA:[4,6]}[profile]||[7,15];
   const lengths=[];for(let len=range[0];len<=range[1];len++)if(ROOTS_BY_LENGTH[len]?.length)lengths.push(len);
-  if(!lengths.length)return choice(ROOTS,rng).slice(0,18);
+  if(!lengths.length)return choice(ROOTS,rng).slice(0,15);
   return choice(ROOTS_BY_LENGTH[choice(lengths,rng)],rng);
 }
 function telegramStyleVariant(root,profile,rng){
@@ -321,7 +321,7 @@ export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
   else handle=telegramStyleVariant(root,profile,rng);
   return normalizeGenerated(handle);
 }
-const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,32}$/.test(x)));
+const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,15}$/.test(x)));
 export function wordQuality(handle){
   const h=String(handle||'').toLowerCase(),letters=h.replace(/[^a-z]/g,'');
   if(WORD_SET.has(h))return 1;
