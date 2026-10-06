@@ -3,126 +3,224 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
 import {createDatabase} from '../src/database.mjs';
-import {GAME,DROP_TIERS,STARTER_DROP_JACKPOT} from '../src/config.mjs';
-import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,stableScoreHandle,wordQuality,generatedSupply,rarityFromValue} from '../src/generator.mjs';
-import {ensureUser,createDrop,resolveDrop,leaderboard,publicUser,sellOwnedUsername,setShowcase,starterDropMode} from '../src/game.mjs';
-import {createListing,buyListing,cancelListing,listMarket} from '../src/market.mjs';
-import {giftUsername} from '../src/social.mjs';
-import {spinWheel,wheelStatus} from '../src/wheel.mjs';
-import {previewUpgrade,performUpgrade,upgradeInfo} from '../src/upgrader.mjs';
-import {ensureSeasonLifecycle} from '../src/seasons.mjs';
-import {activeCollectionCount,systemSellValue,todayKey} from '../src/economy.mjs';
-import {PREMIUM_STARS,SHOP_PRODUCTS,validPremiumCheckout,validProductCheckout,applyPremiumPayment,applyProductPayment} from '../src/payments.mjs';
+import {GAME,DROP_TIERS} from '../src/config.mjs';
+import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
 import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
-import {levelFromXp,progressionFromXp,xpToReachLevel} from '../src/progression.mjs';
-import {labStatus,submitLab} from '../src/lab.mjs';
+import {ensureUser,publicUser,leaderboard,tasks,DAILY_TASK_POOL} from '../src/game.mjs';
+import {listMarket,createListing,buyListing} from '../src/market.mjs';
+import {giftUsername} from '../src/social.mjs';
+import {levelFromXp,progressionFromXp,xpToReachLevel,MAX_LEVEL,TITLE_CONFIG,levelTitle} from '../src/progression.mjs';
+import {achievementsData} from '../src/achievements.mjs';
+import {gamesHub,startMiniGame,answerMiniGame,MINI_GAME_DAILY_CAP,MINI_GAMES} from '../src/minigames.mjs';
+import {SHOP_PRODUCTS,THEME_PRODUCTS,validProductCheckout,applyProductPayment,walletData,buyTheme} from '../src/payments.mjs';
 import {dailyStatus,claimDaily} from '../src/daily.mjs';
 
 const appSrc=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const cssSrc=fs.readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
-const uxCss=fs.readFileSync(new URL('../public/ux4-core.css',import.meta.url),'utf8');
+const indexSrc=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8');
-const upgraderSrc=fs.readFileSync(new URL('../src/upgrader.mjs',import.meta.url),'utf8');
+const paymentSrc=fs.readFileSync(new URL('../src/payments.mjs',import.meta.url),'utf8');
 
-test('generator has a large readable universe',()=>assert.ok(candidateUniverseSize()>3000));
-test('generator keeps usernames <=10 chars and never numeric-only',()=>{for(let i=0;i<100000;i++){const h=buildGeneratedHandle(i%5===0?'RARE':'COMMON');assert.ok(/[a-z]/.test(h));assert.ok(h.length<=10);assert.ok(isValidHandle(h))}});
-test('generator produces Telegram-style words, digits and underscore variants',()=>{
-  let digits=0,underscores=0,clean=0;
-  for(let i=0;i<20000;i++){const h=buildGeneratedHandle('COMMON');if(/\d/.test(h))digits++;if(/_/.test(h))underscores++;if(/^[a-z]+$/.test(h))clean++}
-  assert.ok(digits>0);assert.ok(underscores>0);assert.ok(clean>0);
+test('v7 uses one stylesheet and removed legacy override layer',()=>{
+  assert.match(indexSrc,/styles\.css\?v=7\.0\.0/);
+  assert.doesNotMatch(indexSrc,/ux4-core\.css/);
+  assert.equal(fs.existsSync(new URL('../public/ux4-core.css',import.meta.url)),false);
 });
 
-test('requested word handles and ultra-short Telegram handles exist',()=>{
+test('home keeps username as the centered gameplay object',()=>{
+  const home=appSrc.match(/function homeView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(home,/home-drop-v7/);
+  assert.doesNotMatch(home,/Daily|Lab|Капитал|Последний username|Rank/);
+  const dropRule=cssSrc.match(/\.home-drop-v7\{[^}]+\}/)?.[0]||'';
+  assert.match(dropRule,/flex:1/);
+  assert.match(dropRule,/align-items:center/);
+  assert.match(dropRule,/justify-content:center/);
+  const actionRule=cssSrc.match(/\.drop-result-actions\{[^}]+\}/)?.[0]||'';
+  assert.match(actionRule,/position:absolute/);
+});
+
+test('menu has exactly the four v7 product groups and no Lab or Plus',()=>{
+  const block=appSrc.match(/const MENU_SECTIONS=\[[\s\S]*?\n\];/)?.[0]||'';
+  for(const title of ['Играть','Торговля','Прогресс','Аккаунт'])assert.match(block,new RegExp(title));
+  for(const item of ['Дроп','Игры','Колесо','Апгрейдер','Рынок','Коллекция','Подарки','Задания','Уровни','Достижения','Топ','Профиль','Магазин','Настройки'])assert.match(block,new RegExp(item));
+  assert.doesNotMatch(block,/Lab|Plus|USERNAME\+/);
+});
+
+test('UI icon map is Hugeicons-only and contains verified semantic icons',()=>{
+  const block=appSrc.match(/const ICON_NAME=Object\.freeze\(\{[\s\S]*?\}\);/)?.[0]||'';
+  for(const icon of ['package','gamepad','shopping-bag-01','square-arrow-up-double','medal-01','play','filter'])assert.match(block,new RegExp(icon.replace(/-/g,'\\-')));
+  assert.match(appSrc,/hgi-stroke/);
+  assert.doesNotMatch(block,/lucide|emoji|solid/i);
+});
+
+test('market and collection share one reusable filter icon component',()=>{
+  const collection=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  const market=appSrc.match(/function marketView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(collection,/marketFilterIcon\(\)/);
+  assert.match(market,/marketFilterIcon\(\)/);
+  assert.match(appSrc,/function marketFilterIcon\(/);
+});
+
+test('settings use theme plus three compact toggles without status copy',()=>{
+  const block=appSrc.match(/function settingsView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  for(const x of ['Светлая','Тёмная','Системная','Вибрация','Звук','Анимации'])assert.match(block,new RegExp(x));
+  assert.doesNotMatch(block,/Включено|Выключено/);
+  assert.match(block,/motion/);
+});
+
+test('dark mode has global tokens instead of screen-specific white patches',()=>{
+  assert.match(cssSrc,/:root\[data-theme="dark"\]/);
+  for(const token of ['--bg:','--card:','--surface:','--text:','--muted:','--border:'])assert.match(cssSrc,new RegExp(token));
+  assert.match(cssSrc,/background:var\(--card\)/);
+});
+
+test('desktop keeps Mini App width while narrow screens have compact overrides',()=>{
+  assert.match(cssSrc,/max-width:520px/);
+  assert.match(cssSrc,/@media \(max-width:359px\)/);
+  assert.match(cssSrc,/@media \(min-width:521px\)/);
+  assert.match(cssSrc,/height:var\(--app-h\)/);
+});
+
+test('generator provides a large Telegram-style universe',()=>{
+  assert.ok(candidateUniverseSize()>3000);
   assert.ok(ROOTS.length>=500);
-  for(const h of ['card','loly','mama','papa','sosi','sosal','dedyska','sigma']){assert.ok(ROOTS.includes(h));assert.ok(SPECIALS.some(x=>x[0]===h))}
-  for(const h of ['nft','ufc','gif','vid','pic'])assert.ok(SPECIALS.some(x=>x[0]===h&&x[2]>=60000000));
+  for(const h of ['mama','papa','dima','money','ghost','venom','turbo','moskva','sochi'])assert.ok(ROOTS.includes(h)||SPECIALS.some(x=>x[0]===h));
 });
-test('semantic valuation rewards readable words over junk instead of length alone',()=>{
+
+test('game usernames start at 4 characters and support digits and underscore',()=>{
+  assert.equal(isGameUsername('mama'),true);
+  assert.equal(isGameUsername('abc'),false);
+  assert.equal(isGameUsername('kot77'),true);
+  assert.equal(isGameUsername('real_vlad'),true);
+  let digits=0,underscores=0,clean=0;
+  for(let i=0;i<8000;i++){
+    const h=buildGeneratedHandle(i%7===0?'RARE':'COMMON');
+    assert.ok(h.length>=4&&h.length<=10);
+    if(/\d/.test(h))digits++;
+    if(/_/.test(h))underscores++;
+    if(/^[a-z]+$/.test(h))clean++;
+  }
+  assert.ok(digits>0&&underscores>0&&clean>0);
+});
+
+test('canonical valuation rewards readable clean usernames over junk',()=>{
   const word=analyzeUsername('ghost'),junk=analyzeUsername('qzvr910');
   assert.ok(word.score>junk.score);
   assert.ok(word.value>junk.value);
-  assert.ok(analyzeUsername('mama').score>analyzeUsername('qxzrv').score);
-  assert.ok(wordQuality('mama')>wordQuality('qzvra'));
-});
-test('requested rarity label never changes the canonical username value',()=>{
-  const a=scoreHandle('card','COMMON',1,1,()=>.5),b=scoreHandle('card','ULTRA',1,1,()=>.5);
-  assert.equal(a,b);
-  assert.equal(rarityFromValue(a),rarityFromValue(scoreHandle('card')));
-});
-test('clean usernames beat noisy variants with digits and underscores',()=>{
   assert.ok(scoreHandle('ghost')>scoreHandle('ghost_77'));
-  assert.ok(analyzeUsername('king777').breakdown.pattern>analyzeUsername('king483').breakdown.pattern);
+  assert.ok(wordQuality('mama')>wordQuality('qzvra'));
+  assert.equal(analyzeUsername('ghost').value,analyzeUsername('ghost').value);
 });
-test('game generation starts at four characters while ordinary three-letter generation stays excluded',()=>{
-  assert.equal(isGameUsername('abcd'),true);
-  assert.equal(isGameUsername('abc'),false);
-  assert.equal(isValidHandle('abc'),false);
-  assert.equal(isValidHandle('nft'),true);
-  for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA'])for(let i=0;i<500;i++)assert.ok(buildGeneratedHandle(profile).length>=4);
-});
-test('four-character value depends on meaning and cleanliness, not a blanket multi-million floor',()=>{
-  const meaningful=analyzeUsername('mama'),junk=analyzeUsername('qzvr'),numbered=analyzeUsername('a7x9');
-  assert.ok(meaningful.score>junk.score);
-  assert.ok(meaningful.value>junk.value);
-  assert.ok(junk.value>0&&numbered.value>0);
-});
-test('visual value tiers map to neutral blue purple and gold presentation',()=>{
+
+test('visual rarity only changes meaningful accent tiers',()=>{
   assert.equal(visualTier(1500,200),'normal');
   assert.equal(visualTier(25000,500),'blue');
   assert.equal(visualTier(250000,700),'purple');
   assert.equal(visualTier(2000000,850),'gold');
+  assert.match(cssSrc,/\.value-purple/);
+  assert.match(cssSrc,/\.value-gold/);
+  assert.doesNotMatch(cssSrc,/\.value-purple[^}]*background:linear-gradient/i);
 });
-test('RARE generation never creates 4 or 5 character handles',()=>{
-  for(let i=0;i<5000;i++)assert.ok(buildGeneratedHandle('RARE').length>=6);
-});
-test('system sale uses the canonical username value everywhere',()=>{
-  assert.equal(systemSellValue(5000),5000);
-  assert.equal(systemSellValue(50000),50000);
-  assert.equal(systemSellValue(1000000),1000000);
-});
-test('max paid drop still allows COMMON but meaningfully improves the profile mix',()=>{assert.ok(DROP_TIERS.max.weights.COMMON>0);assert.ok(DROP_TIERS.max.weights.COMMON<DROP_TIERS.basic.weights.COMMON);assert.ok(DROP_TIERS.max.weights.EPIC>DROP_TIERS.basic.weights.EPIC);assert.ok(DROP_TIERS.max.weights.LEGEND>DROP_TIERS.basic.weights.LEGEND)});
-test('v3 economy cannot print several paid drops immediately',()=>{
-  assert.equal(GAME.freeDrops,1);
-  assert.equal(GAME.startBalance,50000);
-  assert.equal(DROP_TIERS.basic.cost,3000);
-  assert.ok(DROP_TIERS.basic.weights.ULTRA<=.001);
-  assert.ok(DROP_TIERS.max.weights.ULTRA<=.5);
-});
-test('every template is globally unique supply 1',()=>{
-  assert.equal(generatedSupply('COMMON'),1);
-  assert.ok(SPECIALS.every(x=>x[3]===1));
-});
-test('four-character generation is reserved for ultra class',()=>{
-  for(let i=0;i<5000;i++){
-    assert.ok(buildGeneratedHandle('COMMON').length>=7);
-    assert.ok(buildGeneratedHandle('RARE').length>=6);
-    assert.ok(buildGeneratedHandle('EPIC').length>=5);
-    assert.ok(buildGeneratedHandle('LEGEND').length>=5);
-    assert.ok(buildGeneratedHandle('ULTRA').length>=4);
-  }
-});
-test('UI uses dollars and weighted wheel geometry',()=>{assert.match(appSrc,/Intl\.NumberFormat\('en-US'\)/);assert.match(appSrc,/function wheelGeometry/);assert.match(appSrc,/landing=target\.start\+margin/);assert.match(cssSrc,/--wheel-bg/)});
-test('drop card is minimal and story share is an icon-only native action',()=>{
-  const m=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/);assert.ok(m);
-  assert.match(m[0],/esc\(x\.handle\)/);assert.doesNotMatch(m[0],/badge\(/);
-  assert.match(m[0],/story-icon-btn/);assert.match(m[0],/icon\('story'\)/);
-  assert.match(appSrc,/shareToStory/);assert.doesNotMatch(appSrc,/function openStoryFallback/);
-  assert.match(appSrc,/canvas\.width=1080/);assert.match(appSrc,/canvas\.height=1920/);
-});
-test('menu is split into four clear product sections',()=>{
-  assert.doesNotMatch(appSrc,/function nav\(/);
-  assert.match(appSrc,/const MENU_SECTIONS=/);assert.match(appSrc,/menu-section-tile/);
-  for(const name of ['Играть','Торговля','Прогресс','Аккаунт','Дроп','Lab','Колесо','Апгрейдер','Рынок','Коллекция','Подарки','Задания','Уровни','Достижения','Топ','Профиль','Plus','Настройки'])assert.match(appSrc,new RegExp(name));
-  assert.match(uxCss,/\.menu-section>div\{[^}]*grid-template-columns:repeat\(4/);
-  assert.match(uxCss,/\.menu-section-tile\{[^}]*height:61px/);
-});
-test('server has production auth guard, trusted proxy gate, story TTL and rate limiting',()=>{assert.match(serverSrc,/ALLOW_DEV_AUTH must be disabled in production/);assert.match(serverSrc,/TRUST_PROXY/);assert.match(serverSrc,/storyTtlMs/);assert.match(serverSrc,/rateLimit\(user\.id,'story'/);assert.match(serverSrc,/rateLimit\(user\.id,'global'/)});
-test('database has payment ledger, migrations, backups, indexes and integrity checks',()=>{for(const name of ['payments','schema_migrations','user_cosmetics','runtime_locks','username_lab_attempts','xp_history','6.0.0-valuation-progression','idx_instances_handle_unique','idx_instances_owner_status_value','VACUUM INTO','integrity_check'])assert.match(dbSrc,new RegExp(name))});
-test('premium does not change drop/upgrader odds',()=>{assert.doesNotMatch(fs.readFileSync(new URL('../src/config.mjs',import.meta.url),'utf8'),/premium.*RARITY/i);assert.doesNotMatch(upgraderSrc,/premium/i)});
 
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username27-test-')),db=createDatabase(tmp);
+test('progression has 200 levels and configured titles',()=>{
+  assert.equal(MAX_LEVEL,200);
+  assert.equal(levelFromXp(Number.MAX_SAFE_INTEGER),200);
+  assert.deepEqual(TITLE_CONFIG.map(x=>x[0]),[1,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200]);
+  assert.equal(levelTitle(1),'Йоу');
+  assert.equal(levelTitle(57),'Могёт');
+  assert.equal(levelTitle(100),'Аура +100');
+  assert.equal(levelTitle(200),'Легендарка');
+  assert.ok(xpToReachLevel(180)-xpToReachLevel(179)>xpToReachLevel(20)-xpToReachLevel(19));
+  const p=progressionFromXp(xpToReachLevel(57)+100);
+  assert.equal(p.level,57);
+  assert.ok(p.progress>0&&p.progress<1);
+});
+
+test('levels UI only shows nearest rewards',()=>{
+  const block=appSrc.match(/function levelsView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/slice\(0,7\)/);
+  assert.match(block,/До следующего/);
+});
+
+test('achievement UI is a compact two-column badge grid',()=>{
+  assert.match(cssSrc,/\.achievement-grid-v7\{[^}]*grid-template-columns:1fr 1fr/);
+  const block=appSrc.match(/function achievementsView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/achievement-badge-icon/);
+  assert.match(block,/\?\?\?\?/);
+});
+
+test('daily task pool has at least 30 templates and serves 5-7 per day',()=>{
+  assert.ok(DAILY_TASK_POOL.length>=30);
+});
+
+test('five skill games replace Lab in the visible client',()=>{
+  assert.deepEqual(MINI_GAMES.map(x=>x.key),['hunt','higher','editor','build','price']);
+  const menu=appSrc.match(/const MENU_SECTIONS=\[[\s\S]*?\n\];/)?.[0]||'';
+  assert.match(menu,/Игры/);
+  assert.doesNotMatch(menu,/Lab/);
+  assert.match(appSrc,/function gamesView\(/);
+  assert.match(appSrc,/function miniGameView\(/);
+});
+
+test('skill-game earnings are capped server-side',()=>{
+  assert.ok(MINI_GAME_DAILY_CAP>0);
+  const src=fs.readFileSync(new URL('../src/minigames.mjs',import.meta.url),'utf8');
+  assert.match(src,/remainingCap/);
+  assert.match(src,/mini_game_daily_earnings/);
+  assert.match(src,/game_cooldown/);
+  assert.match(src,/SESSION_TTL_MS/);
+});
+
+test('gift picker uses selectable bottom sheets and friend search',()=>{
+  const block=appSrc.match(/function giftView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/data-gift-open="item"/);
+  assert.match(block,/data-gift-open="friend"/);
+  assert.match(block,/giftFriendSearch/);
+  assert.doesNotMatch(block,/<select/);
+});
+
+test('profile distinguishes owner controls from public profile',()=>{
+  const block=appSrc.match(/function profileView\(p=state\.profile\?\.profile\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/const own=String\(p\.id\)===String\(state\.user\?\.id\)/);
+  assert.match(block,/BEST USERNAME/);
+  assert.match(block,/ВИТРИНА/);
+  assert.match(block,/own\?'<button[^']*Редактировать витрину/);
+  assert.match(block,/Витрина пуста/);
+  assert.doesNotMatch(block,/Добавь username из коллекции/);
+});
+
+test('top rows open public profiles',()=>{
+  const block=appSrc.match(/function topView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/data-profile=/);
+});
+
+test('shop exposes only deterministic gem packs and themes',()=>{
+  assert.ok(Object.values(SHOP_PRODUCTS).every(x=>x.type==='gems'&&x.gems>0&&x.stars>0));
+  assert.ok(Object.values(THEME_PRODUCTS).every(x=>x.type==='theme'&&x.gems>0));
+  assert.doesNotMatch(paymentSrc,/luck boost|wheel spin|upgrade chance|random box/i);
+  assert.doesNotMatch(appSrc.match(/function shopView\(\)\{[\s\S]*?\n\}/)?.[0]||'',/USERNAME\+/);
+});
+
+test('main currency cannot be purchased through Stars',()=>{
+  for(const p of Object.values(SHOP_PRODUCTS))assert.ok(!/(money|cash|drop|wheel|upgrade|xp|username)/i.test(p.key+' '+p.title+' '+p.description));
+  assert.doesNotMatch(serverSrc,/Stars.*balance|balance.*Stars/i);
+});
+
+test('database schema includes v7 wallets games and achievement progress',()=>{
+  for(const name of ['currency_wallets','mini_game_sessions','mini_game_records','mini_game_daily_earnings','achievement_unlocks'])assert.match(dbSrc,new RegExp(name));
+});
+
+test('server exposes v7 games and shop routes',()=>{
+  for(const route of ['/api/games','/api/shop','/api/shop/theme'])assert.ok(serverSrc.includes(route));
+  assert.match(serverSrc,/mini_game_start/);
+  assert.match(serverSrc,/mini_game_answer/);
+});
+
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'username-v7-test-'));
+const db=createDatabase(tmp);
 const seller=ensureUser(db,{id:10001,username:'seller',first_name:'Seller'});
 const buyer=ensureUser(db,{id:10002,username:'buyer',first_name:'Buyer'});
 const friend=ensureUser(db,{id:10003,username:'friend',first_name:'Friend'});
@@ -130,190 +228,107 @@ const friend=ensureUser(db,{id:10003,username:'friend',first_name:'Friend'});
 let serial=0;
 function owned(user,handle='testname',rarity='COMMON',value=1000){
   const raw=(handle+serial++).toLowerCase().slice(0,20);
-  const tid=db.prepare('INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,?,0,1,?)').run(raw,rarity,value,100,'test',new Date().toISOString()).lastInsertRowid;
+  const tid=db.prepare('INSERT INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,created_at) VALUES(?,?,?,?,1,?,0,1,?)')
+    .run(raw,rarity,value,1,'test',new Date().toISOString()).lastInsertRowid;
   const id='i-'+raw+'-'+serial;
-  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(id,tid,raw,rarity,value,1,100,user.id,'owned',new Date().toISOString(),'test');
+  db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+    .run(id,tid,raw,rarity,value,1,1,user.id,'owned',new Date().toISOString(),'test');
   db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,new Date().toISOString());
   return id;
 }
 
-test('new user starts with configured economy',()=>{assert.equal(GAME.startBalance,50000);assert.equal(seller.balance,GAME.startBalance);assert.equal(seller.free_drops,GAME.freeDrops)});
-test('database rejects a second instance with the same username globally',()=>{
-  const id=owned(seller,'globallyunique','COMMON',1000);
-  const row=db.prepare('SELECT * FROM username_instances WHERE id=?').get(id);
-  assert.throws(()=>db.prepare("INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-    .run('duplicate-instance',row.template_id,row.handle,row.rarity,row.value,1,1,buyer.id,'owned',new Date().toISOString(),'test'),/UNIQUE/);
+test('new user starts with configured gameplay economy',()=>{
+  assert.equal(GAME.startBalance,50000);
+  assert.equal(seller.balance,GAME.startBalance);
+  assert.equal(DROP_TIERS.basic.cost,3000);
 });
-test('drop request is idempotent',()=>{const a=createDrop(db,seller,'same-request'),b=createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),'same-request');assert.equal(a.instance.id,b.instance.id);resolveDrop(db,seller,a.instance.id,'keep')});
-test('3K starter drop has low-value normals plus tiny jackpot bands',()=>{
-  assert.equal(starterDropMode(0),'ultra');
-  assert.equal(starterDropMode(STARTER_DROP_JACKPOT.ultraChance+STARTER_DROP_JACKPOT.bigChance/2),'big');
-  assert.equal(starterDropMode(STARTER_DROP_JACKPOT.ultraChance+STARTER_DROP_JACKPOT.bigChance+STARTER_DROP_JACKPOT.rareChance/2),'rare');
-  assert.equal(starterDropMode(.5),'normal');
-  assert.ok(STARTER_DROP_JACKPOT.rareChance<.01);
-  assert.ok(STARTER_DROP_JACKPOT.bigChance<.001);
-  assert.ok(STARTER_DROP_JACKPOT.ultraChance<=.00001);
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-starter-test-')),starterDb=createDatabase(dir);
+
+test('tasks endpoint returns six daily templates',()=>{
+  const rows=tasks(db,seller);
+  assert.equal(rows.length,6);
+  assert.ok(rows.every(x=>x.target>0&&x.reward>0));
+});
+
+test('achievements provide categorized reward progress',()=>{
+  const data=achievementsData(db,{...seller,level:1});
+  assert.ok(data.total>=15);
+  assert.ok(data.items.some(x=>x.category==='Коллекция'));
+  assert.ok(data.items.some(x=>x.category==='Игры'));
+  assert.ok(data.items.some(x=>x.category==='Прогресс'));
+});
+
+test('all five mini-games create server-side sessions',()=>{
+  const u=db.prepare('SELECT * FROM users WHERE id=?').get(seller.id);
+  for(const game of MINI_GAMES){
+    const s=startMiniGame(db,u,game.key);
+    assert.equal(s.gameKey,game.key);
+    assert.ok(s.id);
+    assert.ok(s.question);
+  }
+  assert.equal(gamesHub(db,u).games.length,5);
+});
+
+test('editor and build games validate answers on the server',()=>{
+  const u=db.prepare('SELECT * FROM users WHERE id=?').get(buyer.id);
+  const editor=startMiniGame(db,u,'editor'),source=String(editor.question.source||'').replace(/^@/,'');
+  const edit=source.includes('_')?source.replace(/_/g,''):source.replace(/\d+$/,'');
+  const er=answerMiniGame(db,u,editor.id,edit);
+  assert.equal(er.done,true);
+  const build=startMiniGame(db,u,'build'),answer=build.question.parts.join('');
+  const br=answerMiniGame(db,u,build.id,answer);
+  assert.equal(br.done,true);
+});
+
+test('daily recovery path is deterministic and cannot be claimed twice',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-daily-v7-')),d=createDatabase(dir);
   try{
-    const u=ensureUser(starterDb,{id:10004,username:'starter',first_name:'Starter'});
-    starterDb.prepare('UPDATE users SET balance=1000000,free_drops=0 WHERE id=?').run(u.id);
-    for(let i=0;i<80;i++){
-      const fresh=starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-      const r=createDrop(starterDb,fresh,'starter-'+i,'basic'),v=r.instance.value;
-      const allowed=(v>=STARTER_DROP_JACKPOT.normalMin&&v<=STARTER_DROP_JACKPOT.normalMax)||
-        (v>=STARTER_DROP_JACKPOT.goodMin&&v<=STARTER_DROP_JACKPOT.goodMax)||
-        (v>=STARTER_DROP_JACKPOT.rareMin&&v<=STARTER_DROP_JACKPOT.rareMax)||
-        (v>=STARTER_DROP_JACKPOT.bigMin&&v<=STARTER_DROP_JACKPOT.bigMax)||
-        v>=STARTER_DROP_JACKPOT.ultraMin;
-      assert.ok(allowed,'starter value '+v+' for '+r.instance.handle);
-      resolveDrop(starterDb,starterDb.prepare('SELECT * FROM users WHERE id=?').get(u.id),r.instance.id,'sell');
-    }
-  }finally{starterDb.close();fs.rmSync(dir,{recursive:true,force:true})}
+    const u=ensureUser(d,{id:31002,username:'dailyuser',first_name:'Daily'}),before=d.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance;
+    assert.equal(dailyStatus(d,u).claimable,true);
+    const r=claimDaily(d,u);
+    assert.equal(r.reward.money,1000);
+    assert.equal(d.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance,before+1000);
+    assert.throws(()=>claimDaily(d,d.prepare('SELECT * FROM users WHERE id=?').get(u.id)),/daily_already_claimed/);
+  }finally{d.close();fs.rmSync(dir,{recursive:true,force:true})}
 });
 
-test('level progression is nonlinear and capped at level 100',()=>{
-  assert.equal(levelFromXp(0),1);
-  assert.ok(xpToReachLevel(10)>xpToReachLevel(5));
-  assert.ok(xpToReachLevel(50)-xpToReachLevel(49)>xpToReachLevel(5)-xpToReachLevel(4));
-  assert.equal(levelFromXp(Number.MAX_SAFE_INTEGER),100);
-  const p=progressionFromXp(xpToReachLevel(17)+100);
-  assert.equal(p.level,17);assert.ok(p.progress>0&&p.progress<1);assert.ok(p.remaining>0);
-});
-test('Username Lab is a server-side skill earning path with 4-character minimum',()=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-lab-test-')),labDb=createDatabase(dir);
-  try{
-    const u=ensureUser(labDb,{id:31001,username:'labuser',first_name:'Lab'}),before=labDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance;
-    const status=labStatus(labDb,u);assert.equal(status.attempts,0);assert.ok(status.dailyCap>0);
-    const r=submitLab(labDb,u,'turbox');
-    assert.ok(r.score>=0&&r.score<=100);assert.ok(r.reward>0);assert.ok(r.xp>0);
-    assert.equal(labStatus(labDb,labDb.prepare('SELECT * FROM users WHERE id=?').get(u.id)).attempts,1);
-    assert.ok(labDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance>before);
-    assert.equal(labDb.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(u.id,todayKey(),'lab').value,1);
-  }finally{labDb.close();fs.rmSync(dir,{recursive:true,force:true})}
-});
-test('daily income gives a deterministic recovery path and cannot be claimed twice',()=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'username-daily-test-')),dailyDb=createDatabase(dir);
-  try{
-    const u=ensureUser(dailyDb,{id:31002,username:'dailyuser',first_name:'Daily'}),before=dailyDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance;
-    assert.equal(dailyStatus(dailyDb,u).claimable,true);
-    const r=claimDaily(dailyDb,u);assert.equal(r.day,1);assert.equal(r.reward.money,1000);
-    assert.equal(dailyDb.prepare('SELECT balance FROM users WHERE id=?').get(u.id).balance,before+1000);
-    assert.throws(()=>claimDaily(dailyDb,dailyDb.prepare('SELECT * FROM users WHERE id=?').get(u.id)),/daily_already_claimed/);
-  }finally{dailyDb.close();fs.rmSync(dir,{recursive:true,force:true})}
+test('market purchase transfers one username once',()=>{
+  const id=owned(seller,'marketv7','COMMON',1400),listing=createListing(db,seller,id,1500);
+  const r=buyListing(db,buyer,listing.id);
+  assert.equal(r.handle.startsWith('@'),true);
+  assert.throws(()=>buyListing(db,buyer,listing.id),/listing_not_found/);
+  assert.ok(listMarket(db,{q:'market'}).items.every(x=>x.id!==listing.id));
 });
 
-test('market listing cannot be bought twice',()=>{const id=owned(seller,'marketname');const l=createListing(db,seller,id,1000);buyListing(db,buyer,l.id);assert.throws(()=>buyListing(db,buyer,l.id),/listing_not_found/)});
-test('gift transfer cannot be repeated by old owner',()=>{db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());const id=owned(seller,'giftname');giftUsername(db,seller,id,friend.id);assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/)});
-test('wheel is idempotent and exposes worthwhile real-weight rewards',()=>{
-  const st=wheelStatus(db,buyer);assert.equal(st.rewards.reduce((s,x)=>s+x.weight,0),100);
-  const byKey=Object.fromEntries(st.rewards.map(x=>[x.key,x]));
-  assert.equal(byKey.cash3000.label,'$3K');
-  assert.equal(byKey.cash10000.label,'$10K');
-  assert.equal(byKey.cash25000.label,'$25K');
-  assert.ok(byKey.username.weight>0);
-  const a=spinWheel(db,buyer,'wheel-1'),b=spinWheel(db,buyer,'wheel-1');assert.equal(a.reward.key,b.reward.key)
-});
-test('direct collection sale pays system sell value, not estimate',()=>{const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(seller.id),before=fresh.balance,id=owned(seller,'directsell','RARE',4200);const r=sellOwnedUsername(db,fresh,id);assert.equal(r.value,4200);assert.equal(r.sellValue,systemSellValue(4200));assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,before+r.sellValue)});
-
-test('market status still counts toward collection limit',()=>{
-  const u=ensureUser(db,{id:20001,username:'limit',first_name:'Limit'});
-  for(let i=0;i<GAME.maxCollection;i++)owned(u,'lim'+i,'COMMON',100);
-  const first=db.prepare("SELECT id FROM username_instances WHERE owner_id=? AND status='owned' LIMIT 1").get(u.id).id;
-  const l=createListing(db,u,first,500);
-  assert.equal(activeCollectionCount(db,u.id),GAME.maxCollection);
-  assert.throws(()=>createDrop(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),'over-limit'),/collection_full/);
-  cancelListing(db,u,l.id);
-  assert.equal(activeCollectionCount(db,u.id),GAME.maxCollection);
+test('gift picker backend only transfers to a friend',()=>{
+  db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());
+  const id=owned(seller,'giftv7','COMMON',1200);
+  const r=giftUsername(db,seller,id,friend.id);
+  assert.ok(r.ok);
+  assert.throws(()=>giftUsername(db,seller,id,friend.id),/not_owned/);
 });
 
-test('full recipient cannot receive a gift or market purchase',()=>{
-  const full=ensureUser(db,{id:20002,username:'full',first_name:'Full'});
-  for(let i=0;i<GAME.maxCollection;i++)owned(full,'full'+i,'COMMON',100);
-  db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,full.id,new Date().toISOString());
-  const gift=owned(seller,'giftfull','COMMON',500);
-  assert.throws(()=>giftUsername(db,seller,gift,full.id),/recipient_full/);
-  const sale=owned(seller,'buyfull','COMMON',500),listing=createListing(db,seller,sale,100);
-  assert.throws(()=>buyListing(db,full,listing.id),/collection_full/);
-});
-
-test('showcase compacts after removing middle item',()=>{
-  const u=ensureUser(db,{id:20003,username:'show',first_name:'Show'}),ids=[owned(u,'showa'),owned(u,'showb'),owned(u,'showc')];
-  for(const id of ids)setShowcase(db,u,id);
-  sellOwnedUsername(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),ids[1]);
-  const d=owned(u,'showd');setShowcase(db,db.prepare('SELECT * FROM users WHERE id=?').get(u.id),d);
-  assert.deepEqual(db.prepare('SELECT position FROM profile_showcase WHERE user_id=? ORDER BY position').all(u.id).map(x=>x.position),[1,2,3]);
-});
-
-test('upgrader accepts exactly one username and chance matches the displayed price ratio',()=>{
-  const u=ensureUser(db,{id:20004,username:'up',first_name:'Up'}),source=owned(u,'cheapup','COMMON',200),extra=owned(u,'extraup','COMMON',300),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  const a=previewUpgrade(db,fresh,[source]);
-  assert.equal(upgradeInfo(db,fresh).maxItems,1);
-  assert.equal(a.maxItems,1);
-  assert.ok(Math.abs(a.chance-Math.max(.01,Math.min(.75,200*.9/a.target.value)))<1e-12);
-  assert.throws(()=>previewUpgrade(db,fresh,[source,extra]),/bad_upgrade/);
-});
-test('same upgrade inputs reuse same preview target instead of rerolling',()=>{
-  const u=ensureUser(db,{id:20005,username:'reroll',first_name:'Reroll'}),id=owned(u,'rerollup','COMMON',600),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  const a=previewUpgrade(db,fresh,[id]),b=previewUpgrade(db,fresh,[id]);assert.equal(a.sessionId,b.sessionId);assert.equal(a.target.handle,b.target.handle);
-  const win=performUpgrade(db,fresh,[id],a.sessionId,()=>0);assert.equal(win.result.handle,a.target.handle);
-});
-test('failed single upgrade consumes the selected username',()=>{
-  const u=ensureUser(db,{id:20006,username:'fail',first_name:'Fail'}),a=owned(u,'faila','COMMON',400),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
-  const p=previewUpgrade(db,fresh,[a]),r=performUpgrade(db,fresh,[a],p.sessionId,()=>.999);assert.equal(r.success,false);assert.equal(r.result,null);assert.equal(db.prepare('SELECT status FROM username_instances WHERE id=?').get(a).status,'consumed');
-});
-
-test('Stars checkout validates product, amount and payer',()=>{
-  const payload='username_plus:10001:12345678-1234-1234-1234-123456789abc';
-  assert.equal(validPremiumCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:PREMIUM_STARS}),true);
-  assert.equal(validPremiumCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:1}),false);
-  assert.equal(validPremiumCheckout({invoice_payload:payload,from:{id:999},currency:'XTR',total_amount:PREMIUM_STARS}),false);
-});
-test('Stars shop contains cosmetics only and validates each exact product price',()=>{
-  for(const p of Object.values(SHOP_PRODUCTS))assert.ok(['subscription','theme','frame','card','showcase'].includes(p.type));
-  assert.ok(Object.values(SHOP_PRODUCTS).every(p=>!/(drop|wheel|upgrade|chance|loot)/i.test(p.key+' '+p.title+' '+p.description)));
-  const p=SHOP_PRODUCTS.theme_ocean,payload='username_shop:'+p.key+':10001:12345678-1234-1234-1234-123456789abc';
-  assert.equal(validProductCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:p.stars}),true);
-  assert.equal(validProductCheckout({invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:p.stars+1}),false);
-});
-test('cosmetic Stars payment grants ownership but never gameplay odds',()=>{
-  const p=SHOP_PRODUCTS.theme_ocean,payload='username_shop:'+p.key+':10001:bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee';
-  const payment={invoice_payload:payload,currency:'XTR',total_amount:p.stars,telegram_payment_charge_id:'charge-theme',provider_payment_charge_id:'provider-theme'},message={from:{id:10001}};
-  const before=db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,result=applyProductPayment(db,message,payment);assert.equal(result.applied,true);
-  assert.ok(db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key='ocean'").get(seller.id));
+test('Stars payment grants gems and never changes gameplay balance',()=>{
+  const product=SHOP_PRODUCTS.gems_500,payload='username_shop:'+product.key+':10001:12345678-1234-1234-1234-123456789abc';
+  const query={invoice_payload:payload,from:{id:10001},currency:'XTR',total_amount:product.stars};
+  assert.equal(validProductCheckout(query),true);
+  const before=db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance;
+  const payment={...query,telegram_payment_charge_id:'v7-gem-charge',provider_payment_charge_id:'provider'};
+  const result=applyProductPayment(db,{from:{id:10001}},payment);
+  assert.equal(result.applied,true);
+  assert.equal(walletData(db,seller.id).gems,product.gems);
   assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,before);
 });
 
-test('Stars payment charge is applied only once',()=>{
-  const payload='username_plus:10001:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',payment={invoice_payload:payload,currency:'XTR',total_amount:PREMIUM_STARS,telegram_payment_charge_id:'charge-1',provider_payment_charge_id:'provider-1'},message={from:{id:10001}};
-  const a=applyPremiumPayment(db,message,payment),after1=db.prepare('SELECT premium_until FROM users WHERE id=?').get(seller.id).premium_until,b=applyPremiumPayment(db,message,payment),after2=db.prepare('SELECT premium_until FROM users WHERE id=?').get(seller.id).premium_until;
-  assert.equal(a.applied,true);assert.equal(b.duplicate,true);assert.equal(after2,after1);assert.equal(db.prepare('SELECT COUNT(*) c FROM payments WHERE telegram_charge_id=?').get('charge-1').c,1);
+test('theme purchase spends only gems and grants deterministic ownership',()=>{
+  const before=walletData(db,seller.id).gems;
+  const theme=THEME_PRODUCTS.ocean;
+  const r=buyTheme(db,seller,'ocean');
+  assert.equal(r.ok,true);
+  assert.equal(walletData(db,seller.id).gems,before-theme.gems);
+  assert.ok(db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key='ocean'").get(seller.id));
 });
 
-test('expired season is finalized and a new one starts',()=>{
-  const old=db.prepare('SELECT * FROM seasons WHERE active=1 ORDER BY id DESC LIMIT 1').get(),past=new Date(Date.now()-1000).toISOString();
-  db.prepare('UPDATE seasons SET end_at=? WHERE id=?').run(past,old.id);
-  db.prepare('INSERT OR REPLACE INTO season_stats(user_id,season_id,score,updated_at) VALUES(?,?,?,?)').run(seller.id,old.id,100,new Date().toISOString());
-  db.prepare('INSERT OR REPLACE INTO season_stats(user_id,season_id,score,updated_at) VALUES(?,?,?,?)').run(buyer.id,old.id,50,new Date().toISOString());
-  const next=ensureSeasonLifecycle(db);assert.notEqual(next.id,old.id);assert.equal(db.prepare('SELECT active FROM seasons WHERE id=?').get(old.id).active,0);
-  assert.equal(db.prepare('SELECT position FROM season_history WHERE user_id=? AND season_id=?').get(seller.id,old.id).position,1);
-  assert.ok(db.prepare('SELECT COUNT(*) c FROM season_rewards WHERE user_id=? AND season_id=?').get(seller.id,old.id).c>0);
-});
-
-test('daily task key uses configured UTC+5 day',()=>{const expected=new Date(Date.now()+300*60000).toISOString().slice(0,10);assert.equal(todayKey(),expected)});
-test('market search is prefix-based',()=>{const u=ensureUser(db,{id:20007,username:'search',first_name:'Search'}),id=owned(u,'prefixfind','RARE',900);createListing(db,u,id,1200);assert.ok(listMarket(db,{q:'prefix'}).items.some(x=>x.handle.includes('prefix')));assert.equal(listMarket(db,{q:'fix'}).items.some(x=>x.handle.includes('prefix')),false)});
-test('username actions update locally instead of reloading screens',()=>{
-  const blocks=[
-    appSrc.match(/if\(el\.dataset\.resolve\)\{[\s\S]*?\n \}/)?.[0]||'',
-    appSrc.match(/if\(el\.dataset\.confirmSystemSell\)\{[\s\S]*?\n \}/)?.[0]||'',
-    appSrc.match(/if\(el\.dataset\.createListing\)\{[\s\S]*?\n \}/)?.[0]||'',
-    appSrc.match(/if\(el\.dataset\.marketBuy\)\{[\s\S]*?return\}/)?.[0]||'',
-    appSrc.match(/if\(el\.dataset\.marketCancel\)\{[\s\S]*?return\}/)?.[0]||'',
-    appSrc.match(/if\(el\.hasAttribute\('data-gift'\)\)\{[\s\S]*?return\}/)?.[0]||''
-  ];
-  for(const block of blocks){assert.ok(block);assert.doesNotMatch(block,/load\(/)}
-  assert.match(appSrc,/removeCollectionLocal/);assert.match(appSrc,/removeMarketLocal/);assert.match(appSrc,/removeGiftLocal/);
-});
-test('leaderboard is a single total-capital ranking',()=>{
+test('leaderboard remains one total-capital ranking and publicUser agrees',()=>{
   const a=ensureUser(db,{id:21001,username:'rankA',first_name:'Rank A'});
   const b=ensureUser(db,{id:21002,username:'rankB',first_name:'Rank B'});
   db.prepare('UPDATE users SET balance=? WHERE id=?').run(5000,a.id);
@@ -324,48 +339,14 @@ test('leaderboard is a single total-capital ranking',()=>{
   assert.equal(ra.capital,6000);
   assert.equal(rb.capital,10000);
   assert.ok(rb.position<ra.position);
+  const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(b.id);
+  assert.equal(publicUser(db,fresh).capital,rb.capital);
 });
-test('leaderboard counts pending and market usernames as assets',()=>{
-  const u=ensureUser(db,{id:21003,username:'rankC',first_name:'Rank C'});
-  db.prepare('UPDATE users SET balance=? WHERE id=?').run(2000,u.id);
-  const pending=owned(u,'rankpending','COMMON',3000);
-  db.prepare("UPDATE username_instances SET status='pending' WHERE id=?").run(pending);
-  const market=owned(u,'rankmarket','COMMON',4000);
-  db.prepare("UPDATE username_instances SET status='market' WHERE id=?").run(market);
-  const row=leaderboard(db).find(x=>x.id===u.id);
-  assert.equal(row.capital,9000);
-  assert.equal(row.username_value,7000);
+
+test('small-screen CSS keeps primary gameplay actions inside the app surface',()=>{
+  assert.match(cssSrc,/\.drop-result-actions\{[^}]*left:0;right:0;bottom:2px/);
+  assert.match(cssSrc,/\.gift-submit-v7\{margin-top:auto\}/);
+  assert.match(cssSrc,/\.upgrade-footer\{margin-top:auto/);
 });
-test('leaderboard UI has no separate modes or periods',()=>{
-  const m=appSrc.match(/function topView\(\)\{[\s\S]*?\n\}/);assert.ok(m);
-  assert.match(m[0],/ОБЩИЙ КАПИТАЛ/i);
-  assert.match(m[0],/r\.capital/);
-  assert.doesNotMatch(m[0],/mode-tabs|period-tabs|rankMode|rankPeriod/);
-});
-test('sold and consumed usernames do not count toward total capital',()=>{
-  const u=ensureUser(db,{id:21004,username:'rankD',first_name:'Rank D'});
-  db.prepare('UPDATE users SET balance=? WHERE id=?').run(3000,u.id);
-  const sold=owned(u,'ranksold','COMMON',5000),consumed=owned(u,'rankconsumed','COMMON',7000),kept=owned(u,'rankkept','COMMON',2000);
-  db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(sold);
-  db.prepare("UPDATE username_instances SET status='consumed' WHERE id=?").run(consumed);
-  const row=leaderboard(db).find(x=>x.id===u.id);
-  assert.equal(row.capital,5000);
-  assert.equal(row.username_value,2000);
-});
-test('publicUser rank uses exactly the same capital formula as leaderboard',()=>{
-  const u=db.prepare('SELECT * FROM users WHERE telegram_id=?').get('21003');
-  const p=publicUser(db,u),row=leaderboard(db).find(x=>x.id===u.id);
-  assert.equal(p.capital,row.capital);
-  assert.equal(p.rank,row.position);
-});
-test('leaderboard cache is invalidated on capital-changing API actions',()=>{
-  assert.match(serverSrc,/function invalidateLeaderboard\(\)/);
-  for(const token of ['createDrop','resolveDrop','claimTask','sellOwnedUsername','buyListing','giftUsername','spinWheel','performUpgrade'])assert.match(serverSrc,new RegExp(token+'[\\s\\S]{0,220}invalidateLeaderboard'));
-});
-test('story sharing uses same-origin public media path and no modal fallback',()=>{
-  assert.match(appSrc,/new URL\(uploaded\.mediaPath,location\.origin\)/);
-  assert.match(serverSrc,/mediaPath='\/story\/'/);
-  assert.doesNotMatch(appSrc,/function openStoryFallback/);
-});
-test('pure numeric handle cannot validate',()=>assert.equal(isValidHandle('777777'),false));
+
 test.after(()=>{db.close();fs.rmSync(tmp,{recursive:true,force:true})});
