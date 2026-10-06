@@ -6,7 +6,7 @@ import {grantXp} from './progression.mjs';
 
 export const MINI_GAME_DAILY_CAP=100000;
 export const MINI_GAMES=Object.freeze([
-  {key:'hunt',title:'Username Hunt',icon:'search-visual',bestLabel:'Серия'},
+  {key:'hunt',title:'Охота за username',icon:'search-visual',bestLabel:'Серия'},
   {key:'higher',title:'Выше / ниже',icon:'chart-up',bestLabel:'Верных'},
   {key:'editor',title:'Редактор',icon:'edit-02',bestLabel:'Прирост'},
   {key:'build',title:'Собери username',icon:'puzzle',bestLabel:'Цена'},
