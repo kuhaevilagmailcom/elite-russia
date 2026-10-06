@@ -310,3 +310,27 @@ button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--
  .podium>div{grid-template-columns:1fr 1fr;grid-template-rows:none}
  .money-rank.hero{min-height:86px}.money-rank{min-height:64px}
 }
+
+
+/* USERNAME 7.0.3 — exact home center + top stake placement */
+/* Keep the stake control visually identical; only move its container above the centered username. */
+.home-stake-top{position:relative;z-index:6;display:flex;justify-content:center;margin-top:8px}
+.home-stake-top .drop-price-v7{position:static;top:auto;left:auto;right:auto;transform:none}
+
+/* Center the actual username stage against the phone viewport, not the remaining flex area below the header. */
+.home-drop-v7{
+ position:fixed;
+ z-index:1;
+ left:50%;
+ right:auto;
+ top:50%;
+ width:min(calc(100vw - 26px),494px);
+ height:188px;
+ transform:translate(-50%,-50%);
+ display:flex;
+ align-items:center;
+ justify-content:center
+}
+@media(max-height:650px){
+ .home-drop-v7{height:150px}
+}
