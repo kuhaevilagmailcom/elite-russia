@@ -1,3 +1,4 @@
+import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 import {grantXp,levelFromXp} from './progression.mjs';
 
@@ -39,19 +40,27 @@ export function friendsData(db,user,botUsername){
     nextReward:next?{need:next[0],type:next[1],amount:next[2],remaining:Math.max(0,next[0]-invited)}:null
   };
 }
-export function giftUsername(db,user,instanceId,friendId){
-  friendId=Number(friendId);
+export function giftUsername(db,user,instanceId,recipientRef){
+  const raw=String(recipientRef??'').trim(),username=raw.replace(/^@/,'').toLowerCase();
   const result=db.transaction(()=>{
-    if(!db.prepare('SELECT 1 FROM friends WHERE user_id=? AND friend_id=?').get(user.id,friendId))throw new Error('not_friend');
     const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id);if(!inst)throw new Error('not_owned');
-    const recipient=db.prepare('SELECT * FROM users WHERE id=?').get(friendId);if(!recipient)throw new Error('user_not_found');if(recipient.blocked)throw new Error('recipient_blocked');
-    if(activeCollectionCount(db,friendId)>=collectionLimit(recipient))throw new Error('recipient_full');
-    db.prepare('UPDATE username_instances SET owner_id=? WHERE id=?').run(friendId,instanceId);
-    db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(friendId,instanceId);
+    let recipient=null;
+    if(/^\d+$/.test(raw))recipient=db.prepare('SELECT * FROM users WHERE id=?').get(Number(raw));
+    if(!recipient&&username)recipient=db.prepare("SELECT * FROM users WHERE LOWER(username)=? ORDER BY last_seen DESC LIMIT 1").get(username);
+    if(!recipient)throw new Error('user_not_found');
+    if(recipient.id===user.id)throw new Error('gift_self');
+    if(recipient.blocked)throw new Error('recipient_blocked');
+    if(activeCollectionCount(db,recipient.id)>=collectionLimit(recipient))throw new Error('recipient_full');
+    const fee=Math.max(1,Math.round(Number(inst.value||0)*Number(GAME.transferFee||.05)));
+    const sender=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+    if(Number(sender.balance||0)<fee)throw new Error('insufficient_funds');
+    txBalance(db,user.id,'gift_fee',-fee,{instanceId,handle:inst.handle,toUserId:recipient.id,rate:Number(GAME.transferFee||.05)});
+    db.prepare('UPDATE username_instances SET owner_id=? WHERE id=?').run(recipient.id,instanceId);
+    db.prepare('UPDATE inventory SET user_id=? WHERE instance_id=?').run(recipient.id,instanceId);
     db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(instanceId);compactShowcase(db,user.id);
-    db.prepare('INSERT INTO username_transfers(id,instance_id,from_user_id,to_user_id,type,created_at) VALUES(?,?,?,?,?,?)').run(uid(),instanceId,user.id,friendId,'gift',nowIso());
-    bumpTask(db,user.id,'gift',1);grantXp(db,user.id,12,'gift',{instanceId,friendId});bumpSeasonScore(db,user.id,10);
-    return {handle:'@'+inst.handle,recipient:recipient.first_name||recipient.username||'Игрок'};
+    db.prepare('INSERT INTO username_transfers(id,instance_id,from_user_id,to_user_id,type,created_at) VALUES(?,?,?,?,?,?)').run(uid(),instanceId,user.id,recipient.id,'gift',nowIso());
+    bumpTask(db,user.id,'gift',1);grantXp(db,user.id,12,'gift',{instanceId,toUserId:recipient.id,fee});bumpSeasonScore(db,user.id,10);
+    return {handle:'@'+inst.handle,recipient:recipient.first_name||recipient.username||'Игрок',recipientUsername:recipient.username?('@'+recipient.username):'',fee,feeRate:Number(GAME.transferFee||.05)};
   })();
   return {ok:true,...result};
 }
