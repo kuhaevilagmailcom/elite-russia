@@ -657,6 +657,16 @@ function removeMarketLocal(id){
   const before=state.market.items.length;state.market.items=state.market.items.filter(x=>String(x.id)!==String(id));
   if(state.market.items.length!==before)state.market.total=Math.max(0,(state.market.total||0)-1);
 }
+async function submitGameAnswer(answer){
+ const session=state.gameSession;if(!session?.id)return;
+ const r=await api('/api/games/session/'+encodeURIComponent(session.id)+'/answer',{method:'POST',body:JSON.stringify({answer})});
+ state.gameSession=r;state.gameFeedback=r.result||null;state.gameBuildValue='';applyUserLocal(r.user);
+ if(state.games&&r.daily)state.games.daily=r.daily;
+ haptic(r.result?.correct?'light':'soft');if(r.result?.correct)sound('reward');
+ render();
+ if(!r.done&&state.gameFeedback)setTimeout(()=>{if(state.page==='miniGame'){state.gameFeedback=null;render()}},650);
+ if(r.done){try{state.games=await api('/api/games')}catch{}}
+}
 document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){setMenuOpen(false);return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
  if(el.hasAttribute('data-menu-open')){sound('tap');setMenuOpen(true);return}
  if(el.hasAttribute('data-menu-close')){setMenuOpen(false);return}
@@ -671,14 +681,38 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.buyProduct){
    if(!TG?.openInvoice)throw new Error('premium_unavailable');
    const r=await api('/api/shop/invoice',{method:'POST',body:JSON.stringify({productKey:el.dataset.buyProduct})});
-   TG.openInvoice(r.invoice,async status=>{if(status==='paid'){sound('reward');haptic('medium');toast('Покупка активирована');state.pageLoadedAt.premium=0;await load('premium',{force:true})}});
+   TG.openInvoice(r.invoice,async status=>{if(status==='paid'){sound('reward');haptic('medium');toast('💎 начислены');state.pageLoadedAt.shop=0;await load('shop',{force:true})}});
    return
  }
  if(el.dataset.selectCosmetic){
    const [type,key]=String(el.dataset.selectCosmetic).split(':');await api('/api/cosmetics/select',{method:'POST',body:JSON.stringify({type,key})});
-   if(state.premium){state.premium.selected=state.premium.selected||{};state.premium.selected[{theme:'theme_key',frame:'frame_key',card:'card_key'}[type]]=key}
+   if(state.shop){state.shop.selected=state.shop.selected||{};state.shop.selected.theme_key=key}
    await refreshUser();sound('tap');haptic('light');render();return
  }
+ if(el.dataset.buyTheme){
+   const r=await api('/api/shop/theme',{method:'POST',body:JSON.stringify({themeKey:el.dataset.buyTheme})});
+   state.shop.wallet=r.wallet;state.shop.owned=state.shop.owned||[];if(!state.shop.owned.some(x=>x.key===r.theme.key))state.shop.owned.push({type:'theme',key:r.theme.key});
+   toast('Тема куплена');haptic('light');render();return
+ }
+ if(el.dataset.gameStart){
+   const r=await api('/api/games/'+encodeURIComponent(el.dataset.gameStart)+'/start',{method:'POST'});
+   state.gameSession=r;state.gameKey=r.gameKey;state.gameFeedback=null;state.gameBuildValue='';state.backPage='games';state.page='miniGame';render();return
+ }
+ if(el.dataset.gameAnswer){await submitGameAnswer(el.dataset.gameAnswer);return}
+ if(el.hasAttribute('data-game-editor-submit')){
+   const value=String(document.querySelector('#gameEditorInput')?.value||'').trim();if(!value)return;await submitGameAnswer(value);return
+ }
+ if(el.dataset.gamePart!==undefined){
+   const part=String(el.dataset.gamePart||'');if(!part||state.gameBuildValue.length+part.length>32)return;
+   state.gameBuildValue+=part;el.disabled=true;const title=document.querySelector('.game-question-v7 h2');if(title)title.textContent='@'+state.gameBuildValue;
+   const submit=document.querySelector('[data-game-build-submit]');if(submit)submit.disabled=!state.gameBuildValue;return
+ }
+ if(el.hasAttribute('data-game-build-clear')){state.gameBuildValue='';render();return}
+ if(el.hasAttribute('data-game-build-submit')){if(state.gameBuildValue)await submitGameAnswer(state.gameBuildValue);return}
+ if(el.dataset.giftOpen){state.giftSheet=el.dataset.giftOpen;render();return}
+ if(el.hasAttribute('data-gift-sheet-close')){state.giftSheet='';render();return}
+ if(el.dataset.giftSelectItem){state.giftSelectedItem=el.dataset.giftSelectItem;state.giftSheet='';render();return}
+ if(el.dataset.giftSelectFriend){state.giftSelectedFriend=el.dataset.giftSelectFriend;state.giftSheet='';render();return}
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
@@ -743,7 +777,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
  if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
  if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
- if(el.hasAttribute('data-gift')){const instanceId=document.querySelector('#giftInstance')?.value,friendId=document.querySelector('#giftFriend')?.value;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);toast(r.handle+' отправлен пользователю '+r.recipient);render();return}
+ if(el.hasAttribute('data-gift')){const instanceId=state.giftSelectedItem,friendId=state.giftSelectedFriend;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftSelectedFriend='';toast(r.handle+' отправлен');render();return}
  if(el.dataset.upItem){
    const id=el.dataset.upItem;
    state.upgradeSelectedIds=[id];state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeScrollTop=0;
@@ -772,11 +806,13 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    }
    return
  }
- if(el.hasAttribute('data-premium')){const r=await api('/api/premium/invoice',{method:'POST'});if(!TG?.openInvoice)throw new Error('premium_unavailable');TG.openInvoice(r.invoice,async status=>{if(status==='paid'){toast('USERNAME+ активирован');await load('premium')}});return}
- if(el.hasAttribute('data-back')){await load(state.backPage||'collection');return}
+ if(el.hasAttribute('data-back')){if(state.page==='miniGame'){await load('games');return}await load(state.backPage||'collection');return}
 }catch(err){state.busy=false;toast(ERR[err.message]||'Что-то пошло не так');el.disabled=false}});
 let marketSearchTimer;
-document.addEventListener('input',e=>{if(e.target.id==='marketQuery'){clearTimeout(marketSearchTimer);const q=e.target.value||'';marketSearchTimer=setTimeout(async()=>{state.marketFilters.q=q;state.marketFilters.page=1;try{state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();requestAnimationFrame(()=>{const input=document.querySelector('#marketQuery');if(input){input.focus();input.setSelectionRange(q.length,q.length)}})}catch{}},320)}});
+document.addEventListener('input',e=>{
+ if(e.target.id==='marketQuery'){clearTimeout(marketSearchTimer);const q=e.target.value||'';marketSearchTimer=setTimeout(async()=>{state.marketFilters.q=q;state.marketFilters.page=1;try{state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();requestAnimationFrame(()=>{const input=document.querySelector('#marketQuery');if(input){input.focus();input.setSelectionRange(q.length,q.length)}})}catch{}},320)}
+ if(e.target.id==='giftFriendSearch'){const q=String(e.target.value||'').toLowerCase().trim();document.querySelectorAll('[data-gift-friend-row]').forEach(row=>{row.hidden=q&&!String(row.dataset.search||'').includes(q)})}
+});
 document.addEventListener('scroll',e=>{
  const list=e.target;if(!list?.classList?.contains('upgrade-list'))return;
  state.upgradeScrollTop=list.scrollTop;
