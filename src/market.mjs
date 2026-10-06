@@ -42,8 +42,6 @@ export function createListing(db,user,instanceId,price){
 export function cancelListing(db,user,listingId){
   db.transaction(()=>{
     const l=db.prepare("SELECT * FROM market_listings WHERE id=? AND seller_id=? AND status='active'").get(listingId,user.id);if(!l)throw new Error('listing_not_found');
-    const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
-    if(activeCollectionCount(db,user.id)>collectionLimit(fresh))throw new Error('collection_full');
     db.prepare("UPDATE market_listings SET status='cancelled',closed_at=? WHERE id=?").run(nowIso(),listingId);
     db.prepare("UPDATE username_instances SET status='owned' WHERE id=? AND owner_id=?").run(l.instance_id,user.id);
   })();
