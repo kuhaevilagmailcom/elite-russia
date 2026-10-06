@@ -101,11 +101,11 @@ async function api(url,opts={}){
  try{return await run}finally{if(key&&inflightGet.get(key)===run)inflightGet.delete(key)}
 }
 const ICON_NAME=Object.freeze({
- home:'home-01',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
- market:'shopping-bag-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
- friends:'user-group',gift:'gift',upgrade:'arrow-up-right-01',season:'award-01',
- collection:'grid-view',profile:'user-circle-02',premium:'gem',filter:'filter',
- search:'search-01',lab:'search-01',levels:'medal-01',achievements:'award-01',settings:'settings-01',
+ home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
+ market:'store-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
+ friends:'user-group',gift:'gift',upgrade:'rocket-01',season:'award-01',
+ collection:'grid-table',profile:'user-circle-02',premium:'gem',filter:'filter',
+ search:'search-01',lab:'test-tube-01',levels:'medal-01',achievements:'trophy',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
