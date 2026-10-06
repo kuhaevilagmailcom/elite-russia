@@ -24,13 +24,13 @@ function rowsFor(db,user){
   const asset=stat(db,"SELECT COALESCE(SUM(value),0) v FROM username_instances WHERE owner_id=? AND status IN ('owned','market')",user.id);
   const capital=Number(user.balance||0)+asset,level=Number(user.level||1);
   return [
-    {key:'first_drop',category:'Коллекция',icon:'package',title:'Первый улов',desc:'Открыть первый drop',current:drops,target:1,xp:25},
-    {key:'collector10',category:'Коллекция',icon:'layers-01',title:'Полка',desc:'Собрать 10 usernames',current:owned,target:10,xp:40},
-    {key:'collector50',category:'Коллекция',icon:'layers-01',title:'Коллекционер',desc:'Собрать 50 usernames',current:owned,target:50,xp:100},
-    {key:'clean10',category:'Коллекция',icon:'sparkles',title:'Чистая десятка',desc:'10 usernames без цифр',current:noDigits,target:10,xp:70},
-    {key:'purple',category:'Редкости',icon:'diamond-02',title:'Фиолетовый',desc:'Получить фиолетовый username',current:purple,target:1,xp:50},
-    {key:'gold',category:'Редкости',icon:'award-01',title:'Золотой билет',desc:'Получить золотой username',current:gold,target:1,xp:100},
-    {key:'gold3',category:'Редкости',icon:'award-01',title:'Золотой запас',desc:'Получить 3 золотых username',current:gold,target:3,xp:180},
+    {key:'first_drop',category:'Коллекция',icon:'package',title:'Первый улов',desc:'Открыть первый дроп',current:drops,target:1,xp:25},
+    {key:'collector10',category:'Коллекция',icon:'layers-01',title:'Полка',desc:'Собрать 10 юзернеймов',current:owned,target:10,xp:40},
+    {key:'collector50',category:'Коллекция',icon:'layers-01',title:'Коллекционер',desc:'Собрать 50 юзернеймов',current:owned,target:50,xp:100},
+    {key:'clean10',category:'Коллекция',icon:'sparkles',title:'Чистая десятка',desc:'10 юзернеймов без цифр',current:noDigits,target:10,xp:70},
+    {key:'purple',category:'Редкости',icon:'diamond-02',title:'Фиолетовый',desc:'Получить фиолетовый юзернейм',current:purple,target:1,xp:50},
+    {key:'gold',category:'Редкости',icon:'award-01',title:'Золотой билет',desc:'Получить золотой юзернейм',current:gold,target:1,xp:100},
+    {key:'gold3',category:'Редкости',icon:'award-01',title:'Золотой запас',desc:'Получить 3 золотых юзернейма',current:gold,target:3,xp:180},
     {key:'deal1',category:'Торговля',icon:'store-01',title:'Первая сделка',desc:'Совершить сделку',current:deals,target:1,xp:25},
     {key:'deal10',category:'Торговля',icon:'store-01',title:'На рынке',desc:'Совершить 10 сделок',current:deals,target:10,xp:80},
     {key:'sales25',category:'Торговля',icon:'chart-up',title:'Продавец',desc:'Сделать 25 продаж',current:sales,target:25,xp:150},
