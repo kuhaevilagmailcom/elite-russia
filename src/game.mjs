@@ -240,7 +240,7 @@ export function leaderboard(db){
   `).all();
   return rows.map((r,i)=>({...r,position:i+1,best_handle:r.best_handle?'@'+r.best_handle:null}));
 }
-const DAILY_TASK_POOL=Object.freeze([
+export const DAILY_TASK_POOL=Object.freeze([
   {key:'drop1',label:'Открыть drop',target:1,reward:450,source:'drop'},
   {key:'drop2',label:'Открыть 2 drops',target:2,reward:800,source:'drop'},
   {key:'drop3',label:'Открыть 3 drops',target:3,reward:1200,source:'drop'},
