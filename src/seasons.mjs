@@ -30,7 +30,7 @@ function finalizeSeason(db,s){
     db.prepare('UPDATE seasons SET active=0 WHERE id=?').run(s.id);
     const nextId=db.prepare('SELECT COALESCE(MAX(id),0)+1 id FROM seasons').get().id;
     const end=new Date(Date.now()+GAME.seasonDays*86400000).toISOString();
-    db.prepare('INSERT INTO seasons(name,start_at,end_at,active) VALUES(?,?,?,1)').run('Season '+nextId,ts,end);
+    db.prepare('INSERT INTO seasons(name,start_at,end_at,active) VALUES(?,?,?,1)').run('Сезон '+nextId,ts,end);
   })();
 }
 export function ensureSeasonLifecycle(db){
@@ -39,7 +39,7 @@ export function ensureSeasonLifecycle(db){
   let s=activeSeason(db);
   if(!s){
     const ts=nowIso(),nextId=db.prepare('SELECT COALESCE(MAX(id),0)+1 id FROM seasons').get().id,end=new Date(Date.now()+GAME.seasonDays*86400000).toISOString();
-    db.prepare('INSERT INTO seasons(name,start_at,end_at,active) VALUES(?,?,?,1)').run('Season '+nextId,ts,end);
+    db.prepare('INSERT INTO seasons(name,start_at,end_at,active) VALUES(?,?,?,1)').run('Сезон '+nextId,ts,end);
     s=activeSeason(db);
   }
   return s;
