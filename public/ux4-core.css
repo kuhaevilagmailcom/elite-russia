@@ -1039,3 +1039,215 @@ html.no-animations *::after{animation-duration:.001ms;animation-iteration-count:
   .menu-section{padding-top:5px}
   .menu-section-tile{height:52px;min-height:52px;gap:4px}
 }
+
+
+/* USERNAME 6.1.1 — complete dark theme contrast pass */
+html[data-theme="dark"]{
+  --u-soft:#20242A;
+  --u-money:#16251D;
+  --u-border:#2A2F36;
+  --u-muted:#98A2AD;
+  --upgrade-loss:#30363D;
+}
+html[data-theme="dark"] body,
+html[data-theme="dark"] button,
+html[data-theme="dark"] input,
+html[data-theme="dark"] select{color:var(--text)}
+html[data-theme="dark"] ::placeholder{color:#6F7883;opacity:1}
+
+/* Global controls and sheets */
+html[data-theme="dark"] .secondary,
+html[data-theme="dark"] .drop-cost-trigger.compact,
+html[data-theme="dark"] .sheet-title button,
+html[data-theme="dark"] .sheet-options button,
+html[data-theme="dark"] .collection-card .user-card-sell,
+html[data-theme="dark"] .wheel-card-clean .wheel-rare,
+html[data-theme="dark"] .wheel-card-clean .wheel-rare b,
+html[data-theme="dark"] .upgrade-target-chance,
+html[data-theme="dark"] .profile-showcase-empty,
+html[data-theme="dark"] .lab-daily,
+html[data-theme="dark"] .daily-card>button:disabled,
+html[data-theme="dark"] .home-mini-action:disabled{
+  background:var(--surface-subtle);color:var(--text);border-color:var(--border)
+}
+html[data-theme="dark"] .sheet-options button.active,
+html[data-theme="dark"] .task-claim,
+html[data-theme="dark"] .daily-card>button{
+  background:#F4F6F8;color:#111316
+}
+html[data-theme="dark"] .sheet-grabber{background:#454C55}
+html[data-theme="dark"] .filter-sheet{background:var(--card);color:var(--text)}
+html[data-theme="dark"] .filter-sheet>span,
+html[data-theme="dark"] .section-title,
+html[data-theme="dark"] .section-label{color:var(--muted)}
+
+/* Home / drop */
+html[data-theme="dark"] .drop-cost-trigger.compact,
+html[data-theme="dark"] .handle-stage.drop-trigger,
+html[data-theme="dark"] .drop-result-main,
+html[data-theme="dark"] .home-progress-side b,
+html[data-theme="dark"] .home-mini-action b,
+html[data-theme="dark"] .daily-card>div b,
+html[data-theme="dark"] .xp-head b,
+html[data-theme="dark"] .luck-row b,
+html[data-theme="dark"] .profile-luck b{color:var(--text)}
+html[data-theme="dark"] .home-metrics .metric{
+  background:var(--surface-subtle);border:1px solid var(--border)
+}
+html[data-theme="dark"] .home-shortcut{
+  background:var(--card);border-color:var(--border);color:var(--text)
+}
+html[data-theme="dark"] .home-shortcut .ico{color:var(--muted)}
+html[data-theme="dark"] .home-shortcut:active{background:var(--surface-subtle);border-color:#3A424B}
+html[data-theme="dark"] .xp-track,
+html[data-theme="dark"] .compact-task .progress{background:#2B3037}
+html[data-theme="dark"] .home-lab-banner,
+html[data-theme="dark"] .home-mini-action.lab,
+html[data-theme="dark"] .lab-hero{
+  background:#16232B;border-color:#264655;color:var(--text)
+}
+html[data-theme="dark"] .home-lab-banner>div small,
+html[data-theme="dark"] .lab-hero p,
+html[data-theme="dark"] .lab-hero small{color:#A5AFB9}
+
+/* Collection / market */
+html[data-theme="dark"] .screen-toolbar>button,
+html[data-theme="dark"] .market-search>button,
+html[data-theme="dark"] .market-search label{
+  background:var(--card);border-color:var(--border);color:var(--text)
+}
+html[data-theme="dark"] .market-filter-button,
+html[data-theme="dark"] .collection-filter-button,
+html[data-theme="dark"] .collection-card .user-card-main>b,
+html[data-theme="dark"] .collection-card .user-card-main>span,
+html[data-theme="dark"] .market-main>span,
+html[data-theme="dark"] .market-main>b{color:var(--text)}
+html[data-theme="dark"] .collection-card .user-card-main>small,
+html[data-theme="dark"] .market-main>small{color:var(--muted)}
+html[data-theme="dark"] .collection-card .user-card-sell{border-top-color:var(--border)}
+html[data-theme="dark"] .pager button{background:var(--card);border-color:var(--border);color:var(--text)}
+
+/* Ranking / social */
+html[data-theme="dark"] .rank-summary.money{
+  background:var(--card);border-color:var(--border);color:var(--text)
+}
+html[data-theme="dark"] .rank-summary.money>span,
+html[data-theme="dark"] .rank-summary.money>small,
+html[data-theme="dark"] .money-rank small,
+html[data-theme="dark"] .money-rank span{color:var(--muted)}
+html[data-theme="dark"] .money-rank.hero{
+  background:var(--u-money);border-color:#294435;color:var(--text)
+}
+html[data-theme="dark"] .friends-intro,
+html[data-theme="dark"] .ref-card,
+html[data-theme="dark"] .friend-row{color:var(--text)}
+html[data-theme="dark"] .ref-card input{background:var(--surface-subtle);border-color:var(--border);color:var(--text)}
+
+/* Tasks */
+html[data-theme="dark"] .compact-task .task-head b,
+html[data-theme="dark"] .compact-task .task-head strong{color:var(--text)}
+html[data-theme="dark"] .compact-task .task-head>span{color:var(--muted)}
+html[data-theme="dark"] .task-status{background:var(--surface-subtle);color:var(--muted)}
+html[data-theme="dark"] .task-status.done{background:#193025;color:#75C997}
+
+/* Wheel */
+html[data-theme="dark"] .wheel-card-clean .wheel-copy b,
+html[data-theme="dark"] .wheel-card-clean .wheel-rare b,
+html[data-theme="dark"] .fortune-hub b{color:var(--text)}
+html[data-theme="dark"] .wheel-card-clean .wheel-copy span,
+html[data-theme="dark"] .wheel-card-clean .wheel-rare span{color:var(--muted)}
+html[data-theme="dark"] .fortune-pointer:after{background:#F4F6F8}
+
+/* Gift */
+html[data-theme="dark"] .gift-card select,
+html[data-theme="dark"] .form-card select{
+  background:var(--surface-subtle);border-color:var(--border);color:var(--text)
+}
+
+/* Upgrader — every hard-coded light-theme text/surface */
+html[data-theme="dark"] .upgrade-step-head>b,
+html[data-theme="dark"] .upgrade-step-head>div>b,
+html[data-theme="dark"] .upgrade-list-title b,
+html[data-theme="dark"] .upgrade-source-handle,
+html[data-theme="dark"] .upgrade-target-main b,
+html[data-theme="dark"] .upgrade-target-chance strong,
+html[data-theme="dark"] .upgrade-target-loading>b,
+html[data-theme="dark"] .upgrade-footer>div b,
+html[data-theme="dark"] .upgrade-match-side b,
+html[data-theme="dark"] .upgrade-roulette-clean .upgrade-ring-core b,
+html[data-theme="dark"] .upgrade-result-panel>b{color:var(--text)}
+html[data-theme="dark"] .upgrade-step-head span,
+html[data-theme="dark"] .upgrade-list-title span,
+html[data-theme="dark"] .upgrade-source-price,
+html[data-theme="dark"] .upgrade-target-main span,
+html[data-theme="dark"] .upgrade-target-chance small,
+html[data-theme="dark"] .upgrade-target-loading span,
+html[data-theme="dark"] .upgrade-footer>div span,
+html[data-theme="dark"] .upgrade-match-side span,
+html[data-theme="dark"] .upgrade-result-panel>span,
+html[data-theme="dark"] .upgrade-result-panel>small{color:var(--muted)}
+html[data-theme="dark"] .upgrade-source-summary{
+  background:#F4F6F8;color:#111316
+}
+html[data-theme="dark"] .upgrade-source-summary strong{color:#5F6872}
+html[data-theme="dark"] .upgrade-source-card.selected,
+html[data-theme="dark"] .upgrade-target-pick.selected{
+  background:#172A34;border-color:#2D7291
+}
+html[data-theme="dark"] .upgrade-target-pick.selected .upgrade-target-chance,
+html[data-theme="dark"] .upgrade-target-pick.selected>i{background:#1D3642}
+html[data-theme="dark"] .upgrade-footer,
+html[data-theme="dark"] .upgrade-matchup,
+html[data-theme="dark"] .upgrade-wheel-card,
+html[data-theme="dark"] .upgrade-result-panel{
+  background:var(--card);border-color:var(--border)
+}
+html[data-theme="dark"] .upgrade-match-side.target{background:#1D2228}
+html[data-theme="dark"] .upgrade-match-arrow,
+html[data-theme="dark"] .upgrade-ring-core,
+html[data-theme="dark"] .upgrade-wheel-rotor .upgrade-ring:before{background:var(--card);color:var(--muted)}
+html[data-theme="dark"] .upgrade-pointer-static{background:#F4F6F8}
+html[data-theme="dark"] .upgrade-result-panel.success{background:#16271E;border-color:#2E5A3D}
+html[data-theme="dark"] .upgrade-result-panel.fail{background:#271B1D;border-color:#5B3439}
+
+/* Profile / Plus / Lab / settings */
+html[data-theme="dark"] .profile-showcase-empty b,
+html[data-theme="dark"] .premium-page-clean .feature-list>div,
+html[data-theme="dark"] .lab-hero h2,
+html[data-theme="dark"] .lab-input-card label,
+html[data-theme="dark"] .lab-input-card input,
+html[data-theme="dark"] .lab-score span,
+html[data-theme="dark"] .lab-score b,
+html[data-theme="dark"] .settings-title b,
+html[data-theme="dark"] .settings-row>span:nth-child(2) b,
+html[data-theme="dark"] .level-rewards article,
+html[data-theme="dark"] .achievement-list article{color:var(--text)}
+html[data-theme="dark"] .profile-showcase-empty span,
+html[data-theme="dark"] .premium-page-clean .plus-hero p,
+html[data-theme="dark"] .lab-daily span,
+html[data-theme="dark"] .lab-daily small,
+html[data-theme="dark"] .lab-breakdown .metric span,
+html[data-theme="dark"] .lab-reward span,
+html[data-theme="dark"] .settings-title span,
+html[data-theme="dark"] .settings-row>span:nth-child(2) small{color:var(--muted)}
+html[data-theme="dark"] .premium-page-clean .feature-list .ico{
+  background:#18313D;color:#55C1EF
+}
+html[data-theme="dark"] .lab-breakdown .metric{
+  background:#20242A;border-color:#30363D
+}
+html[data-theme="dark"] .lab-input-card label{background:var(--surface-subtle);border-color:var(--border)}
+html[data-theme="dark"] .lab-input-card input{background:transparent}
+html[data-theme="dark"] .theme-segment button{
+  background:var(--surface-subtle);border-color:var(--border);color:var(--muted)
+}
+html[data-theme="dark"] .theme-segment button.active{
+  background:#172A34;border-color:var(--accent);color:var(--accent)
+}
+html[data-theme="dark"] .switch{background:#444B54}
+html[data-theme="dark"] .switch.on{background:var(--accent)}
+html[data-theme="dark"] .switch:after{background:#F4F6F8}
+
+/* Modals */
+html[data-theme="dark"] .modal-head button{background:var(--surface-subtle);color:var(--text)}
+html[data-theme="dark"] .system-sell-copy{color:var(--muted)}
