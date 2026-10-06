@@ -4,7 +4,7 @@ import {analyzeUsername,normalizeUsername,isGameUsername} from './valuation.mjs'
 import {todayKey,txBalance,bumpTask,nowIso} from './economy.mjs';
 import {grantXp} from './progression.mjs';
 
-export const MINI_GAME_DAILY_CAP=40000;
+export const MINI_GAME_DAILY_CAP=100000;
 export const MINI_GAMES=Object.freeze([
   {key:'hunt',title:'Username Hunt',icon:'search-visual',bestLabel:'Серия'},
   {key:'higher',title:'Выше / ниже',icon:'chart-up',bestLabel:'Верных'},
@@ -16,10 +16,10 @@ export const MINI_GAMES=Object.freeze([
 const SESSION_TTL_MS=10*60*1000;
 const QUESTION_COUNT=5;
 const PRICE_BANDS=[
-  {key:'under3',label:'до $3K',min:0,max:2999},
-  {key:'3to10',label:'$3K–10K',min:3000,max:9999},
-  {key:'10to50',label:'$10K–50K',min:10000,max:49999},
-  {key:'50plus',label:'$50K+',min:50000,max:Number.MAX_SAFE_INTEGER}
+  {key:'under3',label:'до 3K ₽',min:0,max:2999},
+  {key:'3to10',label:'3K–10K ₽',min:3000,max:9999},
+  {key:'10to50',label:'10K–50K ₽',min:10000,max:49999},
+  {key:'50plus',label:'50K+ ₽',min:50000,max:Number.MAX_SAFE_INTEGER}
 ];
 
 function ensureSchema(db){
@@ -168,11 +168,16 @@ function resolveAnswer(key,q,answer,state){
     return {correct,reward:correct?Math.min(1500,250+Math.round(gain*.08)):50,xp:correct?12:4,score:gain,detail:{before:before.value,after:after.value,handle:'@'+next,gain}};
   }
   if(key==='build'){
-    const raw=Array.isArray(answer)?answer.join(''):String(answer||''),next=normalizeUsername(raw);
-    const allowed=q.parts.join('|'),parts=[...q.parts],copy=next;
-    let remaining=copy;
-    for(const part of parts.sort((a,b)=>b.length-a.length)){const idx=remaining.indexOf(part);if(idx>=0)remaining=remaining.slice(0,idx)+remaining.slice(idx+part.length)}
-    if(remaining||!isGameUsername(next))throw new Error('game_bad_build');
+    const raw=Array.isArray(answer)?answer.join(''):String(answer||''),next=normalizeUsername(raw),parts=[...q.parts];
+    const canBuild=(text,remaining)=>{
+      if(!text.length)return remaining.length===0;
+      for(let i=0;i<remaining.length;i++){
+        const part=remaining[i];
+        if(text.startsWith(part)&&canBuild(text.slice(part.length),remaining.slice(0,i).concat(remaining.slice(i+1))))return true;
+      }
+      return false;
+    };
+    if(!isGameUsername(next)||!canBuild(next,parts))throw new Error('game_bad_build');
     const a=analyzeUsername(next),reward=Math.min(1800,Math.max(100,Math.round(a.value*.03)));
     return {correct:true,reward,xp:10,score:a.value,detail:{handle:'@'+next,value:a.value,visual:a.visual}};
   }
@@ -187,6 +192,7 @@ function finishSession(db,row,state){
     VALUES(?,?,?,?,?) ON CONFLICT(user_id,earning_date) DO UPDATE SET plays=plays+1,updated_at=excluded.updated_at`)
     .run(row.user_id,todayKey(),0,1,ts);
   bumpTask(db,row.user_id,'games',1);
+  bumpTask(db,row.user_id,'game_'+row.game_key,1);
   if(row.game_key==='hunt'&&state.score>=3)bumpTask(db,row.user_id,'hunt_win',1);
 }
 export function gamesHub(db,user){
@@ -206,14 +212,16 @@ export function startMiniGame(db,user,key){
     .run(id,user.id,key,JSON.stringify(payload),JSON.stringify(state),created,expires);
   return {game,...sessionView(db.prepare('SELECT * FROM mini_game_sessions WHERE id=?').get(id)),daily:gamesHub(db,user).daily};
 }
-export function answerMiniGame(db,user,sessionId,answer){
+export function answerMiniGame(db,user,sessionId,answer,expectedIndex=null){
   ensureSchema(db);
   return db.transaction(()=>{
     const row=db.prepare('SELECT * FROM mini_game_sessions WHERE id=? AND user_id=?').get(String(sessionId||''),user.id);
     if(!row)throw new Error('game_session_not_found');
     if(row.finished_at)throw new Error('game_finished');
     if(new Date(row.expires_at).getTime()<Date.now())throw new Error('game_session_expired');
-    const payload=safePayload(row),state=safeState(row),q=payload[state.index];if(!q)throw new Error('game_finished');
+    const payload=safePayload(row),state=safeState(row);
+    if(expectedIndex!==null&&Number(expectedIndex)!==Number(state.index))throw new Error('game_stale_answer');
+    const q=payload[state.index];if(!q)throw new Error('game_finished');
     const resolved=resolveAnswer(row.game_key,q,answer,state);
     if(resolved.correct){state.score=(state.score||0)+1;state.streak=(state.streak||0)+1}else state.streak=0;
     if(Number.isFinite(resolved.score))state.bestScore=Math.max(Number(state.bestScore||0),Number(resolved.score||0));
@@ -226,5 +234,9 @@ export function answerMiniGame(db,user,sessionId,answer){
     const fresh=db.prepare('SELECT * FROM mini_game_sessions WHERE id=?').get(row.id);
     return {...sessionView(fresh),result:{correct:!!resolved.correct,reward:money,xp,detail:resolved.detail},daily:gamesHub(db,user).daily};
   })();
+}
+export function cleanupMiniGameSessions(db){
+  const expired=new Date(Date.now()-24*3600000).toISOString(),finished=new Date(Date.now()-7*24*3600000).toISOString();
+  return db.prepare('DELETE FROM mini_game_sessions WHERE (finished_at IS NULL AND expires_at<?) OR (finished_at IS NOT NULL AND finished_at<?)').run(expired,finished).changes;
 }
 export function ensureMiniGameSchema(db){ensureSchema(db);return true}
