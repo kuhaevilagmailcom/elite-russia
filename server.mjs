@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {GAME} from './src/config.mjs';
 import {createDatabase} from './src/database.mjs';
-import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,setShowcase,sellOwnedUsername} from './src/game.mjs';
+import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,sellOwnedUsername} from './src/game.mjs';
 import {listMarket,createListing,cancelListing,buyListing} from './src/market.mjs';
 import {registerReferral,friendsData,giftUsername} from './src/social.mjs';
 import {wheelStatus,spinWheel} from './src/wheel.mjs';
@@ -279,7 +279,6 @@ async function api(req,res,url){
     }
     if(req.method==='GET'&&url.pathname==='/api/profile')return json(res,200,{profile:profile(db,user.id)});
     const other=url.pathname.match(/^\/api\/profile\/(\d+)$/);if(req.method==='GET'&&other){const targetId=Number(other[1]);if(targetId!==user.id)bumpTask(db,user.id,'view_profile',1);const p=profile(db,targetId);return p?json(res,200,{profile:p}):json(res,404,{error:'user_not_found'})}
-    const showcase=url.pathname.match(/^\/api\/showcase\/([^/]+)$/);if(req.method==='POST'&&showcase){return json(res,200,setShowcase(db,user,showcase[1]))}
     const collectionSell=url.pathname.match(/^\/api\/collection\/([^/]+)\/sell$/);if(req.method==='POST'&&collectionSell){const result=sellOwnedUsername(db,user,collectionSell[1]);invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/market')return json(res,200,listMarket(db,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1)}));
