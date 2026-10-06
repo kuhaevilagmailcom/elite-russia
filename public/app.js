@@ -22,7 +22,7 @@ const ERR={
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
 function syncViewportNow(){
@@ -58,14 +58,14 @@ const EN_TEXT=Object.freeze({
  'Комиссия':'Fee','Сумма':'Total','Твои usernames':'Your usernames','Выбрать цель':'Choose target','Подбираем варианты…':'Finding targets…',
  'Шанс':'Chance','ШАНС':'CHANCE','Не выпало':'Missed','Продолжить':'Continue','Бесплатное вращение':'Free spin',
  'Уже использовано':'Already used','Одно вращение раз в 24 часа':'One spin every 24 hours','Крутить':'Spin','Недоступно':'Unavailable',
- 'КОЛЕСО УДАЧИ':'LUCKY WHEEL','РАЗ В 24 ЧАСА':'EVERY 24 HOURS','Шансы':'Odds','Выпало':'Result',
+ 'КОЛЕСО УДАЧИ':'LUCKY WHEEL','РАЗ В 24 ЧАСА':'EVERY 24 HOURS','24Ч':'24H','КРУТИ':'SPIN','Шансы':'Odds','Выпало':'Result',
  'Сегодня':'Today','Лучший':'Best','Какой дороже?':'Which is worth more?','Выше':'Higher','Ниже':'Lower','Проверить':'Check',
  'Сбросить':'Reset','Готово':'Done','К играм':'Back to games','Игра не запущена.':'Game not started.',
  'Кристаллы':'Crystals','Темы':'Themes','Купить':'Buy','Выбрано':'Selected','Применить':'Apply',
  'Пользователь':'Player','Игрок':'Player','Без username':'No username','Без usernames':'No usernames',
  'Место':'Rank','Осталось':'Time left','Награды':'Rewards','Активные серии':'Active events','ТЕКУЩИЙ СЕЗОН':'CURRENT SEASON',
  'Приглашено':'Invited','До следующей':'Until next','ТВОЯ ССЫЛКА':'YOUR LINK','Скопировать':'Copy','Отправить другу':'Share',
- 'Новичок':'Beginner','Свой':'Regular','В теме':'In the know','Бывалый':'Experienced','Продвинутый':'Advanced','Мастер':'Master',
+ 'Очки сезона':'Season Score','Новичок':'Beginner','Свой':'Regular','В теме':'In the know','Бывалый':'Experienced','Продвинутый':'Advanced','Мастер':'Master',
  'Профи':'Pro','Эксперт':'Expert','Топовый':'Top tier','Имба':'Overpowered','Ветеран':'Veteran','Авторитет':'Authority','Элита':'Elite',
  'Титан':'Titan','Босс':'Boss','Легенда':'Legend','Икона':'Icon','Чемпион':'Champion','Грандмастер':'Grandmaster','Абсолют':'Absolute','Легендарный':'Legendary',
  'Первый улов':'First catch','Полка':'Shelf','Коллекционер':'Collector','Чистая десятка':'Clean ten','Фиолетовый':'Purple',
@@ -75,7 +75,7 @@ const EN_TEXT=Object.freeze({
  'Продать username':'Sell a username','Продать 2 usernames':'Sell 2 usernames','Продать 3 usernames':'Sell 3 usernames',
  'Оставить username':'Keep a username','Оставить 2 usernames':'Keep 2 usernames','Сыграть 1 мини-игру':'Play 1 mini-game',
  'Сыграть 3 мини-игры':'Play 3 mini-games','Сыграть 5 мини-игр':'Play 5 mini-games','Сыграть 7 мини-игр':'Play 7 mini-games','Сыграть 10 мини-игр':'Play 10 mini-games',
- 'Выиграть Username Hunt':'Win Username Hunt','Выиграть Username Hunt дважды':'Win Username Hunt twice','Сыграть в Username Hunt':'Play Username Hunt',
+ 'Выиграть Охоту за username':'Win Username Hunt','Выиграть Охоту за username дважды':'Win Username Hunt twice','Сыграть в Охоту за username':'Play Username Hunt',
  'Сыграть в Выше / ниже':'Play Higher / Lower','Сыграть в Редактор':'Play Editor','Сыграть в Собери username':'Play Build username','Сыграть в Угадай цену':'Play Guess the price',
  'Купить username':'Buy a username','Купить 2 usernames':'Buy 2 usernames','Получить username от 15K ₽':'Get a username worth 15K ₽+',
  'Получить 2 username от 15K ₽':'Get 2 usernames worth 15K ₽+','Получить username без цифр':'Get a username without digits',
@@ -361,7 +361,7 @@ function wheelGeometry(items){
 function wheelShortLabel(x){
  if(x.type==='username')return '1/1';
  if(x.type==='drop')return 'DROP';
- return String(x.label||'').replace('$1 500','$1.5K').replace(' бесплатный дроп',' DROP');
+ return String(x.label||'').replace(' бесплатный дроп',' DROP');
 }
 function wheelPoint(angle,r=48){
  const a=(Number(angle)-90)*Math.PI/180;
@@ -395,7 +395,7 @@ function wheelSvgMarkup(rows){
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),last=state.wheelLastResult,total=Math.max(1,(w.rewards||[]).reduce((s,x)=>s+Number(x.weight||0),0));
  return '<div class="wheel-page wheel-v8"><section class="wheel-v8-card"><div class="wheel-v8-head"><div><small>КОЛЕСО УДАЧИ</small><b>РАЗ В 24 ЧАСА</b></div><span>'+icon('wheel')+'</span></div>'+
-  '<div class="fortune-stage wheel-v8-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>24H</b><span>SPIN</span></div></div>'+
+  '<div class="fortune-stage wheel-v8-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>24Ч</b><span>КРУТИ</span></div></div>'+
   '<div class="wheel-odds-v8"><span>Шансы</span><div>'+(w.rewards||[]).map(x=>'<small><b>'+esc(wheelShortLabel(x))+'</b><em>'+((Number(x.weight||0)/total)*100).toFixed(Number(x.weight||0)<5?1:0)+'%</em></small>').join('')+'</div></div>'+
  '</section><div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее вращение через '+untilText(w.nextAt)))+'</span></div>'+
  '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить':'Недоступно')+'</button>'+
@@ -776,7 +776,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
- if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page=1');render();return}
+ if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page=1');render();return}
  if(el.dataset.marketFilter){state.marketFilters[el.dataset.marketFilter]=el.dataset.filterValue;state.marketFilters.page=1;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();return}
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
@@ -795,7 +795,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    applyUserLocal(r.user);if(state.home){state.home.pending=null;state.home.last=r.instance}
    toast(action==='keep'?'Добавлено в коллекцию':'Username продан');state.busy=false;render();return
  }
- if(el.dataset.pager){const d=Number(el.dataset.dir);if(el.dataset.pager==='collection'){state.filters.page+=d;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page='+state.filters.page);render()}if(el.dataset.pager==='market'){state.marketFilters.page+=d;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);render()}if(el.dataset.pager==='rank'){state.rankPage+=d;render()}return}
+ if(el.dataset.pager){const d=Number(el.dataset.dir);if(el.dataset.pager==='collection'){state.filters.page+=d;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page='+state.filters.page);render()}if(el.dataset.pager==='market'){state.marketFilters.page+=d;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);render()}if(el.dataset.pager==='rank'){state.rankPage+=d;render()}return}
  if(el.dataset.marketBuy){const id=el.dataset.marketBuy,r=await api('/api/market/'+id+'/buy',{method:'POST'});removeMarketLocal(id);toast('Куплено '+r.handle);await refreshUser();render();return}
  if(el.dataset.marketCancel){const id=el.dataset.marketCancel;await api('/api/market/'+id+'/cancel',{method:'POST'});removeMarketLocal(id);toast('Лот снят');render();return}
  if(el.dataset.claim){
@@ -807,7 +807,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.backPage='top';state.page='profile';state.profile=r;render();return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
- if(el.dataset.showcase){const r=await api('/api/showcase/'+el.dataset.showcase,{method:'POST'});if(state.detail&&state.detail.id===el.dataset.showcase)state.detail.inShowcase=r.active;const item=state.collection?.items?.find(x=>x.id===el.dataset.showcase);if(item)item.inShowcase=r.active;toast(r.active?'Добавлено на витрину':'Убрано с витрины');render();return}
  if(el.dataset.sellSystem){openSystemSellModal(el.dataset.sellSystem,el.dataset.handle,Number(el.dataset.value));return}
  if(el.dataset.confirmSystemSell){
    const id=el.dataset.confirmSystemSell,r=await api('/api/collection/'+id+'/sell',{method:'POST'});
