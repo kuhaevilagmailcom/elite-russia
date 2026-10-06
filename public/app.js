@@ -375,25 +375,25 @@ function appendUpgradeBatch(){
 }
 
 function upgraderView(){
- const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),source=selected[0],stage=state.upgradeStage||'source',round=state.upgradeLastRound;
+ const u=state.upgrader||{available:[],maxItems:3},selected=selectedUpgradeItems(),source=selected[0],sourceTotal=selected.reduce((sum,x)=>sum+Number(x.value||0),0),stage=state.upgradeStage||'source',round=state.upgradeLastRound;
  if(stage==='source'){
-  return '<div class="upgrade-page upgrade-source-stage"><div class="upgrade-list-title"><b>Твой username</b><span>'+(u.available||[]).length+'</span></div><div class="upgrade-list upgrade-source-list">'+
+  return '<div class="upgrade-page upgrade-source-stage"><div class="upgrade-list-title"><b>Твои usernames</b><span>'+selected.length+' / '+Number(u.maxItems||3)+'</span></div><div class="upgrade-list upgrade-source-list">'+
    ((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+
-  '</div></div>';
+  '</div><div class="upgrade-footer source-footer"><div><span>Сумма</span><b>'+fmt(sourceTotal)+'</b></div><button class="primary" data-upgrade-preview '+(!selected.length?'disabled':'')+'>Выбрать цель</button></div></div>';
  }
  if(stage==='target'){
-  const targets=upgradeTargetOptions(),picked=selectedUpgradeTarget();
+  const targets=upgradeTargetOptions(),picked=selectedUpgradeTarget(),total=Number(state.upgradePreview?.totalValue||sourceTotal),count=Number(state.upgradePreview?.sources?.length||selected.length||1);
   return '<div class="upgrade-page upgrade-target-stage">'+
-   '<section class="upgrade-source-summary"><div><b data-fit-username data-max-size="20" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'—')+'</strong></div></section>'+
+   '<section class="upgrade-source-summary"><div><b>'+(count>1?(count+' usernames'):(source?esc(source.handle):'—'))+'</b><strong>'+fmt(total)+'</strong></div></section>'+
    '<div class="upgrade-target-list">'+(targets.length?targets.map(upgradeTargetRowHtml).join(''):'<div class="empty">Подбираем варианты…</div>')+'</div>'+
    '<div class="upgrade-footer"><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+'</button><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>Апгрейд</button></div>'+
   '</div>';
  }
- const picked=selectedUpgradeTarget(),liveSource=round?.source||source,target=round?.target||picked?.target||state.upgradeOutcome?.target;
+ const picked=selectedUpgradeTarget(),roundSources=round?.sources||[],liveSources=roundSources.length?roundSources:selected,liveTotal=liveSources.reduce((sum,x)=>sum+Number(x.value||0),0),liveLabel=liveSources.length>1?(liveSources.length+' usernames'):(liveSources[0]?.handle||'—'),target=round?.target||picked?.target||state.upgradeOutcome?.target;
  const chanceValue=round?.chance??picked?.chance??state.upgradeOutcome?.chance??0,chance=upgradeChanceText(chanceValue),angle=Math.max(3,Math.min(331.2,Number(chanceValue||0)*360)),landing=round?Number(state.upgradeLandingAngle||0):0,wheelAngle=round?((360-(landing%360))%360):0;
  const done=!!state.upgradeOutcome&&!state.upgradeSpinning&&!!round,success=!!state.upgradeOutcome?.success;
  return '<div class="upgrade-page upgrade-spin-stage">'+
-  '<section class="upgrade-matchup"><div class="upgrade-match-side source"><b data-fit-username data-max-size="18" data-min-size="11">'+(liveSource?esc(liveSource.handle):'—')+'</b><strong>'+(liveSource?fmt(liveSource.value):'—')+'</strong></div><div class="upgrade-match-arrow">→</div><div class="upgrade-match-side target"><b data-fit-username data-max-size="18" data-min-size="11">'+(target?esc(target.handle):'—')+'</b><strong>'+(target?fmt(target.value):'—')+'</strong></div></section>'+
+  '<section class="upgrade-matchup"><div class="upgrade-match-side source"><b data-fit-username data-max-size="18" data-min-size="11">'+esc(liveLabel)+'</b><strong>'+fmt(liveTotal)+'</strong></div><div class="upgrade-match-arrow">→</div><div class="upgrade-match-side target"><b data-fit-username data-max-size="18" data-min-size="11">'+(target?esc(target.handle):'—')+'</b><strong>'+(target?fmt(target.value):'—')+'</strong></div></section>'+
   '<section class="upgrade-wheel-card ready '+(done?(success?'round-win':'round-fail'):'')+'"><div class="upgrade-roulette upgrade-roulette-clean" style="--chance-angle:'+angle+'deg"><div class="upgrade-wheel-rotor" id="upgradeRotor" style="transform:rotate('+wheelAngle+'deg)"><div class="upgrade-ring"></div></div><div class="upgrade-pointer-static"></div><div class="upgrade-ring-core"><b>'+chance+'%</b></div></div></section>'+
   (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><b>'+(success?'Получено '+esc(state.upgradeOutcome.result.handle):'Не выпало')+'</b><button class="primary" data-upgrade-continue>Продолжить</button></section>':'')+
  '</div>';
@@ -607,7 +607,7 @@ async function refreshUpgradePreview(){
  }
 }
 async function animateUpgradeWheel(result){
- const source=result.sources?.[0]||selectedUpgradeItems()[0]||null;
+ const sources=result.sources?.length?result.sources:selectedUpgradeItems();
  state.upgradeOutcome=result;state.upgradeSpinning=true;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();
  const rotor=document.querySelector('#upgradeRotor');if(!rotor){state.upgradeSpinning=false;render();return}
  const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(5,winArc/3),unit=rollRandomInt(10000)/10000;
@@ -617,7 +617,7 @@ async function animateUpgradeWheel(result){
  await animateRotation(rotor,wheelDegrees,3200,'cubic-bezier(.12,.72,.08,1)');
  rotor.closest('.upgrade-roulette-clean')?.classList.remove('spinning');
  haptic(result.success?'medium':'light');sound(result.success?'reward':'fail');
- state.upgradeLandingAngle=landing;state.upgradeLastRound={source,target:result.target,chance:Number(result.chance||0),success:!!result.success};
+ state.upgradeLandingAngle=landing;state.upgradeLastRound={sources,target:result.target,chance:Number(result.chance||0),success:!!result.success};
  state.upgradeSpinning=false;state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeTargetSessionId='';
  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
 }
@@ -763,10 +763,11 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
  if(el.hasAttribute('data-gift')){const instanceId=state.giftSelectedItem,friendId=state.giftSelectedFriend;if(!instanceId||!friendId){toast('Выберите username и друга');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,friendId})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftSelectedFriend='';toast(r.handle+' отправлен');render();return}
  if(el.dataset.upItem){
-   const id=el.dataset.upItem;
-   state.upgradeSelectedIds=[id];state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeScrollTop=0;
-   await refreshUpgradePreview();return
+   const id=el.dataset.upItem,max=Number(state.upgrader?.maxItems||3),list=[...(state.upgradeSelectedIds||[])],at=list.indexOf(id);
+   if(at>=0)list.splice(at,1);else{if(list.length>=max){toast('Максимум '+max);return}const next=state.upgrader?.available?.find(x=>x.id===id),first=state.upgrader?.available?.find(x=>x.id===list[0]);if(first&&next&&first.rarity!==next.rarity){toast('Выбирай usernames одной редкости');return}list.push(id)}
+   state.upgradeSelectedIds=list;state.upgradePreview=null;state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeScrollTop=0;render();return
  }
+ if(el.hasAttribute('data-upgrade-preview')){await refreshUpgradePreview();return}
  if(el.hasAttribute('data-upgrade-back-source')){
    state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeLastRound=null;state.upgradeLandingAngle=0;render();return
  }
