@@ -1,3 +1,4 @@
+import {USERNAME_RULES} from './config.mjs';
 const COMMON_WORDS=new Set([
   'money','game','video','photo','music','car','cars','love','news','shop','bank','market','trade','stock','vault',
   'crypto','coin','profit','capital','business','studio','media','audio','design','art','film','camera','player','level',
@@ -40,8 +41,8 @@ export function normalizeUsername(input){
 }
 export function isGameUsername(input,{allowCuratedShort=false}={}){
   const h=normalizeUsername(input);
-  if(allowCuratedShort&&/^[a-z0-9_]{3}$/.test(h))return true;
-  return /^[a-z0-9_]{4,15}$/.test(h)&&/[a-z]/.test(h);
+  if(allowCuratedShort&&/^[a-z][a-z0-9_]{2}$/.test(h))return true;
+  return new RegExp(USERNAME_RULES.pattern).test(h);
 }
 function pronounceability(h){
   const letters=h.replace(/[^a-z]/g,'');if(!letters)return 0;
