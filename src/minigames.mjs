@@ -6,10 +6,10 @@ import {grantXp} from './progression.mjs';
 
 export const MINI_GAME_DAILY_CAP=100000;
 export const MINI_GAMES=Object.freeze([
-  {key:'hunt',title:'Охота за username',icon:'search-visual',bestLabel:'Серия'},
+  {key:'hunt',title:'Охота за юзернеймом',icon:'search-visual',bestLabel:'Серия'},
   {key:'higher',title:'Выше / ниже',icon:'chart-up',bestLabel:'Верных'},
   {key:'editor',title:'Редактор',icon:'edit-02',bestLabel:'Прирост'},
-  {key:'build',title:'Собери username',icon:'puzzle',bestLabel:'Цена'},
+  {key:'build',title:'Собери юзернейм',icon:'puzzle',bestLabel:'Цена'},
   {key:'price',title:'Угадай цену',icon:'money-bag-02',bestLabel:'Верных'}
 ]);
 
