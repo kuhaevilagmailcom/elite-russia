@@ -102,10 +102,10 @@ async function api(url,opts={}){
 }
 const ICON_NAME=Object.freeze({
  home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
- market:'store-01',rank:'chart-increase',tasks:'task-01',wheel:'circle-gauge',
+ market:'store-01',rank:'ranking',tasks:'task-done-01',wheel:'target-01',
  friends:'user-group',gift:'gift',upgrade:'rocket-01',season:'award-01',
- collection:'grid-table',profile:'user-circle-02',premium:'gem',filter:'filter',
- search:'search-01',lab:'test-tube-01',levels:'medal-01',achievements:'trophy',settings:'settings-02',
+ collection:'layers-01',profile:'user-circle-02',premium:'diamond-02',filter:'filter',
+ search:'search-01',lab:'test-tube-01',levels:'medal-01',achievements:'crown',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
@@ -132,7 +132,7 @@ function setMenuOpen(open){
  render();
 }
 function menuHtml(){
- const tiles=list=>list.map(([p,i,t])=>'<button class="menu-section-tile" data-page="'+p+'" aria-label="'+esc(t)+'">'+icon(i)+'<span>'+esc(t)+'</span></button>').join('');
+ const tiles=list=>list.map(([p,i,t])=>'<button class="menu-section-tile" data-page="'+p+'" aria-label="'+esc(t)+'"><span class="menu-tile-icon">'+icon(i)+'</span><span class="menu-tile-label">'+esc(t)+'</span></button>').join('');
  const groups=MENU_SECTIONS.map(s=>'<section class="menu-section"><b>'+esc(s.title)+'</b><div>'+tiles(s.items)+'</div></section>').join('');
  return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-sections-sheet" data-menu-sheet>'+
   '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin">'+icon('admin')+'<span>Админ</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
