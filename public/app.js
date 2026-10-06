@@ -226,8 +226,8 @@ function homeView(){
  const h=state.home,u=h.user,p=h.pending,tiers=h.config?.dropTiers||{},tier=selectedDropTier(),free=u.freeDrops>0&&tier.key==='basic',payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
  return '<div class="home-v7">'+
   '<section class="home-level-v7">'+xpBar(u)+'</section>'+
+  (!p?'<div class="home-stake-top"><button class="drop-price-v7" data-drop-picker-open aria-label="Выбрать стоимость дропа"><span>'+(free?'FREE':fmt(tier.cost))+'</span>'+icon('down')+'</button></div>':'')+
   '<section class="drop-zone home-drop-v7">'+
-    (!p?'<button class="drop-price-v7" data-drop-picker-open aria-label="Выбрать стоимость дропа"><span>'+(free?'FREE':fmt(tier.cost))+'</span>'+icon('down')+'</button>':'')+
     (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b><span>Нажми, чтобы получить</span></button>')+
   '</section>'+
   (!p?'<section class="home-quick-v7"><button class="home-quick-action" data-page="upgrader"><span class="home-quick-icon">'+icon('upgrade')+'</span><div><b>Апгрейдер</b><small>Улучшить username</small></div>'+icon('chevron')+'</button><button class="home-quick-action" data-page="wheel"><span class="home-quick-icon">'+icon('wheel')+'</span><div><b>Колесо</b><small>Быстрое вращение</small></div>'+icon('chevron')+'</button></section>':'')+
