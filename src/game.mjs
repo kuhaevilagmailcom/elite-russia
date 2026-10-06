@@ -35,6 +35,12 @@ function handleUnavailable(db,handle){
   if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))return true;
   return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
 }
+function badLuckProtection(player){
+  const streak=Math.max(0,Number(player?.bad_drop_streak||0)),charge=Math.max(0,Math.min(100,Number(player?.luck_points||0)));
+  const floorRate=streak>=20?.90:(streak>=10||charge>=75)?.75:charge>=40?.50:0;
+  const state=floorRate>=.9?'strong':floorRate>=.75?'boosted':floorRate>=.5?'active':'normal';
+  return {streak,charge,floorRate,state};
+}
 function starterValueBand(mode){
   if(mode==='good')return [STARTER_DROP_JACKPOT.goodMin,STARTER_DROP_JACKPOT.goodMax];
   if(mode==='rare')return [STARTER_DROP_JACKPOT.rareMin,STARTER_DROP_JACKPOT.rareMax];
@@ -53,12 +59,12 @@ export function starterDropMode(roll=randomUnit()){
 function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
   const tier=normalizeTier(tierKey),starter=tier.key==='basic';
   let starterMode=starter?starterDropMode(rng()):null;
-  const streak=Math.max(0,Number(player?.bad_drop_streak||0)),luck=Math.max(0,Math.min(100,Number(player?.luck_points||0)));
+  const protection=badLuckProtection(player),streak=protection.streak,luck=protection.charge;
   if(starter&&starterMode==='normal'){
     if(streak>=20)starterMode='rare';
     else if(streak>=10||luck>=75)starterMode='good';
   }
-  const profile=starter?(starterMode==='ultra'?'ULTRA':starterMode==='big'?'RARE':starterMode==='rare'?'RARE':'COMMON'):weightedTierProfile(tier,rng),now=nowIso();
+  const profile=starter?(starterMode==='ultra'?'ULTRA':starterMode==='big'?'RARE':starterMode==='rare'?'RARE':'COMMON'):weightedTierProfile(tier,rng),now=nowIso(),protectionFloor=!starter&&protection.floorRate>0?Math.round(tier.cost*protection.floorRate):0;
 
   // The basic 3K tier is cheap most of the time, but keeps tiny real jackpot chances.
   if(starter&&(starterMode==='ultra'||starterMode==='big')){
@@ -76,12 +82,12 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
       JOIN username_templates t ON t.id=et.template_id
       WHERE e.active=1 AND e.start_at<=? AND e.end_at>=? AND t.active=1 AND t.rarity=? AND t.current_supply<t.max_supply
       LIMIT 200`).all(now,now,profile);
-    const availableEvents=eventPool.filter(x=>!handleUnavailable(db,x.handle));if(availableEvents.length)return availableEvents[Math.floor(rng()*availableEvents.length)];
+    const availableEvents=eventPool.filter(x=>!handleUnavailable(db,x.handle)&&Number(x.base_value||0)>=protectionFloor);if(availableEvents.length)return availableEvents[Math.floor(rng()*availableEvents.length)];
   }
   const specialChance=starter?0:({COMMON:.002,RARE:.012,EPIC:.05,LEGEND:.18,ULTRA:.55}[profile]||0);
   if(specialChance>0&&rng()<specialChance){
     const specials=db.prepare("SELECT * FROM username_templates WHERE special=1 AND category NOT IN ('wheel','admin') AND rarity=? AND active=1 AND current_supply<max_supply LIMIT 200").all(profile);
-    const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle));if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
+    const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle)&&Number(x.base_value||0)>=protectionFloor);if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
   const starterBand=starter?starterValueBand(starterMode):null;
   for(let i=0;i<(starter?650:80);i++){
@@ -90,6 +96,7 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
     if(starter&&t?.special)continue;
     const base=t?Number(t.base_value):scoreHandle(handle),rarity=rarityFromValue(base);
     if(starter&&(base<starterBand[0]||base>starterBand[1]))continue;
+    if(!starter&&protectionFloor&&base<protectionFloor)continue;
     if(!t){
       const supply=1,assessment=analyzeUsername(handle);
       db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at) VALUES(?,?,?,?,0,?,0,1,?,?,?,?)')
@@ -310,11 +317,11 @@ function luckProfile(db,u){
   const paid=rows.filter(x=>Number(x.cost)>0),totalCost=paid.reduce((s,x)=>s+Number(x.cost||0),0),totalValue=paid.reduce((s,x)=>s+Number(x.value||0),0);
   const profitable=paid.filter(x=>Number(x.value)>=Number(x.cost)).length,profitRate=paid.length?profitable/paid.length:0;
   const roi=totalCost?totalValue/totalCost:1,bestMultiplier=paid.reduce((m,x)=>Math.max(m,Number(x.value||0)/Math.max(1,Number(x.cost||0))),0);
-  const badStreak=Math.max(0,Number(u.bad_drop_streak||0)),protection=Math.max(0,Math.min(100,Number(u.luck_points||0)));
+  const protectionInfo=badLuckProtection(u),badStreak=protectionInfo.streak;
   const score=Math.max(0,Math.min(100,Math.round(50+(roi-.85)*50+(profitRate-.25)*20-badStreak*1.25)));
   const status=score>=85?'legendary':score>=68?'lucky':score>=55?'good':score>=40?'neutral':score>=22?'unlucky':'cursed';
-  const protectionState=badStreak>=20?'rare':badStreak>=10||protection>=75?'good':'normal';
-  return {score,status,protection,protectionState,badStreak,totalDrops:rows.length,paidDrops:paid.length,profitableDrops:profitable,
+  return {score,status,protection:Math.round(protectionInfo.floorRate*100),protectionCharge:protectionInfo.charge,protectionState:protectionInfo.state,
+    badStreak,totalDrops:rows.length,paidDrops:paid.length,profitableDrops:profitable,
     roi:Number(roi.toFixed(2)),bestMultiplier:Number(bestMultiplier.toFixed(2))};
 }
 export function profile(db,userId){
