@@ -7,12 +7,12 @@ import {grantXp} from './progression.mjs';
 
 export const WHEEL_USERNAMES=['abuser','wheel','daily','lucky','spin','winner','fortune'];
 const BASE_REWARDS=[
-  {key:'cash3000',label:'$3K',type:'money',amount:3000,weight:38},
-  {key:'cash5000',label:'$5K',type:'money',amount:5000,weight:25},
-  {key:'cash10000',label:'$10K',type:'money',amount:10000,weight:15},
+  {key:'cash3000',label:'3K ₽',type:'money',amount:3000,weight:38},
+  {key:'cash5000',label:'5K ₽',type:'money',amount:5000,weight:25},
+  {key:'cash10000',label:'10K ₽',type:'money',amount:10000,weight:15},
   {key:'xp100',label:'100 XP',type:'xp',amount:100,weight:10},
   {key:'drop1',label:'1 бесплатный дроп',type:'drop',amount:1,weight:6},
-  {key:'cash25000',label:'$25K',type:'money',amount:25000,weight:3},
+  {key:'cash25000',label:'25K ₽',type:'money',amount:25000,weight:3},
   {key:'username',label:'1/1 USERNAME',type:'username',amount:0,weight:3}
 ];
 function availableWheelHandles(db){return WHEEL_USERNAMES.filter(h=>!db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(h))}
