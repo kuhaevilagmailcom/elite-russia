@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {RARITY_WEIGHTS,USERNAME_RULES} from './config.mjs';
 import {randomUnit} from './economy.mjs';
 import {analyzeUsername} from './valuation.mjs';
+import {REAL_ENGLISH_ROOTS} from './lexicon-real-en.mjs';
 
 const EXTRA_RU_ROOTS=[
   'bratan','bratok','patsan','chelik','maloy','krasava','krutoy','chetko','topchik','privet',
@@ -121,6 +122,7 @@ function buildMassLexicon(base,target=MASS_LEXICON_TARGET){
 }
 
 const BASE_ROOTS=[
+...REAL_ENGLISH_ROOTS,
 ...EXTRA_RU_ROOTS,
 'card','loly','mama','papa','sosi','sosal','dedyska','brat','sestra','drug','svoy','kot','pes','babka','ded','vova','dima','tema','maks','vlad','roma','sasha','sanya','artem','vasya','petya','kirill','ruslan','bogdan','sigma','love','dream','angel','baby','cool','club','news','music','bank','shop','monk','ghost','void','vision','legend','dealer','storm','night','phantom','million','master','mister','king','prime','rocket','shadow','venom','savage','black','white','wolf','tiger','moon','solar','street','drive','speed','turbo','money','rich','diamond','silver','rare','zero','pixel','cloud','wave','nova','silent','unknown','anonymous','alpha','omega','orbit','pulse','frame','motion','vector','signal','matrix','vertex','binary','cipher','static','future','chrome','carbon','graphite','velvet','royal','elite','major','minor','urban','metro','avenue','district','tower','garage','motor','rider','pilot','racer','drift','boost','nitro','gtr','amg','bmw','mclaren','porsche','supra','skyline','viper','cobra','falcon','hawk','raven','lion','panther','shark','orca','fox','bear','eagle','hunter','chief','boss','owner','founder','leader','winner','champion','hero','icon','famous','classic','vintage','simple','basic','clean','mono','blank','pure','clear','sharp','swift','quick','rapid','sonic','flash','light','bright','dark','midnight','sunset','dawn','winter','summer','north','south','west','east','ocean','river','stone','steel','iron','gold','platinum','onyx','jade','ruby','sapphire','emerald','luxury','premium','status','credit','cash','market','trade','stock','vault','mint','coin','profit','wealth','capital','business','studio','media','audio','beat','bass','vibe','mood','style','fashion','model','design','art','photo','film','camera','scene','screen','game','player','level','score','rank','top','arena','clutch','skill','aim','quest','party','lobby','server','online','digital','cyber','logic','code','byte','data','node','core','link','network','system','device','mobile','phone','apple','telegram','social','viral','trend','daily','global','world','planet','space','cosmos','astro','mars','lunar','star','comet','galaxy','mystic','secret','hidden','private','public','real','true','only','first','last','young','old','modern','retro','smart','wild','calm','cold','hot','high','low','big','small','great','super','hyper','ultra','max','pro','one','seven','noble','monarch','duke','baron','saint','ace','zen','echo','flux','frost','blaze','ember','mist','rain','snow','thunder','volt','crisp','solid','fluid','stark','roman','atlas','apollo','mercury','saturn','jupiter','venus','pluto','delta','lambda','kappa','daylight','nightfall','blackout','overdrive','redline','pitlane','roadster','coupe','sedan','touring','motors','driver','fastlane','highway','cityline','skyway','airline','railway','terminal','station','central','uptown','downtown','midtown','brook','park','garden','forest','valley','mountain','island','harbor','port','bay','coast','beach','desert','canyon','cliff','peak','summit','ridge','field','meadow','green','blue','red','orange','purple','gray','grey','ivory','obsidian','crystal','marble','granite','wood','paper','glass','metal','titanium','cobalt','nickel','copper','bronze','brass'
 ];
@@ -353,9 +355,16 @@ export function assessHandle(handle,{stable=false,theme=''}={}){
 }
 export function generatedSupply(){return 1}
 export function candidateUniverseSize(){return ROOTS.length*SUFFIXES.length+ROOTS.length*(PREFIXES.length-1)}
+const CURATED_REAL_ROOTS=new Set([
+  ...REAL_ENGLISH_ROOTS,
+  ...EXTRA_RU_ROOTS,
+  ...Object.values(LEXICON_CATEGORY_ROOTS).flat()
+].map(cleanLexiconRoot).filter(x=>x.length>=3&&x.length<=USERNAME_RULES.maxLength));
 export const LEXICON_STATS=Object.freeze({
   roots:ROOTS.length,
+  realRoots:CURATED_REAL_ROOTS.size,
+  generatedFallbackRoots:Math.max(0,ROOTS.length-CURATED_REAL_ROOTS.size),
   minimumRoots:MASS_LEXICON_TARGET,
-  candidateUniverse:candidateUniverseSize(),
+  candidateUniverseUpperBound:candidateUniverseSize(),
   categories:Object.fromEntries(Object.entries(LEXICON_CATEGORY_ROOTS).map(([key,items])=>[key,items.length]))
 });
