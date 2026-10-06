@@ -3,19 +3,25 @@ const COMMON_WORDS=new Set([
   'crypto','coin','profit','capital','business','studio','media','audio','design','art','film','camera','player','level',
   'score','rank','arena','skill','online','digital','code','data','network','mobile','phone','telegram','social','global',
   'world','space','pixel','nova','orbit','vision','ghost','shadow','venom','panda','wolf','tiger','lion','eagle','bear',
-  'nova','boost','prime','elite','royal','gold','silver','diamond','club','city','metro','street','drive','speed','turbo'
+  'nova','boost','prime','elite','royal','gold','silver','diamond','club','city','metro','street','drive','speed','turbo',
+  'devil','deer','angel','demon','heaven','hell','happy','sad','funny','crazy','grandma','grandpa','family','house','school',
+  'forest','river','lake','mountain','ocean','fire','water','earth','wind','rain','snow','coffee','bread','apple','banana'
 ]);
 const RU_TRANSLIT=new Set([
   'mama','papa','batya','brat','drug','ded','dedushka','dedyska','babka','sestra','dvor','rayon','gorod','ulitsa',
   'babki','dengi','rubli','cena','obmen','torg','skidka','tachka','mashina','privet','poka','zhiza','dvizh','imba',
-  'kot','kotik','pes','pesik','volk','medved','enot','panda','moskva','piter','sochi','kazan','ufa','omsk','samara'
+  'kot','kotik','pes','pesik','volk','medved','enot','panda','moskva','piter','sochi','kazan','ufa','omsk','samara',
+  'babushka','govno','zalupa','penis','sanina','zhopa','chlen','mudak','dolboeb','blyad','blyat','suka','pizda','nahuy',
+  'dobro','zlo','schastye','radost','grust','pechal','lyubov','semya','dom','shkola','univer','rabota','otdyh','borsh','pelmeni'
 ]);
 const NAMES=new Set([
   'vlad','dima','dimon','vova','vovan','maks','maxim','roma','artem','sasha','sanya','pasha','kolya','nikita','denis',
   'danya','egor','ilya','gleb','timur','ruslan','bogdan','misha','anton','andrey','sergey','anya','masha','dasha',
-  'katya','lena','vika','nastya','alina','sonya','ivan','yura','igor','oleg','kirill'
+  'katya','lena','vika','nastya','alina','sonya','ivan','yura','igor','oleg','kirill','matvey','matvei','maksim','alexandr',
+  'aleksandr','mikhail','mihail','dmitry','vladimir','roman','danila','daniil','mark','stepan','miron','arseniy','georgiy',
+  'elena','ekaterina','viktoria','victoria','elizaveta','anastasia','alexandra','valeria','veronika','kristina','diana','eva'
 ]);
-const CITIES=new Set(['moskva','moscow','piter','sochi','kazan','ufa','omsk','perm','samara','saratov','rostov','tomsk']);
+const CITIES=new Set(['moskva','moscow','piter','sochi','kazan','ufa','omsk','perm','samara','saratov','rostov','tomsk','novosibirsk','ekaterinburg','chelyabinsk','krasnodar','krasnoyarsk','vladivostok','habarovsk','tyumen','kaliningrad','volgograd','orenburg','izhevsk','murmansk','yakutsk','grozny','stavropol','london','paris','berlin','madrid','rome','tokyo','seoul','dubai','miami','chicago','toronto','oslo','vienna','prague','warsaw','helsinki','riga','tallinn','vilnius','minsk','tbilisi','baku','astana','almaty']);
 const SEMANTIC={
   finance:new Set(['money','cash','bank','coin','crypto','profit','capital','market','trade','stock','vault','dengi','babki','rubli','cena']),
   gaming:new Set(['game','player','level','score','rank','arena','clutch','skill','aim','quest','server','online']),
