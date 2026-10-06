@@ -19,7 +19,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const ERR={
   unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
-  listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
+  listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',network:'Нет соединения с сервером'
@@ -50,12 +50,12 @@ const EN_TEXT=Object.freeze({
  'Общая стоимость':'Total value','Продать':'Sell','На рынок':'List on market','Оценка':'Score','В коллекции':'In collection',
  'Получено':'Claimed','Забрать':'Claim','В процессе':'In progress','Ближайшие награды':'Upcoming rewards','Все награды получены.':'All rewards claimed.',
  'Тема':'Theme','Светлая':'Light','Тёмная':'Dark','Системная':'System','Язык':'Language','Русский':'Russian','Вибрация':'Haptics','Звук':'Sound','Анимации':'Animations',
- 'ЛУЧШИЙ USERNAME':'BEST USERNAME','ДОСТИЖЕНИЯ':'ACHIEVEMENTS','СТАТИСТИКА':'STATS','УДАЧА И НЕВЕЗЕНИЕ':'LUCK & BAD LUCK',
+ 'ЛУЧШИЙ ЮЗЕРНЕЙМ':'BEST USERNAME','ДОСТИЖЕНИЯ':'ACHIEVEMENTS','СТАТИСТИКА':'STATS','УДАЧА И НЕВЕЗЕНИЕ':'LUCK & BAD LUCK',
  'Юзернеймы':'Usernames','юзернеймов':'usernames','Сделки':'Deals','Друзья':'Friends','Удача':'Luck','Защита от невезения':'Bad-luck protection','Серия неудач':'Bad streak',
  'Нейтрально':'Neutral','Везёт':'Lucky','Очень везёт':'Very lucky','Невероятно везёт':'Legendary luck','Не везёт':'Unlucky','Жёстко не везёт':'Cursed',
  'Профиль не найден.':'Profile not found.','Пока нет':'None yet','Награда':'Reward','Лучший username':'Best username',
- 'Выберите username':'Choose username','Получатель':'Recipient','Введите @username':'Enter @username','Передать':'Transfer','Комиссия 5%':'5% fee',
- 'Комиссия':'Fee','Сумма':'Total','Твои usernames':'Your usernames','Выбрать цель':'Choose target','Подбираем варианты…':'Finding targets…',
+ 'Выберите юзернейм':'Choose username','Получатель':'Recipient','Введите @username':'Enter @username','Передать':'Transfer','Комиссия 5%':'5% fee',
+ 'Комиссия':'Fee','Сумма':'Total','Твои юзернеймы':'Your usernames','Выбрать цель':'Choose target','Подбираем варианты…':'Finding targets…',
  'Шанс':'Chance','ШАНС':'CHANCE','Не выпало':'Missed','Продолжить':'Continue','Бесплатное вращение':'Free spin',
  'Уже использовано':'Already used','Одно вращение раз в 24 часа':'One spin every 24 hours','Крутить':'Spin','Недоступно':'Unavailable',
  'КОЛЕСО УДАЧИ':'LUCKY WHEEL','РАЗ В 24 ЧАСА':'EVERY 24 HOURS','24Ч':'24H','КРУТИ':'SPIN','Шансы':'Odds','Выпало':'Result',
@@ -71,17 +71,17 @@ const EN_TEXT=Object.freeze({
  'Первый улов':'First catch','Полка':'Shelf','Коллекционер':'Collector','Чистая десятка':'Clean ten','Фиолетовый':'Purple',
  'Золотой билет':'Golden ticket','Золотой запас':'Golden reserve','Первая сделка':'First deal','На рынке':'On the market','Продавец':'Seller',
  'Щедрый':'Generous','Разминка':'Warm-up','Серия':'Streak','Миллион':'Million','Игрок':'Player',
- 'Открыть drop':'Open a drop','Открыть 2 drops':'Open 2 drops','Открыть 3 drops':'Open 3 drops','Открыть 5 drops':'Open 5 drops',
- 'Продать username':'Sell a username','Продать 2 usernames':'Sell 2 usernames','Продать 3 usernames':'Sell 3 usernames',
- 'Оставить username':'Keep a username','Оставить 2 usernames':'Keep 2 usernames','Сыграть 1 мини-игру':'Play 1 mini-game',
+ 'Открыть дроп':'Open a drop','Открыть 2 дропа':'Open 2 drops','Открыть 3 дропа':'Open 3 drops','Открыть 5 дропов':'Open 5 drops',
+ 'Продать юзернейм':'Sell a username','Продать 2 юзернейма':'Sell 2 usernames','Продать 3 юзернейма':'Sell 3 usernames',
+ 'Оставить юзернейм':'Keep a username','Оставить 2 юзернейма':'Keep 2 usernames','Сыграть 1 мини-игру':'Play 1 mini-game',
  'Сыграть 3 мини-игры':'Play 3 mini-games','Сыграть 5 мини-игр':'Play 5 mini-games','Сыграть 7 мини-игр':'Play 7 mini-games','Сыграть 10 мини-игр':'Play 10 mini-games',
- 'Выиграть Охоту за username':'Win Username Hunt','Выиграть Охоту за username дважды':'Win Username Hunt twice','Сыграть в Охоту за username':'Play Username Hunt',
- 'Сыграть в Выше / ниже':'Play Higher / Lower','Сыграть в Редактор':'Play Editor','Сыграть в Собери username':'Play Build username','Сыграть в Угадай цену':'Play Guess the price',
- 'Купить username':'Buy a username','Купить 2 usernames':'Buy 2 usernames','Получить username от 15K ₽':'Get a username worth 15K ₽+',
- 'Получить 2 username от 15K ₽':'Get 2 usernames worth 15K ₽+','Получить username без цифр':'Get a username without digits',
- 'Получить 2 username без цифр':'Get 2 usernames without digits','Открыть колесо':'Spin the wheel','Сделать upgrade':'Do an upgrade','Сделать 2 upgrades':'Do 2 upgrades',
- 'Передать username':'Transfer a username','Посмотреть профиль игрока':'View a player profile','Пригласить друга':'Invite a friend','Пригласить 2 друзей':'Invite 2 friends',
- 'Купить 3 username на рынке':'Buy 3 usernames on the market'
+ 'Выиграть Охоту за юзернеймом':'Win Username Hunt','Выиграть Охоту за юзернеймом дважды':'Win Username Hunt twice','Сыграть в Охоту за юзернеймом':'Play Username Hunt',
+ 'Сыграть в Выше / ниже':'Play Higher / Lower','Сыграть в Редактор':'Play Editor','Сыграть в Собери юзернейм':'Play Build username','Сыграть в Угадай цену':'Play Guess the price',
+ 'Купить юзернейм':'Buy a username','Купить 2 юзернейма':'Buy 2 usernames','Получить юзернейм от 15K ₽':'Get a username worth 15K ₽+',
+ 'Получить 2 юзернейма от 15K ₽':'Get 2 usernames worth 15K ₽+','Получить юзернейм без цифр':'Get a username without digits',
+ 'Получить 2 юзернейма без цифр':'Get 2 usernames without digits','Открыть колесо':'Spin the wheel','Сделать апгрейд':'Do an upgrade','Сделать 2 апгрейда':'Do 2 upgrades',
+ 'Передать юзернейм':'Transfer a username','Посмотреть профиль игрока':'View a player profile','Пригласить друга':'Invite a friend','Пригласить 2 друзей':'Invite 2 friends',
+ 'Купить 3 юзернейма на рынке':'Buy 3 usernames on the market'
 });
 const EN_TEXT_EXTRA=Object.freeze({
  'Закрыть':'Close','Стоимость попытки':'Attempt price','Выберите цену дропа':'Choose drop price','Получить username':'Get username',
@@ -96,7 +96,7 @@ const EN_TEXT_EXTRA=Object.freeze({
  'Недостаточно денег':'Not enough money','Сначала решите, что делать с текущим username':'Resolve your current username first',
  'Коллекция заполнена':'Collection is full','У получателя заполнена коллекция':'Recipient collection is full','Тираж закончился':'Sold out',
  'Слишком быстро. Попробуйте ещё раз':'Too fast. Try again','Лот уже недоступен':'Listing is no longer available','Нельзя купить свой лот':'You cannot buy your own listing',
- 'Username уже на рынке':'Username is already listed','Username должен быть длиной 4–15 символов: a-z, 0-9, _':'Username must be 4–15 characters: a-z, 0-9, _',
+ 'Юзернейм уже на рынке':'Username is already listed','Username должен быть длиной 4–15 символов: a-z, 0-9, _':'Username must be 4–15 characters: a-z, 0-9, _',
  'Подожди пару секунд перед следующей оценкой':'Wait a couple of seconds before the next rating','Ты уже оценивал этот username':'You already rated this username',
  'Слишком похож на уже оценённый сегодня username':'Too similar to a username already rated today','Ежедневная награда уже получена':'Daily reward already claimed',
  'Сейчас не удалось собрать вопрос':'Could not create a question right now','Слишком много игр подряд':'Too many games in a row',
@@ -111,11 +111,11 @@ const EN_TEXT_EXTRA=Object.freeze({
  'Нельзя заблокировать самого себя':'You cannot block yourself','Что-то пошло не так':'Something went wrong','Не удалось загрузить раздел':'Failed to load section',
  'Океан':'Ocean','Голубой акцент':'Blue accent','Фиолетовая':'Violet','Фиолетовый акцент':'Violet accent','Лайм':'Lime','Зелёный акцент':'Green accent',
  'Закат':'Sunset','Тёплый оранжевый акцент':'Warm orange accent','Моно':'Mono','Чёрно-белый акцент':'Black-and-white accent',
- 'Охота за username':'Username Hunt','Выше / ниже':'Higher / Lower','Редактор':'Editor','Собери username':'Build username','Угадай цену':'Guess the price',
+ 'Охота за юзернеймом':'Username Hunt','Выше / ниже':'Higher / Lower','Редактор':'Editor','Собери юзернейм':'Build username','Угадай цену':'Guess the price',
  'Коллекция':'Collection','Редкости':'Rarities','Торговля':'Trading','Прогресс':'Progress','Игры':'Games',
  'Читаемость':'Readability','Краткость':'Brevity','Чистота':'Cleanliness','Спрос':'Demand','Система сразу начислит':'The system will instantly credit',
- 'Только оформление. На drop, wheel и upgrade они не влияют.':'Cosmetics only. They do not affect drops, wheel or upgrades.',
- 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','дропов':'drops','ДРОП':'DROP'
+ '💎 — только оформление. На дроп, колесо и апгрейд они не влияют.':'💎 — cosmetics only. They do not affect drops, wheel or upgrades.',
+ 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','дропов':'drops','ДРОП':'DROP','Юзернейм':'Username'
 });
 function currentLanguage(){return state.settings?.language==='en'?'en':'ru'}
 function tx(ru,en){return currentLanguage()==='en'?en:ru}
@@ -399,7 +399,7 @@ function wheelGeometry(items){
 function wheelShortLabel(x){
  if(x.type==='username')return '1/1';
  if(x.type==='drop')return 'DROP';
- return String(x.label||'').replace(' бесплатный дроп',' DROP');
+ return String(x.label||'').replace(' бесплатный дроп',' ДРОП');
 }
 function wheelPoint(angle,r=48){
  const a=(Number(angle)-90)*Math.PI/180;
@@ -445,9 +445,9 @@ function friendsView(){
 }
 function giftView(){
  const g=state.gift||{items:[]},item=g.items.find(x=>String(x.id)===String(state.giftSelectedItem)),fee=item?Math.max(1,Math.round(Number(item.value||0)*.05)):0;
- const itemSheet=state.giftSheet==='item'?'<div class="sheet-root"><button class="sheet-backdrop" data-gift-sheet-close></button><aside class="filter-sheet gift-sheet"><div class="sheet-grabber"></div><div class="sheet-title"><b>Username</b><button data-gift-sheet-close>'+icon('close')+'</button></div><div class="gift-options">'+g.items.map(x=>'<button data-gift-select-item="'+x.id+'"><span>'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b></button>').join('')+'</div></aside></div>':'';
+ const itemSheet=state.giftSheet==='item'?'<div class="sheet-root"><button class="sheet-backdrop" data-gift-sheet-close></button><aside class="filter-sheet gift-sheet"><div class="sheet-grabber"></div><div class="sheet-title"><b>Юзернейм</b><button data-gift-sheet-close>'+icon('close')+'</button></div><div class="gift-options">'+g.items.map(x=>'<button data-gift-select-item="'+x.id+'"><span>'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b></button>').join('')+'</div></aside></div>':'';
  return '<div class="gift-page-v7">'+itemSheet+
-  '<button class="gift-select-row" data-gift-open="item"><span>Username</span><b>'+(item?esc(item.handle):'Выберите username')+'</b>'+icon('chevron')+'</button>'+
+  '<button class="gift-select-row" data-gift-open="item"><span>Юзернейм</span><b>'+(item?esc(item.handle):'Выберите username')+'</b>'+icon('chevron')+'</button>'+
   '<label class="gift-recipient-v8"><span>Получатель</span><div>@<input id="giftRecipientUsername" maxlength="32" autocomplete="off" value="'+esc(state.giftRecipientUsername||'')+'" placeholder="Введите @username"></div></label>'+
   (item?'<div class="gift-fee-v8"><span>Комиссия 5%</span><b>'+fmt(fee)+'</b></div>':'')+
   '<button class="primary gift-submit-v7" data-gift '+(!item?'disabled':'')+'>Передать</button>'+
@@ -491,7 +491,7 @@ function upgraderView(){
  const u=state.upgrader||{available:[],maxItems:3},selected=selectedUpgradeItems(),source=selected[0],sourceTotal=selected.reduce((sum,x)=>sum+Number(x.value||0),0),stage=state.upgradeStage||'source',round=state.upgradeLastRound;
  if(stage==='source'){
   return '<div class="upgrade-page upgrade-source-stage"><div class="upgrade-list-title"><b>Твои usernames</b><span>'+selected.length+' / '+Number(u.maxItems||3)+'</span></div><div class="upgrade-list upgrade-source-list">'+
-   ((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+
+   ((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет юзернеймов для апгрейда.</div>')+
   '</div><div class="upgrade-footer source-footer"><div><span>Сумма</span><b>'+fmt(sourceTotal)+'</b></div><button class="primary" data-upgrade-preview '+(!selected.length?'disabled':'')+'>Выбрать цель</button></div></div>';
  }
  if(stage==='target'){
@@ -502,7 +502,7 @@ function upgraderView(){
    '<div class="upgrade-footer"><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+'</button><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>Апгрейд</button></div>'+
   '</div>';
  }
- const picked=selectedUpgradeTarget(),roundSources=round?.sources||[],liveSources=roundSources.length?roundSources:selected,liveTotal=liveSources.reduce((sum,x)=>sum+Number(x.value||0),0),liveLabel=liveSources.length>1?(liveSources.length+' usernames'):(liveSources[0]?.handle||'—'),target=round?.target||picked?.target||state.upgradeOutcome?.target;
+ const picked=selectedUpgradeTarget(),roundSources=round?.sources||[],liveSources=roundSources.length?roundSources:selected,liveTotal=liveSources.reduce((sum,x)=>sum+Number(x.value||0),0),liveLabel=liveSources.length>1?(liveSources.length+' юзернеймов'):(liveSources[0]?.handle||'—'),target=round?.target||picked?.target||state.upgradeOutcome?.target;
  const chanceValue=round?.chance??picked?.chance??state.upgradeOutcome?.chance??0,chance=upgradeChanceText(chanceValue),angle=Math.max(3,Math.min(331.2,Number(chanceValue||0)*360)),landing=round?Number(state.upgradeLandingAngle||0):0,wheelAngle=round?((360-(landing%360))%360):0;
  const done=!!state.upgradeOutcome&&!state.upgradeSpinning&&!!round,success=!!state.upgradeOutcome?.success;
  return '<div class="upgrade-page upgrade-spin-stage">'+
@@ -518,7 +518,7 @@ function profileView(p=state.profile?.profile){
  const achievementNames={first_drop:'Первый улов',collector10:'Полка',collector50:'Коллекционер',clean10:'Чистая десятка',purple:'Фиолетовый',gold:'Золотой билет',gold3:'Золотой запас',deal1:'Первая сделка',deal10:'На рынке',sales25:'Продавец',gift5:'Щедрый',game1:'Разминка',game25:'Игрок',streak5:'Серия',capital1m:'Миллион',level50:'Мастер',level100:'Ветеран',level200:'Легендарный'};
  const luckStatus={legendary:'Невероятно везёт',lucky:'Очень везёт',good:'Везёт',neutral:'Нейтрально',unlucky:'Не везёт',cursed:'Жёстко не везёт'}[luck.status]||'Нейтрально';
  const achievements='<section class="profile-section-v7"><small>ДОСТИЖЕНИЯ</small><div class="profile-achievements-v7">'+(badges.length?badges.map(x=>'<span>'+icon('achievements')+'<b>'+esc(achievementNames[x.achievement_key]||'Награда')+'</b></span>').join(''):'<div class="profile-empty-v7">Пока нет</div>')+'</div></section>';
- const bestBlock='<section class="profile-section-v7"><small>ЛУЧШИЙ USERNAME</small>'+(best?'<div class="profile-best'+valueClass(best)+'"><b>'+esc(best.handle)+'</b><strong>'+fmt(best.value)+'</strong></div>':'<div class="profile-empty-v7">—</div>')+'</section>';
+ const bestBlock='<section class="profile-section-v7"><small>ЛУЧШИЙ ЮЗЕРНЕЙМ</small>'+(best?'<div class="profile-best'+valueClass(best)+'"><b>'+esc(best.handle)+'</b><strong>'+fmt(best.value)+'</strong></div>':'<div class="profile-empty-v7">—</div>')+'</section>';
  const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Юзернеймы',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
   '<section class="profile-luck-v8"><div class="luck-score-ring" style="--luck:'+Math.max(0,Math.min(100,Number(luck.score||0)))+'%"><b>'+Number(luck.score||0)+'%</b><span>Удача</span></div><div class="luck-copy"><small>УДАЧА И НЕВЕЗЕНИЕ</small><b>'+luckStatus+'</b><div><span>Защита от невезения</span><strong>'+Number(luck.protection||0)+'%</strong></div><div><span>Серия неудач</span><strong>'+Number(luck.badStreak||0)+'</strong></div></div></section>':'';
  return '<div class="profile-v7 '+(own?'own-profile':'public-profile')+'">'+
