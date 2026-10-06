@@ -7,3 +7,46 @@
 .danger-soft{background:#fbecef!important;color:#aa2934!important}.danger{min-height:46px;border-radius:11px;background:#c83b45;color:#fff;font-size:11px;font-weight:750}.danger-zone{flex:0 0 auto;margin-top:8px;background:#fff7f7;border:1px solid #f2d8db;border-radius:14px;padding:11px}.danger-zone small{font-size:9px;color:#a33d46;font-weight:800}.danger-zone b{display:block;font-size:12px;margin-top:4px}.danger-zone span{display:block;font-size:9.5px;color:#7a686a;margin:4px 0 8px}.danger-zone button{width:100%}
 .danger-sheet p{font-size:11px;line-height:1.45;color:#62575a}.danger-sheet label{font-size:11px}.danger-sheet input{width:100%;border:1px solid #e2c7ca;border-radius:10px;padding:0 10px;margin:7px 0}.danger-sheet>button{width:100%;margin-top:7px}
 @media(max-width:370px){.admin-add-username{grid-template-columns:1fr}.admin-add-username b,.admin-add-username button{grid-column:auto}.admin-usernames article>div:last-child{grid-template-columns:1fr 1fr}.admin-usernames article>div:last-child button:last-child{grid-column:1/-1}}
+
+
+/* USERNAME 6.1.1 — dark admin */
+html[data-theme="dark"] .admin-page,
+html[data-theme="dark"] .admin-dashboard,
+html[data-theme="dark"] .admin-user-hero,
+html[data-theme="dark"] .admin-actions,
+html[data-theme="dark"] .admin-add-username,
+html[data-theme="dark"] .admin-usernames article,
+html[data-theme="dark"] .admin-users>button{
+  color:var(--text)
+}
+html[data-theme="dark"] .admin-search input,
+html[data-theme="dark"] .admin-user-hero,
+html[data-theme="dark"] .admin-actions,
+html[data-theme="dark"] .admin-add-username,
+html[data-theme="dark"] .admin-usernames article,
+html[data-theme="dark"] .admin-users>button{
+  background:var(--card);border-color:var(--border)
+}
+html[data-theme="dark"] .admin-search input,
+html[data-theme="dark"] .admin-actions input,
+html[data-theme="dark"] .admin-add-username input,
+html[data-theme="dark"] .danger-sheet input{
+  background:var(--surface-subtle);border-color:var(--border);color:var(--text)
+}
+html[data-theme="dark"] .admin-search button{
+  background:#F4F6F8;color:#111316
+}
+html[data-theme="dark"] .admin-users span small,
+html[data-theme="dark"] .admin-usernames article span,
+html[data-theme="dark"] .admin-user-hero small,
+html[data-theme="dark"] .admin-user-hero span{color:var(--muted)}
+html[data-theme="dark"] .admin-users em{color:#F08C95}
+html[data-theme="dark"] .danger-zone{
+  background:#271B1D;border-color:#5B3439;color:var(--text)
+}
+html[data-theme="dark"] .danger-zone small{color:#F08C95}
+html[data-theme="dark"] .danger-zone span,
+html[data-theme="dark"] .danger-sheet p{color:#C7AFB2}
+html[data-theme="dark"] .danger-soft{
+  background:#3B2327!important;color:#FF9BA4!important
+}
