@@ -700,19 +700,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-collection-filter-open')){state.collectionFilterOpen=true;render();return}
  if(el.hasAttribute('data-market-filter-open')){state.marketFilterOpen=true;render();return}
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
- if(el.hasAttribute('data-daily-claim')){
-   if(el.disabled)return;el.disabled=true;
-   const r=await api('/api/daily/claim',{method:'POST'});state.daily=r.status;applyUserLocal(r.user);haptic('light');toast('Ежедневная награда: '+esc(r.reward?.label||'получена'));render();return
- }
- if(el.hasAttribute('data-lab-submit')){
-   const input=document.querySelector('#labHandle'),handle=String(input?.value||'').trim();if(!handle)return;
-   el.disabled=true;
-   try{
-     const r=await api('/api/lab',{method:'POST',body:JSON.stringify({handle})});
-     state.labResult=r;state.lab=r.status;applyUserLocal(r.user);haptic('light');toast('+'+fmt(r.reward)+' · +'+r.xp+' XP');render();
-   }finally{el.disabled=false}
-   return
- }
  if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page=1');render();return}
  if(el.dataset.marketFilter){state.marketFilters[el.dataset.marketFilter]=el.dataset.filterValue;state.marketFilters.page=1;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();return}
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
