@@ -157,9 +157,10 @@ test('HTTP admin block immediately blocks target API access',async()=>{
   const blocked=await json('/api/home',{headers:headers('30002')});assert.equal(blocked.r.status,403);assert.equal(blocked.body.error,'blocked');
 });
 
-test('HTTP premium invoice is unavailable without bot token',async()=>{
+test('HTTP gem invoice is unavailable without bot token',async()=>{
   await json('/api/home',{headers:headers('30003')});
-  const p=await json('/api/premium/invoice',{method:'POST',headers:headers('30003'),body:'{}'});assert.equal(p.r.status,503);assert.equal(p.body.error,'premium_unavailable');
+  const p=await json('/api/shop/invoice',{method:'POST',headers:headers('30003'),body:JSON.stringify({productKey:'gems_500'})});
+  assert.equal(p.r.status,503);assert.equal(p.body.error,'premium_unavailable');
 });
 
 test('HTTP full reset requires exact confirmation, makes backup, frees usernames and preserves financial/schema records',async()=>{
