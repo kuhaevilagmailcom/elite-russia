@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import {RARITY_WEIGHTS} from './config.mjs';
+import {RARITY_WEIGHTS,USERNAME_RULES} from './config.mjs';
 import {randomUnit} from './economy.mjs';
 import {analyzeUsername} from './valuation.mjs';
 
@@ -79,7 +79,7 @@ const LEXICON_CATEGORY_ROOTS=Object.freeze({
 
 const MASS_LEXICON_TARGET=120000;
 function cleanLexiconRoot(value){
-  return String(value||'').toLowerCase().replace(/[^a-z]/g,'').slice(0,15);
+  return String(value||'').toLowerCase().replace(/[^a-z]/g,'').slice(0,USERNAME_RULES.maxLength);
 }
 function buildMassLexicon(base,target=MASS_LEXICON_TARGET){
   const out=new Set();
@@ -248,7 +248,7 @@ export function hasLetter(handle){return /[a-z]/i.test(String(handle||''))}
 export function isValidHandle(handle){
   const h=String(handle||'').toLowerCase();
   if(TELEGRAM_THREE_LETTER.has(h))return true;
-  return /^[a-z][a-z0-9_]{3,14}$/i.test(h)&&hasLetter(h);
+  return new RegExp(USERNAME_RULES.pattern,'i').test(h)&&hasLetter(h);
 }
 const clampUnit=x=>Math.max(0,Math.min(.999999999,Number(x)||0));
 export function randInt(min,max,rng=randomUnit){return min+Math.floor(clampUnit(rng())*(max-min+1))}
@@ -276,8 +276,8 @@ function randomPronounceable(min=4,max=8,rng=randomUnit){
 }
 function normalizeGenerated(handle){
   let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,15);
-  if(h.length<4)h=(h+'name').slice(0,4);
-  if(!hasLetter(h))h='u'+h.slice(0,14);
+  if(h.length<USERNAME_RULES.minLength)h=(h+'name').slice(0,USERNAME_RULES.minLength);
+  if(!hasLetter(h))h='u'+h.slice(0,USERNAME_RULES.maxLength-1);
   return h;
 }
 const ROOTS_BY_LENGTH=Array.from({length:33},()=>[]);
