@@ -9,6 +9,10 @@ export const todayKey=()=>{
   return new Date(Date.now()+offset).toISOString().slice(0,10);
 };
 export function premiumActive(user){return !!(user?.premium_until&&new Date(user.premium_until).getTime()>Date.now())}
+export function activeCosmetics(db,userId){
+  const selected=db.prepare('SELECT theme_key,frame_key,card_key FROM user_cosmetic_settings WHERE user_id=?').get(userId)||{};
+  return {theme:selected.theme_key||'',frame:selected.frame_key||'',card:selected.card_key||''};
+}
 export function collectionLimit(user){return premiumActive(user)?GAME.premiumMaxCollection:GAME.maxCollection}
 export function activeCollectionCount(db,userId){
   return db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(userId).c;
