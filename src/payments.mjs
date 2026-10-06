@@ -7,11 +7,11 @@ export const SHOP_PRODUCTS=Object.freeze({
 });
 
 export const THEME_PRODUCTS=Object.freeze({
-  ocean:{key:'ocean',title:'Ocean',description:'Голубой accent',gems:350,type:'theme'},
-  violet:{key:'violet',title:'Violet',description:'Фиолетовый accent',gems:350,type:'theme'},
-  lime:{key:'lime',title:'Lime',description:'Зелёный accent',gems:350,type:'theme'},
-  sunset:{key:'sunset',title:'Sunset',description:'Тёплый orange',gems:350,type:'theme'},
-  mono:{key:'mono',title:'Mono',description:'Чёрно-белый accent',gems:350,type:'theme'}
+  ocean:{key:'ocean',title:'Океан',description:'Голубой акцент',gems:350,type:'theme'},
+  violet:{key:'violet',title:'Фиолетовая',description:'Фиолетовый акцент',gems:350,type:'theme'},
+  lime:{key:'lime',title:'Лайм',description:'Зелёный акцент',gems:350,type:'theme'},
+  sunset:{key:'sunset',title:'Закат',description:'Тёплый оранжевый акцент',gems:350,type:'theme'},
+  mono:{key:'mono',title:'Моно',description:'Чёрно-белый акцент',gems:350,type:'theme'}
 });
 
 function ensureWallet(db){
