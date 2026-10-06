@@ -1,4 +1,4 @@
-import {GAME,DROP_TIERS,RARITIES,STARTER_DROP_JACKPOT} from './config.mjs';
+import {GAME,DROP_TIERS,RARITIES,STARTER_DROP_JACKPOT,USERNAME_RULES} from './config.mjs';
 import {buildGeneratedHandle,isValidHandle,scoreHandle,rarityFromValue} from './generator.mjs';
 import {analyzeUsername,visualTier} from './valuation.mjs';
 import {levelFromXp,progressionFromXp,grantXp} from './progression.mjs';
@@ -16,8 +16,11 @@ export function ensureUser(db,tg){
       .run(id,tg.username||'',tg.first_name||'Игрок',GAME.startBalance,GAME.freeDrops,ts,ts);
     u=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(id);
   }else{
-    db.prepare('UPDATE users SET username=?,first_name=?,last_seen=? WHERE id=?').run(tg.username||u.username,tg.first_name||u.first_name,ts,u.id);
-    u=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+    const nextUsername=tg.username||u.username,nextName=tg.first_name||u.first_name,lastSeen=Date.parse(u.last_seen||'')||0;
+    if(nextUsername!==u.username||nextName!==u.first_name||Date.now()-lastSeen>=60000){
+      db.prepare('UPDATE users SET username=?,first_name=?,last_seen=? WHERE id=?').run(nextUsername,nextName,ts,u.id);
+      u=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
+    }
   }
   return u;
 }
@@ -137,7 +140,7 @@ export function publicUser(db,user){
 export function homeData(db,user){
   const pending=shapeInstance(findPending(db,user.id));
   const last=shapeInstance(db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND obtained_type='drop' ORDER BY obtained_at DESC LIMIT 1").get(user.id));
-  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:showcaseSlotLimit(db,user),usernameRules:{gameMin:4,basicTelegramMin:5}}};
+  return {user:publicUser(db,user),pending,last,config:{dropCost:GAME.dropCost,dropTiers:DROP_TIERS,maxCollection:collectionLimit(user),showcaseSlots:showcaseSlotLimit(db,user),usernameRules:{gameMin:USERNAME_RULES.minLength,gameMax:USERNAME_RULES.maxLength,basicTelegramMin:5}}};
 }
 export function createDrop(db,user,requestId,tierKey='basic'){
   if(!requestId||requestId.length>100)throw new Error('bad_request_id');
@@ -250,27 +253,32 @@ export const DAILY_TASK_POOL=Object.freeze([
   {key:'sell3',label:'Продать 3 usernames',target:3,reward:1500,source:'sell'},
   {key:'keep1',label:'Оставить username',target:1,reward:450,source:'keep'},
   {key:'keep2',label:'Оставить 2 usernames',target:2,reward:750,source:'keep'},
-  {key:'keep3',label:'Оставить 3 usernames',target:3,reward:1100,source:'keep'},
-  {key:'games1',label:'Сыграть игру',target:1,reward:500,source:'games'},
-  {key:'games2',label:'Сыграть 2 игры',target:2,reward:900,source:'games'},
-  {key:'games3',label:'Сыграть 3 игры',target:3,reward:1300,source:'games'},
-  {key:'games5',label:'Сыграть 5 игр',target:5,reward:1900,source:'games'},
+  {key:'games1',label:'Сыграть 1 мини-игру',target:1,reward:500,source:'games'},
+  {key:'games3',label:'Сыграть 3 мини-игры',target:3,reward:1300,source:'games'},
+  {key:'games5',label:'Сыграть 5 мини-игр',target:5,reward:1900,source:'games'},
+  {key:'games7',label:'Сыграть 7 мини-игр',target:7,reward:2600,source:'games'},
+  {key:'games10',label:'Сыграть 10 мини-игр',target:10,reward:3800,source:'games'},
   {key:'hunt1',label:'Выиграть Username Hunt',target:1,reward:1000,source:'hunt_win'},
-  {key:'hunt2',label:'Выиграть Hunt дважды',target:2,reward:1700,source:'hunt_win'},
+  {key:'hunt2',label:'Выиграть Username Hunt дважды',target:2,reward:1700,source:'hunt_win'},
+  {key:'play_hunt',label:'Сыграть в Username Hunt',target:1,reward:700,source:'game_hunt'},
+  {key:'play_higher',label:'Сыграть в Выше / ниже',target:1,reward:700,source:'game_higher'},
+  {key:'play_editor',label:'Сыграть в Редактор',target:1,reward:700,source:'game_editor'},
+  {key:'play_build',label:'Сыграть в Собери username',target:1,reward:700,source:'game_build'},
+  {key:'play_price',label:'Сыграть в Угадай цену',target:1,reward:700,source:'game_price'},
   {key:'market1',label:'Купить username',target:1,reward:800,source:'market_buy'},
   {key:'market2',label:'Купить 2 usernames',target:2,reward:1300,source:'market_buy'},
-  {key:'rare1',label:'Получить username от $15K',target:1,reward:1200,source:'rare'},
-  {key:'rare2',label:'Получить 2 username от $15K',target:2,reward:1800,source:'rare'},
+  {key:'rare1',label:'Получить username от 15K ₽',target:1,reward:1200,source:'rare'},
+  {key:'rare2',label:'Получить 2 username от 15K ₽',target:2,reward:1800,source:'rare'},
   {key:'nodigits1',label:'Получить username без цифр',target:1,reward:650,source:'nodigits'},
-  {key:'nodigits2',label:'Получить 2 без цифр',target:2,reward:1050,source:'nodigits'},
+  {key:'nodigits2',label:'Получить 2 username без цифр',target:2,reward:1050,source:'nodigits'},
   {key:'wheel1',label:'Открыть колесо',target:1,reward:500,source:'wheel'},
   {key:'upgrade1',label:'Сделать upgrade',target:1,reward:900,source:'upgrade'},
   {key:'upgrade2',label:'Сделать 2 upgrades',target:2,reward:1500,source:'upgrade'},
-  {key:'gift1',label:'Подарить username',target:1,reward:900,source:'gift'},
+  {key:'gift1',label:'Передать username',target:1,reward:900,source:'gift'},
   {key:'profile1',label:'Посмотреть профиль игрока',target:1,reward:400,source:'view_profile'},
   {key:'invite1',label:'Пригласить друга',target:1,reward:1000,source:'invite'},
   {key:'invite2',label:'Пригласить 2 друзей',target:2,reward:1700,source:'invite'},
-  {key:'trade3',label:'Три действия на рынке',target:3,reward:1600,source:'market_buy'}
+  {key:'trade3',label:'Купить 3 username на рынке',target:3,reward:1600,source:'market_buy'}
 ]);
 function dailyTaskDefs(user){
   const seed=String(user.id)+':'+todayKey();
@@ -301,10 +309,23 @@ export function claimTask(db,user,key){
   })();
   return {reward:t.reward,user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id))};
 }
+function luckProfile(db,u){
+  const rows=db.prepare(`SELECT h.value,COALESCE(r.cost,0) cost
+    FROM drop_history h LEFT JOIN drop_requests r ON r.instance_id=h.instance_id
+    WHERE h.user_id=? ORDER BY h.created_at DESC LIMIT 500`).all(u.id);
+  const paid=rows.filter(x=>Number(x.cost)>0),totalCost=paid.reduce((s,x)=>s+Number(x.cost||0),0),totalValue=paid.reduce((s,x)=>s+Number(x.value||0),0);
+  const profitable=paid.filter(x=>Number(x.value)>=Number(x.cost)).length,profitRate=paid.length?profitable/paid.length:0;
+  const roi=totalCost?totalValue/totalCost:1,bestMultiplier=paid.reduce((m,x)=>Math.max(m,Number(x.value||0)/Math.max(1,Number(x.cost||0))),0);
+  const badStreak=Math.max(0,Number(u.bad_drop_streak||0)),protection=Math.max(0,Math.min(100,Number(u.luck_points||0)));
+  const score=Math.max(0,Math.min(100,Math.round(50+(roi-.85)*50+(profitRate-.25)*20-badStreak*1.25)));
+  const status=score>=85?'legendary':score>=68?'lucky':score>=55?'good':score>=40?'neutral':score>=22?'unlucky':'cursed';
+  const protectionState=badStreak>=20?'rare':badStreak>=10||protection>=75?'good':'normal';
+  return {score,status,protection,protectionState,badStreak,totalDrops:rows.length,paidDrops:paid.length,profitableDrops:profitable,
+    roi:Number(roi.toFixed(2)),bestMultiplier:Number(bestMultiplier.toFixed(2))};
+}
 export function profile(db,userId){
   const u=db.prepare('SELECT * FROM users WHERE id=?').get(userId);if(!u)return null;
   const p=publicUser(db,u);
-  const showcase=db.prepare(`SELECT i.*,s.position FROM profile_showcase s JOIN username_instances i ON i.id=s.instance_id WHERE s.user_id=? AND i.status='owned' ORDER BY s.position`).all(userId).map(shapeInstance);
   const best=shapeInstance(db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status IN ('owned','market') ORDER BY value DESC LIMIT 1").get(userId));
   const friends=db.prepare('SELECT COUNT(*) c FROM friends WHERE user_id=?').get(userId).c;
   const gifts=db.prepare('SELECT COUNT(*) c FROM username_transfers WHERE from_user_id=?').get(userId).c;
@@ -312,7 +333,7 @@ export function profile(db,userId){
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
   const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId),activeCosmeticState=activeCosmetics(db,userId);
   const achievements=db.prepare('SELECT achievement_key,xp_reward,unlocked_at FROM achievement_unlocks WHERE user_id=? ORDER BY unlocked_at DESC LIMIT 3').all(userId);
-  return {...p,showcase,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,achievements};
+  return {...p,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,achievements,luckStats:luckProfile(db,u)};
 }
 export function sellOwnedUsername(db,user,instanceId){
   const result=db.transaction(()=>{
