@@ -51,7 +51,7 @@ const EN_TEXT=Object.freeze({
  'Получено':'Claimed','Забрать':'Claim','В процессе':'In progress','Ближайшие награды':'Upcoming rewards','Все награды получены.':'All rewards claimed.',
  'Тема':'Theme','Светлая':'Light','Тёмная':'Dark','Системная':'System','Язык':'Language','Русский':'Russian','Вибрация':'Haptics','Звук':'Sound','Анимации':'Animations',
  'ЛУЧШИЙ USERNAME':'BEST USERNAME','ДОСТИЖЕНИЯ':'ACHIEVEMENTS','СТАТИСТИКА':'STATS','УДАЧА И НЕВЕЗЕНИЕ':'LUCK & BAD LUCK',
- 'Usernames':'Usernames','Сделки':'Deals','Друзья':'Friends','Удача':'Luck','Защита от невезения':'Bad-luck protection','Серия неудач':'Bad streak',
+ 'Юзернеймы':'Usernames','юзернеймов':'usernames','Сделки':'Deals','Друзья':'Friends','Удача':'Luck','Защита от невезения':'Bad-luck protection','Серия неудач':'Bad streak',
  'Нейтрально':'Neutral','Везёт':'Lucky','Очень везёт':'Very lucky','Невероятно везёт':'Legendary luck','Не везёт':'Unlucky','Жёстко не везёт':'Cursed',
  'Профиль не найден.':'Profile not found.','Пока нет':'None yet','Награда':'Reward','Лучший username':'Best username',
  'Выберите username':'Choose username','Получатель':'Recipient','Введите @username':'Enter @username','Передать':'Transfer','Комиссия 5%':'5% fee',
@@ -62,7 +62,7 @@ const EN_TEXT=Object.freeze({
  'Сегодня':'Today','Лучший':'Best','Какой дороже?':'Which is worth more?','Выше':'Higher','Ниже':'Lower','Проверить':'Check',
  'Сбросить':'Reset','Готово':'Done','К играм':'Back to games','Игра не запущена.':'Game not started.',
  'Кристаллы':'Crystals','Темы':'Themes','Купить':'Buy','Выбрано':'Selected','Применить':'Apply',
- 'Пользователь':'Player','Игрок':'Player','Без username':'No username','Без usernames':'No usernames',
+ 'Пользователь':'Player','Игрок':'Player','Без username':'No username','Без юзернеймов':'No usernames',
  'Место':'Rank','Осталось':'Time left','Награды':'Rewards','Активные серии':'Active events','ТЕКУЩИЙ СЕЗОН':'CURRENT SEASON',
  'Приглашено':'Invited','До следующей':'Until next','ТВОЯ ССЫЛКА':'YOUR LINK','Скопировать':'Copy','Отправить другу':'Share',
  'Очки сезона':'Season Score','Новичок':'Beginner','Свой':'Regular','В теме':'In the know','Бывалый':'Experienced','Продвинутый':'Advanced','Мастер':'Master',
@@ -87,8 +87,8 @@ const EN_TEXT_EXTRA=Object.freeze({
  'Закрыть':'Close','Стоимость попытки':'Attempt price','Выберите цену дропа':'Choose drop price','Получить username':'Get username',
  'Нажми, чтобы получить':'Tap to get one','Улучшить username':'Upgrade username','Быстрое вращение':'Quick spin',
  'По этому фильтру ничего нет.':'Nothing matches this filter.','Назад':'Back','Дальше':'Next','Поиск...':'Search...','Ничего не найдено.':'Nothing found.',
- 'ОБЩИЙ КАПИТАЛ':'TOTAL CAPITAL','Кто богаче':'Who is richer','Баланс + стоимость всех активных usernames':'Balance + value of all active usernames',
- 'Снять':'Remove','Нет usernames для апгрейда.':'No usernames available for upgrade.','Нет usernames для апгрейда':'No usernames available for upgrade',
+ 'ОБЩИЙ КАПИТАЛ':'TOTAL CAPITAL','Кто богаче':'Who is richer','Баланс + стоимость всех активных юзернеймов':'Balance + value of all active usernames',
+ 'Снять':'Remove','Нет юзернеймов для апгрейда.':'No usernames available for upgrade.','Нет usernames для апгрейда':'No usernames available for upgrade',
  'Получено ':'Received ','Активного сезона нет.':'No active season.','Значок профиля':'Profile badge','Тема сезона':'Season theme','Эксклюзивная рамка':'Exclusive profile frame',
  'Приглашай друзей и собирай коллекцию вместе.':'Invite friends and build your collection together.','Ссылка загружается…':'Loading link…',
  'Пригласи первого друга.':'Invite your first friend.','Наград':'Rewards','До следующей':'Until next',
@@ -115,7 +115,7 @@ const EN_TEXT_EXTRA=Object.freeze({
  'Коллекция':'Collection','Редкости':'Rarities','Торговля':'Trading','Прогресс':'Progress','Игры':'Games',
  'Читаемость':'Readability','Краткость':'Brevity','Чистота':'Cleanliness','Спрос':'Demand','Система сразу начислит':'The system will instantly credit',
  'Только оформление. На drop, wheel и upgrade они не влияют.':'Cosmetics only. They do not affect drops, wheel or upgrades.',
- 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','ДРОП':'DROP'
+ 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','дропов':'drops','ДРОП':'DROP'
 });
 function currentLanguage(){return state.settings?.language==='en'?'en':'ru'}
 function tx(ru,en){return currentLanguage()==='en'?en:ru}
@@ -131,7 +131,11 @@ function translateLiteral(value){
   [/^Оценка (.+)$/,'Score $1'],
   [/^ур\. (\d+)$/,'lvl $1'],
   [/^до (.+)$/,'until $1'],
-  [/^Комиссия 5% · получите (.+)$/,'5% fee · you receive $1']
+  [/^Комиссия 5% · получите (.+)$/,'5% fee · you receive $1'],
+  [/^УР\. (\d+)$/,'LVL $1'],
+  [/^(\d+) \/ (\d+) опыта$/,'$1 / $2 XP'],
+  [/^(\d+) дропов$/,'$1 drops'],
+  [/^(\d+) юзернеймов$/,'$1 usernames']
  ];
  for(const [re,to] of patterns)if(re.test(s))return s.replace(re,to);
  return s;
@@ -228,7 +232,7 @@ function metric(label,value){return '<div class="metric"><span>'+label+'</span><
 function valueClass(x){return ' value-'+(['blue','purple','gold'].includes(String(x?.visual||''))?x.visual:'normal')}
 function xpBar(u){
  const pct=Math.max(0,Math.min(100,Math.round(Number(u?.levelProgress||0)*100)));
- return '<div class="xp-block"><div class="xp-head"><b>LVL '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=200?'MAX':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' XP'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
+ return '<div class="xp-block"><div class="xp-head"><b>УР. '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=200?'МАКС':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' опыта'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
 }
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU_SECTIONS=[
@@ -358,7 +362,7 @@ function collectionFilterSheet(){
 function collectionView(){
  const d=state.collection||{items:[],summary:{count:0,value:0},page:1,pages:1};
  return '<div class="page-body collection-page collection-page-clean">'+collectionFilterSheet()+
-  '<div class="screen-toolbar collection-toolbar"><div><b>'+(d.summary?.count||0)+' usernames</b><span>Общая стоимость · '+fmt(d.summary?.value||0)+'</span></div>'+FilterButton('collection')+'</div>'+
+  '<div class="screen-toolbar collection-toolbar"><div><b>'+(d.summary?.count||0)+' юзернеймов</b><span>Общая стоимость · '+fmt(d.summary?.value||0)+'</span></div>'+FilterButton('collection')+'</div>'+
   '<div class="collection-grid">'+(d.items.length?d.items.map(x=>'<article class="user-card collection-card'+valueClass(x)+'">'+
    '<button class="user-card-main" data-detail="'+x.id+'"><span data-fit-username data-max-size="18" data-min-size="11">'+esc(x.handle)+'</span><b>'+fmt(x.value)+'</b><small>'+(x.score?'Оценка '+x.score:'В коллекции')+'</small></button>'+
    '<button class="user-card-sell" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+(x.sellValue??x.value)+'">Продать</button>'+
@@ -493,7 +497,7 @@ function upgraderView(){
  if(stage==='target'){
   const targets=upgradeTargetOptions(),picked=selectedUpgradeTarget(),total=Number(state.upgradePreview?.totalValue||sourceTotal),count=Number(state.upgradePreview?.sources?.length||selected.length||1);
   return '<div class="upgrade-page upgrade-target-stage">'+
-   '<section class="upgrade-source-summary"><div><b>'+(count>1?(count+' usernames'):(source?esc(source.handle):'—'))+'</b><strong>'+fmt(total)+'</strong></div></section>'+
+   '<section class="upgrade-source-summary"><div><b>'+(count>1?(count+' юзернеймов'):(source?esc(source.handle):'—'))+'</b><strong>'+fmt(total)+'</strong></div></section>'+
    '<div class="upgrade-target-list">'+(targets.length?targets.map(upgradeTargetRowHtml).join(''):'<div class="empty">Подбираем варианты…</div>')+'</div>'+
    '<div class="upgrade-footer"><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+'</button><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>Апгрейд</button></div>'+
   '</div>';
@@ -515,7 +519,7 @@ function profileView(p=state.profile?.profile){
  const luckStatus={legendary:'Невероятно везёт',lucky:'Очень везёт',good:'Везёт',neutral:'Нейтрально',unlucky:'Не везёт',cursed:'Жёстко не везёт'}[luck.status]||'Нейтрально';
  const achievements='<section class="profile-section-v7"><small>ДОСТИЖЕНИЯ</small><div class="profile-achievements-v7">'+(badges.length?badges.map(x=>'<span>'+icon('achievements')+'<b>'+esc(achievementNames[x.achievement_key]||'Награда')+'</b></span>').join(''):'<div class="profile-empty-v7">Пока нет</div>')+'</div></section>';
  const bestBlock='<section class="profile-section-v7"><small>ЛУЧШИЙ USERNAME</small>'+(best?'<div class="profile-best'+valueClass(best)+'"><b>'+esc(best.handle)+'</b><strong>'+fmt(best.value)+'</strong></div>':'<div class="profile-empty-v7">—</div>')+'</section>';
- const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Usernames',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
+ const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Юзернеймы',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
   '<section class="profile-luck-v8"><div class="luck-score-ring" style="--luck:'+Math.max(0,Math.min(100,Number(luck.score||0)))+'%"><b>'+Number(luck.score||0)+'%</b><span>Удача</span></div><div class="luck-copy"><small>УДАЧА И НЕВЕЗЕНИЕ</small><b>'+luckStatus+'</b><div><span>Защита от невезения</span><strong>'+Number(luck.protection||0)+'%</strong></div><div><span>Серия неудач</span><strong>'+Number(luck.badStreak||0)+'</strong></div></div></section>':'';
  return '<div class="profile-v7 '+(own?'own-profile':'public-profile')+'">'+
   '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+xpBar(p)+'<div class="profile-inline-stats"><b>#'+Number(p.rank||0)+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
@@ -524,9 +528,9 @@ function profileView(p=state.profile?.profile){
 function shopView(){
  const p=state.shop||{wallet:{gems:0},gemPacks:[],themes:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.key)),selected=String(p.selected?.theme_key||'');
  return '<div class="shop-page-v7"><section class="shop-wallet"><span>💎</span><b>'+new Intl.NumberFormat('ru-RU').format(Number(p.wallet?.gems||0))+'</b></section>'+
-  '<div class="section-label">Кристаллы</div><div class="gem-pack-grid">'+(p.gemPacks||[]).map(x=>'<article><div><b>'+esc(x.title)+'</b><span>'+x.stars+' Stars</span></div><button class="primary" data-buy-product="'+x.key+'" '+(!p.starsEnabled?'disabled':'')+'>Купить</button></article>').join('')+'</div>'+
+  '<div class="section-label">Кристаллы</div><div class="gem-pack-grid">'+(p.gemPacks||[]).map(x=>'<article><div><b>'+esc(x.title)+'</b><span>'+x.stars+' звёзд</span></div><button class="primary" data-buy-product="'+x.key+'" '+(!p.starsEnabled?'disabled':'')+'>Купить</button></article>').join('')+'</div>'+
   '<div class="section-label">Темы</div><div class="theme-shop-grid">'+(p.themes||[]).map(x=>{const has=owned.has(x.key),active=selected===x.key;return '<article data-theme-preview="'+esc(x.key)+'"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+(has?'<button class="secondary" data-select-cosmetic="theme:'+x.key+'" '+(active?'disabled':'')+'>'+(active?'Выбрано':'Применить')+'</button>':'<button data-buy-theme="'+x.key+'">'+x.gems+' 💎</button>')+'</article>'}).join('')+'</div>'+
-  '<p class="shop-note">💎 — только оформление. На drop, wheel и upgrade они не влияют.</p></div>';
+  '<p class="shop-note">💎 — только оформление. На дроп, колесо и апгрейд они не влияют.</p></div>';
 }
 function settingsView(){
  const s=state.settings||DEFAULT_SETTINGS,themeName={light:'Светлая',dark:'Тёмная',system:'Системная'}[s.theme]||'Системная';
@@ -540,8 +544,8 @@ function settingsView(){
 function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function levelsView(){
  const l=state.levels||{},p=l.progression||state.user||{},rewards=(l.rewards||[]).filter(r=>Number(r.level)>Number(p.level||1)).slice(0,7);
- return '<div class="levels-v7"><section class="levels-main-v7"><h1>LVL '+Number(p.level||1)+'</h1><b>'+esc(p.title||state.user?.title||'Новичок')+'</b>'+xpBar(p)+'<span>До следующего: '+Number(p.remaining||0)+' XP</span></section>'+
- '<div class="section-label">Ближайшие награды</div><div class="level-nearby-v7">'+(rewards.length?rewards.map(r=>'<article><b>LVL '+r.level+'</b><span>'+esc(r.title||'')+'</span><strong>'+(r.money?fmt(r.money):((r.freeDrops||0)+' DROP'))+'</strong></article>').join(''):'<div class="empty compact">Все награды получены.</div>')+'</div></div>';
+ return '<div class="levels-v7"><section class="levels-main-v7"><h1>УР. '+Number(p.level||1)+'</h1><b>'+esc(p.title||state.user?.title||'Новичок')+'</b>'+xpBar(p)+'<span>До следующего: '+Number(p.remaining||0)+' XP</span></section>'+
+ '<div class="section-label">Ближайшие награды</div><div class="level-nearby-v7">'+(rewards.length?rewards.map(r=>'<article><b>УР. '+r.level+'</b><span>'+esc(r.title||'')+'</span><strong>'+(r.money?fmt(r.money):((r.freeDrops||0)+' дропов'))+'</strong></article>').join(''):'<div class="empty compact">Все награды получены.</div>')+'</div></div>';
 }
 function achievementsView(){
  const a=state.achievements||{items:[],completed:0,total:0};
@@ -562,11 +566,11 @@ function gamesView(){
 }
 function miniGameView(){
  const g=state.gameSession;if(!g)return '<div class="empty">Игра не запущена.</div>';
- if(g.done)return '<div class="game-finish-v7"><span>'+icon('games')+'</span><h2>'+g.score+' / '+g.total+'</h2><b>+'+fmt(g.reward)+' · +'+g.xp+' XP</b><button class="primary" data-page="games">К играм</button></div>';
+ if(g.done)return '<div class="game-finish-v7"><span>'+icon('games')+'</span><h2>'+g.score+' / '+g.total+'</h2><b>+'+fmt(g.reward)+' · +'+g.xp+' опыта</b><button class="primary" data-page="games">К играм</button></div>';
  const q=g.question||{},head='<div class="game-progress-v7"><span>'+(g.index+1)+' / '+g.total+'</span><b>+'+fmt(g.reward||0)+'</b></div>';
  let body='';
  if(g.gameKey==='hunt')body='<div class="game-question-v7"><h2>Какой дороже?</h2><div class="hunt-grid-v7">'+(q.options||[]).map(x=>'<button class="'+valueClass(x).trim()+'" data-game-answer="'+esc(x.handle)+'">'+esc(x.handle)+'</button>').join('')+'</div></div>';
- if(g.gameKey==='higher')body='<div class="game-question-v7"><div class="versus-v7"><article><b>'+esc(q.left?.handle||'')+'</b><strong>'+fmt(q.left?.value||0)+'</strong></article><span>VS</span><article><b>'+esc(q.right?.handle||'')+'</b><strong>???</strong></article></div><div class="game-two-actions"><button data-game-answer="higher">Выше</button><button data-game-answer="lower">Ниже</button></div></div>';
+ if(g.gameKey==='higher')body='<div class="game-question-v7"><div class="versus-v7"><article><b>'+esc(q.left?.handle||'')+'</b><strong>'+fmt(q.left?.value||0)+'</strong></article><span>ПРОТИВ</span><article><b>'+esc(q.right?.handle||'')+'</b><strong>???</strong></article></div><div class="game-two-actions"><button data-game-answer="higher">Выше</button><button data-game-answer="lower">Ниже</button></div></div>';
  if(g.gameKey==='editor')body='<div class="game-question-v7"><h2>'+esc(q.source||'')+'</h2><span>'+fmt(q.sourceValue||0)+'</span><label class="game-input-v7">@<input id="gameEditorInput" maxlength="15" autocomplete="off" placeholder="сделай дороже"></label><button class="primary" data-game-editor-submit>Проверить</button></div>';
  if(g.gameKey==='build')body='<div class="game-question-v7"><h2>@'+esc(state.gameBuildValue||'')+'</h2><div class="parts-v7">'+(q.parts||[]).map(x=>'<button data-game-part="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div><div class="game-two-actions"><button class="secondary" data-game-build-clear>Сбросить</button><button class="primary" data-game-build-submit '+(!state.gameBuildValue?'disabled':'')+'>Готово</button></div></div>';
  if(g.gameKey==='price')body='<div class="game-question-v7"><h2>'+esc(q.item?.handle||'')+'</h2><div class="price-options-v7">'+(q.bands||[]).map(x=>'<button data-game-answer="'+x.key+'">'+esc(x.label)+'</button>').join('')+'</div></div>';
