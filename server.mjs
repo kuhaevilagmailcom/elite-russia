@@ -19,7 +19,7 @@ import {dailyStatus,claimDaily} from './src/daily.mjs';
 import {publicUser} from './src/game.mjs';
 import {achievementsData} from './src/achievements.mjs';
 import {levelRewards,progressionFromXp} from './src/progression.mjs';
-import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema} from './src/minigames.mjs';
+import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema,cleanupMiniGameSessions} from './src/minigames.mjs';
 import {bumpTask} from './src/economy.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
@@ -42,16 +42,23 @@ fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
 ensureMiniGameSchema(db);
 const lastDropAt=new Map();
-const rateBuckets=new Map();
 const leaderboardCache=new Map();
 function invalidateLeaderboard(){leaderboardCache.clear()}
 
 function rateLimit(userId,key,limit,windowMs){
-  const k=String(userId)+':'+key,now=Date.now(),row=rateBuckets.get(k);
-  if(!row||now-row.started>=windowMs){rateBuckets.set(k,{started:now,count:1});return true}
-  if(row.count>=limit)return false;row.count++;return true;
+  const rateKey=String(userId)+':'+String(key),now=Date.now();
+  return db.transaction(()=>{
+    const row=db.prepare('SELECT started_at,count FROM api_rate_limits WHERE rate_key=?').get(rateKey);
+    if(!row||now-Number(row.started_at)>=windowMs){
+      db.prepare('INSERT INTO api_rate_limits(rate_key,started_at,count) VALUES(?,?,1) ON CONFLICT(rate_key) DO UPDATE SET started_at=excluded.started_at,count=1').run(rateKey,now);
+      return true;
+    }
+    if(Number(row.count)>=limit)return false;
+    db.prepare('UPDATE api_rate_limits SET count=count+1 WHERE rate_key=?').run(rateKey);
+    return true;
+  })();
 }
-function cleanupRateBuckets(){const now=Date.now();for(const [k,v] of rateBuckets){if(now-v.started>10*60*1000)rateBuckets.delete(k)}}
+function cleanupRateBuckets(){db.prepare('DELETE FROM api_rate_limits WHERE started_at<?').run(Date.now()-24*60*60*1000)}
 function cleanupStoryFiles(){
   const cutoff=Date.now()-Number(GAME.storyTtlMs||86400000);
   try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(st.mtimeMs<cutoff)fs.unlinkSync(p)}}catch(e){console.error('Story cleanup:',e.message)}
@@ -67,7 +74,7 @@ async function backupDatabase(label=''){
   }catch(e){console.error('Backup:',e.message);throw e}
 }
 function maintenance(){
-  cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
+  cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);cleanupMiniGameSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
 }
 maintenance();
 setInterval(maintenance,10*60*1000).unref?.();
@@ -100,6 +107,8 @@ function auth(req){
   }
   if(ALLOW_DEV_AUTH){
     const rawDev=req.headers['x-dev-user'];if(!rawDev)return null;
+    const host=String(req.headers.host||'').split(':')[0].toLowerCase();
+    if(!['localhost','127.0.0.1','::1'].includes(host))return null;
     const id=String(rawDev),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
     const devStart=String(req.headers['x-start-param']||'');registerReferral(db,u,devStart);if(devStart)invalidateLeaderboard();return u;
   }
@@ -258,7 +267,7 @@ async function api(req,res,url){
     const gameAnswer=url.pathname.match(/^\/api\/games\/session\/([^/]+)\/answer$/);
     if(req.method==='POST'&&gameAnswer){
       if(!rateLimit(user.id,'mini_game_answer',80,60000))return json(res,429,{error:'rate_limited'});
-      const b=await readBody(req),result=answerMiniGame(db,user,gameAnswer[1],b.answer);
+      const b=await readBody(req),result=answerMiniGame(db,user,gameAnswer[1],b.answer,b.index);
       const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);invalidateLeaderboard();
       return json(res,200,{...result,user:publicUser(db,fresh)});
     }
@@ -280,7 +289,7 @@ async function api(req,res,url){
 
     if(req.method==='GET'&&url.pathname==='/api/friends'){if(!BOT_USERNAME&&BOT_TOKEN)await resolveBotUsername();return json(res,200,friendsData(db,user,BOT_USERNAME))}
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
-    if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),Number(b.friendId));invalidateLeaderboard();return json(res,200,result)}
+    if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),b.recipientUsername??b.friendId);invalidateLeaderboard();return json(res,200,result)}
 
     if(req.method==='GET'&&url.pathname==='/api/wheel')return json(res,200,wheelStatus(db,user));
     if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req),result=spinWheel(db,user,String(b.requestId||''));invalidateLeaderboard();return json(res,200,result)}
@@ -355,7 +364,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
@@ -372,7 +381,10 @@ function serveStatic(req,res,url){
   const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':'no-store, max-age=0','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})
 }
-const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz')return json(res,200,{ok:true,service:'username',version:GAME.version,botConfigured:!!BOT_TOKEN,telegramPolling});if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
+const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz'){
+  try{const dbOk=Number(db.prepare('SELECT 1 ok').get()?.ok)===1;return json(res,dbOk?200:503,{ok:dbOk,service:'username',version:GAME.version,db:dbOk,botConfigured:!!BOT_TOKEN,telegramPolling})}
+  catch{return json(res,503,{ok:false,service:'username',version:GAME.version,db:false,botConfigured:!!BOT_TOKEN,telegramPolling})}
+}if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(isMain)server.listen(PORT,()=>{console.log(`USERNAME v${GAME.version} running on http://localhost:${PORT}`);startTelegramPolling().catch(e=>console.error('Telegram bot fatal:',e))});
 export {validateInitData,externalOrigin};
