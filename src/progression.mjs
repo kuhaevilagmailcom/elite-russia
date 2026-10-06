@@ -1,43 +1,80 @@
 import {txBalance,nowIso} from './economy.mjs';
 
-const TITLES=[
-  [1,'Новичок'],[5,'Перекуп'],[10,'Торгаш'],[15,'Барыга'],[20,'Охотник'],
-  [30,'Коллекционер'],[40,'Магнат'],[50,'Акула'],[65,'Дилер имён'],[80,'Король рынка'],[100,'Легенда']
-];
-const REWARDS=new Map([
-  [2,{money:1000}],[3,{money:1500}],[5,{freeDrops:1}],[10,{money:10000}],
-  [15,{money:7500}],[20,{freeDrops:2}],[25,{money:15000}],[30,{money:25000}],
-  [40,{money:35000}],[50,{money:50000}],[65,{money:75000}],[75,{freeDrops:3}],[80,{money:100000}],[100,{money:250000,freeDrops:5}]
+export const MAX_LEVEL=200;
+
+export const TITLE_CONFIG=Object.freeze([
+  [1,'Йоу'],
+  [10,'Чечик'],
+  [20,'Шарит'],
+  [30,'В теме'],
+  [40,'На вайбе'],
+  [50,'Могёт'],
+  [60,'Лудик'],
+  [70,'Жёсткий'],
+  [80,'Лютый'],
+  [90,'Имбовый'],
+  [100,'Аура +100'],
+  [110,'Сигма'],
+  [120,'Маэстро'],
+  [130,'Раздаёт'],
+  [140,'Аура +500'],
+  [150,'Имба'],
+  [160,'Боссик'],
+  [170,'Сверхразум'],
+  [180,'Аура +1000'],
+  [190,'Финальный босс'],
+  [200,'Легендарка']
 ]);
 
+const REWARDS=new Map([
+  [5,{money:2500}],[10,{money:5000}],[15,{freeDrops:1}],[20,{money:7500}],
+  [30,{money:10000}],[40,{money:12500}],[50,{freeDrops:1}],[60,{money:10000}],
+  [70,{freeDrops:1}],[80,{money:20000}],[90,{money:25000}],[100,{freeDrops:2,money:30000}],
+  [120,{money:40000}],[140,{freeDrops:2}],[150,{money:50000}],[160,{money:60000}],
+  [180,{freeDrops:3,money:75000}],[190,{money:100000}],[200,{freeDrops:5,money:200000}]
+]);
+
+function xpForStep(level){
+  const l=Math.max(1,Math.min(MAX_LEVEL-1,Math.floor(Number(level)||1)));
+  if(l<20)return Math.round(85+l*18);
+  if(l<80)return Math.round(430+(l-20)*38);
+  if(l<150)return Math.round(2800+(l-80)*95);
+  return Math.round(9800+(l-150)*235);
+}
+
 export function xpToReachLevel(level){
-  const l=Math.max(1,Math.min(100,Math.floor(Number(level)||1)));
-  if(l<=1)return 0;
+  const target=Math.max(1,Math.min(MAX_LEVEL,Math.floor(Number(level)||1)));
+  if(target<=1)return 0;
   let total=0;
-  for(let n=1;n<l;n++)total+=Math.round(90+34*n+4.2*Math.pow(n,1.55));
+  for(let l=1;l<target;l++)total+=xpForStep(l);
   return total;
 }
+
 export function levelFromXp(xp){
   const value=Math.max(0,Math.floor(Number(xp)||0));
-  let lo=1,hi=100;
+  let lo=1,hi=MAX_LEVEL;
   while(lo<hi){
     const mid=Math.ceil((lo+hi)/2);
     if(xpToReachLevel(mid)<=value)lo=mid;else hi=mid-1;
   }
   return lo;
 }
+
 export function levelTitle(level){
-  let title=TITLES[0][1];
-  for(const [at,name] of TITLES)if(Number(level)>=at)title=name;
+  const l=Math.max(1,Math.min(MAX_LEVEL,Math.floor(Number(level)||1));
+  let title=TITLE_CONFIG[0][1];
+  for(const [at,name] of TITLE_CONFIG)if(l>=at)title=name;
   return title;
 }
+
 export function progressionFromXp(xp){
-  const value=Math.max(0,Math.floor(Number(xp)||0)),level=levelFromXp(value),start=xpToReachLevel(level),next=level>=100?start:xpToReachLevel(level+1);
+  const value=Math.max(0,Math.floor(Number(xp)||0)),level=levelFromXp(value),start=xpToReachLevel(level),next=level>=MAX_LEVEL?start:xpToReachLevel(level+1);
   return {
     level,xp:value,title:levelTitle(level),levelXp:value-start,nextLevelXp:Math.max(0,next-start),
-    remaining:level>=100?0:Math.max(0,next-value),progress:level>=100?1:Math.max(0,Math.min(1,(value-start)/Math.max(1,next-start)))
+    remaining:level>=MAX_LEVEL?0:Math.max(0,next-value),progress:level>=MAX_LEVEL?1:Math.max(0,Math.min(1,(value-start)/Math.max(1,next-start)))
   };
 }
+
 function awardLevelReward(db,userId,level){
   const reward=REWARDS.get(level);if(!reward)return null;
   const inserted=db.prepare('INSERT OR IGNORE INTO level_reward_claims(user_id,level,claimed_at) VALUES(?,?,?)').run(userId,level,nowIso()).changes;
@@ -46,6 +83,7 @@ function awardLevelReward(db,userId,level){
   if(reward.freeDrops)db.prepare('UPDATE users SET free_drops=free_drops+? WHERE id=?').run(reward.freeDrops,userId);
   return {...reward,level};
 }
+
 export function grantXp(db,userId,amount,reason='game',metadata={}){
   const add=Math.max(0,Math.min(10000,Math.round(Number(amount)||0))),before=db.prepare('SELECT xp,level FROM users WHERE id=?').get(userId);
   if(!before)throw new Error('user_not_found');
@@ -58,4 +96,7 @@ export function grantXp(db,userId,amount,reason='game',metadata={}){
   for(let l=beforeLevel+1;l<=after.level;l++){const r=awardLevelReward(db,userId,l);if(r)rewards.push(r)}
   return {...after,added:add,rewards};
 }
-export function levelRewards(){return [...REWARDS.entries()].map(([level,reward])=>({level,...reward,title:levelTitle(level)}))}
+
+export function levelRewards(){
+  return [...REWARDS.entries()].map(([level,reward])=>({level,...reward,title:levelTitle(level)}));
+}
