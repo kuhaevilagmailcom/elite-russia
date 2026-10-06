@@ -7,7 +7,7 @@ const state={
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
   pageLoadedAt:{}
 };
-const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
+const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' ₽';
 function untilText(iso){
  const ms=Math.max(0,new Date(iso).getTime()-Date.now()),mins=Math.max(1,Math.ceil(ms/60000));
  const h=Math.floor(mins/60),m=mins%60;
@@ -223,13 +223,15 @@ function dropPricePicker(tiers){
  return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
 function homeView(){
- const h=state.home,u=h.user,p=h.pending,tier=(h.config?.dropTiers||{}).basic||{key:'basic',cost:3000},free=u.freeDrops>0,payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
+ const h=state.home,u=h.user,p=h.pending,tiers=h.config?.dropTiers||{},tier=selectedDropTier(),free=u.freeDrops>0,payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
  return '<div class="home-v7">'+
   '<section class="home-level-v7">'+xpBar(u)+'</section>'+
   '<section class="drop-zone home-drop-v7">'+
-    (!p?'<button class="drop-price-v7" tabindex="-1">'+(free?'FREE':fmt(tier.cost))+'</button>':'')+
-    (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b></button>')+
+    (!p?'<button class="drop-price-v7" data-drop-picker-open aria-label="Выбрать стоимость дропа"><span>'+(free?'FREE':fmt(tier.cost))+'</span>'+icon('down')+'</button>':'')+
+    (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b><span>Нажми, чтобы получить</span></button>')+
   '</section>'+
+  (!p?'<section class="home-quick-v7"><button class="home-quick-action" data-page="upgrader"><span class="home-quick-icon">'+icon('upgrade')+'</span><div><b>Апгрейдер</b><small>Улучшить username</small></div>'+icon('chevron')+'</button><button class="home-quick-action" data-page="wheel"><span class="home-quick-icon">'+icon('wheel')+'</span><div><b>Колесо</b><small>Быстрое вращение</small></div>'+icon('chevron')+'</button></section>':'')+
+  dropPricePicker(tiers)+
  '</div>';
 }
 async function animateDrop(result){
@@ -590,9 +592,9 @@ async function spinWheelUi(){
   const req=crypto.randomUUID?.()||('w-'+Date.now()),r=await api('/api/wheel',{method:'POST',body:JSON.stringify({requestId:req})});
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
   if(disc&&target){
-   const margin=Math.min(2.2,Math.max(.35,target.span*.12)),room=Math.max(.25,target.span-margin*2),landing=target.start+margin+(rollRandomInt(10000)/10000)*room,final=8*360-landing;
+   const margin=Math.min(2.2,Math.max(.35,target.span*.12)),room=Math.max(.25,target.span-margin*2),landing=target.start+margin+(rollRandomInt(10000)/10000)*room,final=10*360-landing;
    const stage=disc.closest('.fortune-stage');stage?.classList.add('spinning');
-   await animateRotation(disc,final,3450,'cubic-bezier(.08,.74,.09,1)');
+   await animateRotation(disc,final,5600,'cubic-bezier(.06,.76,.08,1)');
    stage?.classList.remove('spinning');
   }
   state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');sound('reward');await refreshUser();state.wheel=await api('/api/wheel');render();
@@ -617,9 +619,9 @@ async function animateUpgradeWheel(result){
  const rotor=document.querySelector('#upgradeRotor');if(!rotor){state.upgradeSpinning=false;render();return}
  const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(5,winArc/3),unit=rollRandomInt(10000)/10000;
  const landing=result.success?(margin+unit*Math.max(1,winArc-margin*2)):(winArc+margin+unit*Math.max(1,360-winArc-margin*2));
- const wheelDegrees=360*6-landing;
+ const wheelDegrees=360*9-landing;
  rotor.closest('.upgrade-roulette-clean')?.classList.add('spinning');
- await animateRotation(rotor,wheelDegrees,3200,'cubic-bezier(.12,.72,.08,1)');
+ await animateRotation(rotor,wheelDegrees,6200,'cubic-bezier(.055,.72,.075,1)');
  rotor.closest('.upgrade-roulette-clean')?.classList.remove('spinning');
  haptic(result.success?'medium':'light');sound(result.success?'reward':'fail');
  state.upgradeLandingAngle=landing;state.upgradeLastRound={sources,target:result.target,chance:Number(result.chance||0),success:!!result.success};
