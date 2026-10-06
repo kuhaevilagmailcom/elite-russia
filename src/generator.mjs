@@ -30,10 +30,104 @@ const EXTRA_RU_ROOTS=[
   'car','domik','dacha','banya','lesok','more','reka','gory','solnce','luna'
 ];
 
-export const ROOTS=[
+
+const LEXICON_CATEGORY_ROOTS=Object.freeze({
+  names:[
+    'matvey','matvei','maksim','alexandr','aleksandr','alexander','mikhail','mihail','michael','dmitry','dmitriy','vladimir',
+    'vyacheslav','stanislav','yaroslav','vsevolod','leonid','valera','valeriy','viktor','victor','roman','danila','daniil',
+    'mark','markus','lev','leon','stepan','platon','miron','rodion','arseniy','arsen','georgiy','german','robert','eduard',
+    'elena','ekaterina','katerina','victoria','viktoria','elizaveta','elizabet','anastasia','anastasiya','alexandra','aleksandra',
+    'valeria','valeriya','veronika','kristina','karina','diana','eva','evgenia','evgeniya','natalia','natalya','tatiana','tatyana',
+    'oksana','lyubov','nadezhda','galina','larisa','irina','olga','yulia','yuliya','anna','maria','mariya','ksenia','kseniya',
+    'alice','alise','emily','emma','oliver','liam','noah','james','lucas','henry','jack','leo','daniel','david','adam','sam','john'
+  ],
+  cities:[
+    'novosibirsk','ekaterinburg','chelyabinsk','krasnodar','krasnoyarsk','vladivostok','habarovsk','khabarovsk','tyumen',
+    'kaliningrad','volgograd','orenburg','izhevsk','kirov','astrahan','astrakhan','penza','lipetsk','belgorod','murmansk',
+    'yakutsk','grozny','mahachkala','makhachkala','stavropol','sevastopol','simferopol','pskov','kostroma','ivanovo','bryansk',
+    'smolensk','orelcity','nalchik','vladimircity','yoshkarola','saransk','cheboksary','ulyanovsk','novgorod','petrozavodsk',
+    'london','paris','berlin','madrid','rome','roma','tokyo','seoul','dubai','miami','boston','chicago','toronto','oslo',
+    'vienna','prague','warsaw','helsinki','riga','tallinn','vilnius','minsk','tbilisi','yerevan','baku','astana','almaty',
+    'bishkek','tashkent','beijing','shanghai','singapore','sydney','melbourne','delhi','mumbai','cairo','istanbul','athens',
+    'lisbon','zurich','geneva','brussels','amsterdam','rotterdam','stockholm','copenhagen','budapest','bucharest','sofia'
+  ],
+  funny:[
+    'babushka','dedushka','babka','dedka','batya','mamulya','papulya','tetyushka','dyadya','osloeb','govno','zalupa','penis',
+    'sanina','zhopa','pisyun','chlen','sosun','sosal','sosi','govnyuk','govnar','mudak','dolboeb','eblan','eban','blyad',
+    'blyat','suka','nahuy','pizda','huy','hui','ebat','zaebal','zaebis','pizdec','pizdets','durak','debil','idiot','loshara',
+    'loh','loch','bomzh','kringe','krinzh','rzhaka','ugarchik','memas','prikol','prikolist','shiza','zhiza','chelik','chuvak',
+    'bro','bruh','bratan','bratok','patsan','vasya','petrovich','ivanich','dedinside','sigma','skuf','altushka','normis',
+    'shkolnik','student','uchilka','direktor','sosed','sosedka','podik','podezd','tualet','unitaz','nosok','tapok','ogurec'
+  ],
+  ruWords:[
+    'dobro','zlo','schastye','radost','grust','pechal','lyubov','nenavist','druzhba','semya','dom','kvartira','shkola','univer',
+    'rabota','otdyh','otpusk','more','reka','ozero','les','pole','gora','nebo','zemlya','ogon','voda','vozduh','veter','dozhd',
+    'sneg','solnce','luna','zvezda','utro','den','vecher','noch','vesna','leto','osen','zima','hleb','moloko','chay','kofe',
+    'sup','borsh','pelmeni','kotleta','kartoshka','arbuz','yabloko','banan','limon','apelsin','ogurec','pomidor','sir','myaso',
+    'riba','kurica','kot','koshka','sobaka','pes','volk','lisa','zayac','medved','olen','orel','voron','golub','utka','gus',
+    'korova','loshad','svinya','koza','ovca','mysh','krisa','ryba','akula','kit','delfin','rak','krab','zmeya','zhuk','muha'
+  ],
+  english:[
+    'devil','deer','angel','demon','heaven','hell','happy','sad','funny','crazy','stupid','smart','brave','kind','evil','good',
+    'bad','trash','garbage','toilet','sock','shoe','grandma','grandpa','mother','father','brother','sister','friend','family',
+    'house','home','school','student','teacher','city','village','country','forest','river','lake','mountain','ocean','island',
+    'fire','water','earth','wind','rain','snow','sun','moon','star','night','morning','evening','summer','winter','spring',
+    'autumn','coffee','tea','bread','milk','apple','banana','lemon','orange','cheese','meat','fish','chicken','cat','dog',
+    'mouse','rat','horse','cow','pig','goat','sheep','snake','bird','duck','goose','whale','dolphin','crab','spider','beetle'
+  ]
+});
+
+const MASS_LEXICON_TARGET=120000;
+function cleanLexiconRoot(value){
+  return String(value||'').toLowerCase().replace(/[^a-z]/g,'').slice(0,32);
+}
+function buildMassLexicon(base,target=MASS_LEXICON_TARGET){
+  const out=new Set();
+  const add=value=>{
+    const root=cleanLexiconRoot(value);
+    if(root.length>=3&&root.length<=32)out.add(root);
+  };
+  for(const value of base)add(value);
+  for(const group of Object.values(LEXICON_CATEGORY_ROOTS))for(const value of group)add(value);
+
+  const priority=[
+    'dark','black','white','red','blue','green','gold','silver','big','small','super','mega','ultra','real','true','only','top',
+    'pro','king','boss','lord','baby','crazy','wild','cool','hot','cold','night','day','city','street','rus','ru','mgn','tg',
+    'brat','batya','ded','babka','kot','pes','govno','zalupa','devil','angel','deer','sigma','skuf','mem','lol'
+  ].map(cleanLexiconRoot).filter(Boolean);
+
+  const seeds=[...out].filter(x=>x.length>=3&&x.length<=14);
+  for(const left of priority){
+    for(const right of seeds){
+      add(left+right);
+      if(out.size>=target)return [...out];
+      add(right+left);
+      if(out.size>=target)return [...out];
+    }
+  }
+
+  for(let i=0;i<seeds.length&&out.size<target;i++){
+    const a=seeds[i];
+    for(let j=0;j<seeds.length&&out.size<target;j++){
+      const b=seeds[j];
+      if(a===b)continue;
+      if(a.length+b.length<=24)add(a+b);
+      if(out.size>=target)break;
+      if((i+j)%3===0&&a.length+b.length<=24)add(b+a);
+    }
+  }
+  if(out.size<target)throw new Error('username_lexicon_too_small:'+out.size);
+  return [...out];
+}
+
+const BASE_ROOTS=[
 ...EXTRA_RU_ROOTS,
 'card','loly','mama','papa','sosi','sosal','dedyska','brat','sestra','drug','svoy','kot','pes','babka','ded','vova','dima','tema','maks','vlad','roma','sasha','sanya','artem','vasya','petya','kirill','ruslan','bogdan','sigma','love','dream','angel','baby','cool','club','news','music','bank','shop','monk','ghost','void','vision','legend','dealer','storm','night','phantom','million','master','mister','king','prime','rocket','shadow','venom','savage','black','white','wolf','tiger','moon','solar','street','drive','speed','turbo','money','rich','diamond','silver','rare','zero','pixel','cloud','wave','nova','silent','unknown','anonymous','alpha','omega','orbit','pulse','frame','motion','vector','signal','matrix','vertex','binary','cipher','static','future','chrome','carbon','graphite','velvet','royal','elite','major','minor','urban','metro','avenue','district','tower','garage','motor','rider','pilot','racer','drift','boost','nitro','gtr','amg','bmw','mclaren','porsche','supra','skyline','viper','cobra','falcon','hawk','raven','lion','panther','shark','orca','fox','bear','eagle','hunter','chief','boss','owner','founder','leader','winner','champion','hero','icon','famous','classic','vintage','simple','basic','clean','mono','blank','pure','clear','sharp','swift','quick','rapid','sonic','flash','light','bright','dark','midnight','sunset','dawn','winter','summer','north','south','west','east','ocean','river','stone','steel','iron','gold','platinum','onyx','jade','ruby','sapphire','emerald','luxury','premium','status','credit','cash','market','trade','stock','vault','mint','coin','profit','wealth','capital','business','studio','media','audio','beat','bass','vibe','mood','style','fashion','model','design','art','photo','film','camera','scene','screen','game','player','level','score','rank','top','arena','clutch','skill','aim','quest','party','lobby','server','online','digital','cyber','logic','code','byte','data','node','core','link','network','system','device','mobile','phone','apple','telegram','social','viral','trend','daily','global','world','planet','space','cosmos','astro','mars','lunar','star','comet','galaxy','mystic','secret','hidden','private','public','real','true','only','first','last','young','old','modern','retro','smart','wild','calm','cold','hot','high','low','big','small','great','super','hyper','ultra','max','pro','one','seven','noble','monarch','duke','baron','saint','ace','zen','echo','flux','frost','blaze','ember','mist','rain','snow','thunder','volt','crisp','solid','fluid','stark','roman','atlas','apollo','mercury','saturn','jupiter','venus','pluto','delta','lambda','kappa','daylight','nightfall','blackout','overdrive','redline','pitlane','roadster','coupe','sedan','touring','motors','driver','fastlane','highway','cityline','skyway','airline','railway','terminal','station','central','uptown','downtown','midtown','brook','park','garden','forest','valley','mountain','island','harbor','port','bay','coast','beach','desert','canyon','cliff','peak','summit','ridge','field','meadow','green','blue','red','orange','purple','gray','grey','ivory','obsidian','crystal','marble','granite','wood','paper','glass','metal','titanium','cobalt','nickel','copper','bronze','brass'
 ];
+
+export const ROOTS=buildMassLexicon(BASE_ROOTS);
+if(ROOTS.length<100000)throw new Error('username_lexicon_too_small:'+ROOTS.length);
+
 export const SUFFIXES=['','7','77','777','1','01','07','007','x','xx','pro','one','max','hq','live','lab','io','tv','club','zone','hub','net','go'];
 export const PREFIXES=['','the','real','mr','its','iam'];
 
@@ -154,7 +248,7 @@ export function hasLetter(handle){return /[a-z]/i.test(String(handle||''))}
 export function isValidHandle(handle){
   const h=String(handle||'').toLowerCase();
   if(TELEGRAM_THREE_LETTER.has(h))return true;
-  return /^[a-z][a-z0-9_]{3,9}$/i.test(h)&&hasLetter(h);
+  return /^[a-z][a-z0-9_]{3,31}$/i.test(h)&&hasLetter(h);
 }
 const clampUnit=x=>Math.max(0,Math.min(.999999999,Number(x)||0));
 export function randInt(min,max,rng=randomUnit){return min+Math.floor(clampUnit(rng())*(max-min+1))}
@@ -181,15 +275,18 @@ function randomPronounceable(min=4,max=8,rng=randomUnit){
   return s;
 }
 function normalizeGenerated(handle){
-  let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,10);
+  let h=String(handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,32);
   if(h.length<4)h=(h+'name').slice(0,4);
-  if(!hasLetter(h))h='u'+h.slice(0,9);
+  if(!hasLetter(h))h='u'+h.slice(0,31);
   return h;
 }
+const ROOTS_BY_LENGTH=Array.from({length:33},()=>[]);
+for(const root of ROOTS)if(/^[a-z]+$/.test(root)&&root.length<ROOTS_BY_LENGTH.length)ROOTS_BY_LENGTH[root.length].push(root);
 function rootForProfile(profile,rng){
-  const range={COMMON:[7,10],RARE:[6,9],EPIC:[5,8],LEGEND:[5,7],ULTRA:[4,6]}[profile]||[7,10];
-  const pool=ROOTS.filter(x=>x.length>=range[0]&&x.length<=range[1]&&/^[a-z]+$/.test(x));
-  return choice(pool.length?pool:ROOTS,rng).slice(0,10);
+  const range={COMMON:[7,18],RARE:[6,14],EPIC:[5,10],LEGEND:[4,8],ULTRA:[4,6]}[profile]||[7,18];
+  const lengths=[];for(let len=range[0];len<=range[1];len++)if(ROOTS_BY_LENGTH[len]?.length)lengths.push(len);
+  if(!lengths.length)return choice(ROOTS,rng).slice(0,18);
+  return choice(ROOTS_BY_LENGTH[choice(lengths,rng)],rng);
 }
 function telegramStyleVariant(root,profile,rng){
   const r=rng(),pretty=prettyDigits(rng);
@@ -224,7 +321,7 @@ export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
   else handle=telegramStyleVariant(root,profile,rng);
   return normalizeGenerated(handle);
 }
-const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,10}$/.test(x)));
+const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,32}$/.test(x)));
 export function wordQuality(handle){
   const h=String(handle||'').toLowerCase(),letters=h.replace(/[^a-z]/g,'');
   if(WORD_SET.has(h))return 1;
@@ -256,3 +353,9 @@ export function assessHandle(handle,{stable=false,theme=''}={}){
 }
 export function generatedSupply(){return 1}
 export function candidateUniverseSize(){return ROOTS.length*SUFFIXES.length+ROOTS.length*(PREFIXES.length-1)}
+export const LEXICON_STATS=Object.freeze({
+  roots:ROOTS.length,
+  minimumRoots:MASS_LEXICON_TARGET,
+  candidateUniverse:candidateUniverseSize(),
+  categories:Object.fromEntries(Object.entries(LEXICON_CATEGORY_ROOTS).map(([key,items])=>[key,items.length]))
+});
