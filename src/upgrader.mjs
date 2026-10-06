@@ -14,20 +14,24 @@ const TARGET_OPTION_COUNT=8;
 const TARGET_RANGE=Object.freeze({RARE:[15000,99999],EPIC:[100000,499999],LEGEND:[500000,1999999],ULTRA:[2000000,25000000]});
 export const chanceFor=(sourceValue,targetValue)=>clamp(Number(sourceValue)*.92/Math.max(1,Number(targetValue)),.01,.92);
 function validateIds(ids){
-  if(!Array.isArray(ids)||ids.length!==1)throw new Error('bad_upgrade');
-  const clean=String(ids[0]||'');if(!clean)throw new Error('bad_upgrade');return [clean];
+  if(!Array.isArray(ids)||ids.length<1||ids.length>3)throw new Error('bad_upgrade');
+  const clean=ids.map(x=>String(x||'')).filter(Boolean);
+  if(clean.length!==ids.length||new Set(clean).size!==clean.length)throw new Error('bad_upgrade');
+  return clean;
 }
 function loadSources(db,user,ids){
   const clean=validateIds(ids),marks=clean.map(()=>'?').join(',');
   const rows=db.prepare(`SELECT * FROM username_instances WHERE id IN (${marks}) AND owner_id=? AND status='owned'`).all(...clean,user.id);
   if(rows.length!==clean.length)throw new Error('upgrade_invalid_items');
   if(rows.some(r=>r.rarity==='ULTRA'||!UPGRADE_RULES[r.rarity]))throw new Error('upgrade_bad_recipe');
-  return clean.map(id=>rows.find(r=>r.id===id));
+  const ordered=clean.map(id=>rows.find(r=>r.id===id)),rarity=ordered[0]?.rarity;
+  if(ordered.some(r=>r.rarity!==rarity))throw new Error('upgrade_mixed_rarity');
+  return ordered;
 }
-function calculatePlan(source){
-  const rule=UPGRADE_RULES[source.rarity];
-  const targetMinValue=Math.ceil(Number(source.value)*rule.minMultiplier/50)*50;
-  return {source,rule,totalValue:Number(source.value),targetMinValue,from:source.rarity,to:rule.next,count:1};
+function calculatePlan(rows){
+  const source=rows[0],rule=UPGRADE_RULES[source.rarity],totalValue=rows.reduce((sum,r)=>sum+Number(r.value||0),0);
+  const targetMinValue=Math.ceil(totalValue*rule.minMultiplier/50)*50;
+  return {source,rule,totalValue,targetMinValue,from:source.rarity,to:rule.next,count:rows.length};
 }
 function prepareTarget(db,next,minValue,maxValue=Infinity){
   for(let i=0;i<300;i++){
@@ -52,7 +56,7 @@ function createSession(db,user,rows,preview,targetMinValue=preview.targetMinValu
   const sorted=rows.map(r=>r.id).sort(),target=prepareTarget(db,preview.to,targetMinValue,targetMaxValue);
   // CS-style upgrader: every visible target carries its real server-side
   // probability. More expensive targets therefore have a smaller win arc.
-  const chance=chanceFor(preview.source.value,target.value);
+  const chance=chanceFor(preview.totalValue,target.value);
   const id=uid(),created=nowIso(),expires=new Date(Date.now()+10*60*1000).toISOString();
   db.prepare(`INSERT INTO upgrade_sessions(id,user_id,source_ids,target_template_id,target_handle,target_rarity,target_value,chance,from_rarity,created_at,expires_at,used_at)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)`).run(id,user.id,JSON.stringify(sorted),target.templateId,target.handle,target.rarity,target.value,chance,preview.from,created,expires);
@@ -116,12 +120,12 @@ export function cleanupUpgradeSessions(db){
 }
 export function upgradeInfo(db,user){
   const available=db.prepare("SELECT id,handle,rarity,value,instance_number,max_supply FROM username_instances WHERE owner_id=? AND status='owned' AND rarity IN ('COMMON','RARE','EPIC','LEGEND') ORDER BY value DESC LIMIT 250").all(user.id).map(shape);
-  return {rules:UPGRADE_RULES,maxItems:1,available};
+  return {rules:UPGRADE_RULES,maxItems:3,available};
 }
 export function previewUpgrade(db,user,ids){
   cleanupUpgradeSessions(db);
-  const rows=loadSources(db,user,ids),calc=calculatePlan(rows[0]),targets=targetOptions(db,user,rows,calc),base=targets[Math.min(2,targets.length-1)];
-  return {...base,targets,totalValue:calc.totalValue,targetMinValue:calc.targetMinValue,sources:rows.map(shape),maxItems:1};
+  const rows=loadSources(db,user,ids),calc=calculatePlan(rows),targets=targetOptions(db,user,rows,calc),base=targets[Math.min(2,targets.length-1)];
+  return {...base,targets,totalValue:calc.totalValue,targetMinValue:calc.targetMinValue,sources:rows.map(shape),maxItems:3};
 }
 export function performUpgrade(db,user,ids,sessionId,rng=randomUnit){
   if(!sessionId||String(sessionId).length>100)throw new Error('bad_request_id');
