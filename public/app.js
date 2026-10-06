@@ -480,9 +480,29 @@ function miniGameView(){
  const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'">'+(state.gameFeedback.correct?'✓':'×')+' +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
  return '<div class="mini-game-v7">'+head+body+feedback+'</div>';
 }
-function render(){const page=state.page;if(page==='home')shell('USERNAME',homeView());else if(page==='collection')shell('Коллекция',collectionView());else if(page==='market')shell('Рынок',marketView());else if(page==='top')shell('Топ',topView());else if(page==='tasks')shell('Задания',tasksView());else if(page==='levels')shell('Уровни',levelsView());else if(page==='achievements')shell('Достижения',achievementsView());else if(page==='settings')shell('Настройки',settingsView());else if(page==='wheel')shell('Колесо',wheelView());else if(page==='friends')shell('Друзья',friendsView());else if(page==='gift')shell('Подарки',giftView());else if(page==='upgrader')shell('Апгрейдер',upgraderView());else if(page==='seasons')shell('Сезоны',seasonsView());else if(page==='profile')shell('Профиль',profileView());else if(page==='premium')shell('USERNAME+',premiumView());else if(page==='lab')shell('Username Lab',labView());else if(page==='detail')shell('Username',detailView(state.detail),{back:true});else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')}
+function render(){const page=state.page;
+ if(page==='home')shell('USERNAME',homeView());
+ else if(page==='collection')shell('Коллекция',collectionView());
+ else if(page==='market')shell('Рынок',marketView());
+ else if(page==='top')shell('Топ',topView());
+ else if(page==='tasks')shell('Задания',tasksView());
+ else if(page==='levels')shell('Уровни',levelsView());
+ else if(page==='achievements')shell('Достижения',achievementsView());
+ else if(page==='settings')shell('Настройки',settingsView());
+ else if(page==='wheel')shell('Колесо',wheelView());
+ else if(page==='friends')shell('Друзья',friendsView());
+ else if(page==='gift')shell('Подарки',giftView());
+ else if(page==='upgrader')shell('Апгрейдер',upgraderView());
+ else if(page==='seasons')shell('Сезоны',seasonsView());
+ else if(page==='profile')shell('Профиль',profileView());
+ else if(page==='shop')shell('Магазин',shopView());
+ else if(page==='games')shell('Игры',gamesView());
+ else if(page==='miniGame')shell('Игра',miniGameView(),{back:true});
+ else if(page==='detail')shell('Username',detailView(state.detail),{back:true});
+ else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')
+}
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',premium:'USERNAME+',lab:'Username Lab',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',games:'Игры',miniGame:'Игра',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -500,8 +520,9 @@ function pageReady(page){
   page==='upgrader'?!!state.upgrader:
   page==='seasons'?!!state.season:
   page==='profile'?!!state.profile:
-  page==='premium'?!!state.premium:
-  page==='lab'?!!state.lab:
+  page==='shop'?!!state.shop:
+  page==='games'?!!state.games:
+  page==='miniGame'?!!state.gameSession:
   page==='admin'?!!state.admin:true;
 }
 function routeLoading(on){
@@ -517,23 +538,22 @@ async function fetchPage(page){
  if(page==='tasks')state.tasks=await api('/api/tasks');
  if(page==='levels')state.levels=await api('/api/levels');
  if(page==='achievements')state.achievements=await api('/api/achievements');
+ if(page==='games')state.games=await api('/api/games');
  if(page==='wheel')state.wheel=await api('/api/wheel');
  if(page==='friends')state.friends=await api('/api/friends');
- if(page==='gift')state.gift=await api('/api/gift/options');
+ if(page==='gift'){state.gift=await api('/api/gift/options');state.giftSheet='';}
  if(page==='upgrader'){
   state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);
   state.upgradeSelectedIds=[];state.upgradePreview=null;state.upgradeStage='source';state.upgradeTargetSessionId='';state.upgradeOutcome=null;state.upgradeSpinning=false;state.upgradeLastRound=null;state.upgradeLandingAngle=0;state.upgradeVisibleCount=Math.min(30,state.upgrader.available.length);state.upgradeScrollTop=0
  }
  if(page==='seasons')state.season=await api('/api/seasons');
  if(page==='profile')state.profile=await api('/api/profile');
- if(page==='premium')state.premium=await api('/api/premium');
- if(page==='lab')state.lab=await api('/api/lab');
- if(page==='home')state.daily=await api('/api/daily');
+ if(page==='shop')state.shop=await api('/api/shop');
  if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
  const seq=++routeSeq,initial=!window.__USERNAME_READY||!state.user;
- state.menu=false;state.dropPicker=false;
+ state.menu=false;state.dropPicker=false;if(page!=='miniGame')state.gameFeedback=null;
  const fresh=pageReady(page)&&Date.now()-Number(state.pageLoadedAt[page]||0)<PAGE_CACHE_TTL;
  if(fresh&&!force){state.page=page;render();return}
  if(!initial)routeLoading(true);
