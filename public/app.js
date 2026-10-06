@@ -742,5 +742,5 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=6.1.2').catch(()=>{});
+import('/admin-ui.js?v=6.1.3').catch(()=>{});
 load('home');
