@@ -7,7 +7,7 @@ const state={
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
   pageLoadedAt:{}
 };
-const fmt=n=>new Intl.NumberFormat('ru-RU').format(Math.round(Number(n)||0))+' ₽';
+const fmt=n=>new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))+' ₽';
 function untilText(iso){
  const ms=Math.max(0,new Date(iso).getTime()-Date.now()),mins=Math.max(1,Math.ceil(ms/60000)),en=currentLanguage()==='en';
  const h=Math.floor(mins/60),m=mins%60;
@@ -83,11 +83,45 @@ const EN_TEXT=Object.freeze({
  'Передать username':'Transfer a username','Посмотреть профиль игрока':'View a player profile','Пригласить друга':'Invite a friend','Пригласить 2 друзей':'Invite 2 friends',
  'Купить 3 username на рынке':'Buy 3 usernames on the market'
 });
+const EN_TEXT_EXTRA=Object.freeze({
+ 'Закрыть':'Close','Стоимость попытки':'Attempt price','Выберите цену дропа':'Choose drop price','Получить username':'Get username',
+ 'Нажми, чтобы получить':'Tap to get one','Улучшить username':'Upgrade username','Быстрое вращение':'Quick spin',
+ 'По этому фильтру ничего нет.':'Nothing matches this filter.','Назад':'Back','Дальше':'Next','Поиск...':'Search...','Ничего не найдено.':'Nothing found.',
+ 'ОБЩИЙ КАПИТАЛ':'TOTAL CAPITAL','Кто богаче':'Who is richer','Баланс + стоимость всех активных usernames':'Balance + value of all active usernames',
+ 'Снять':'Remove','Нет usernames для апгрейда.':'No usernames available for upgrade.','Нет usernames для апгрейда':'No usernames available for upgrade',
+ 'Получено ':'Received ','Активного сезона нет.':'No active season.','Значок профиля':'Profile badge','Тема сезона':'Season theme','Эксклюзивная рамка':'Exclusive profile frame',
+ 'Приглашай друзей и собирай коллекцию вместе.':'Invite friends and build your collection together.','Ссылка загружается…':'Loading link…',
+ 'Пригласи первого друга.':'Invite your first friend.','Наград':'Rewards','До следующей':'Until next',
+ 'Нет соединения с сервером':'No connection to server','Откройте игру через Telegram':'Open the game through Telegram','Аккаунт заблокирован':'Account blocked',
+ 'Недостаточно денег':'Not enough money','Сначала решите, что делать с текущим username':'Resolve your current username first',
+ 'Коллекция заполнена':'Collection is full','У получателя заполнена коллекция':'Recipient collection is full','Тираж закончился':'Sold out',
+ 'Слишком быстро. Попробуйте ещё раз':'Too fast. Try again','Лот уже недоступен':'Listing is no longer available','Нельзя купить свой лот':'You cannot buy your own listing',
+ 'Username уже на рынке':'Username is already listed','Username должен быть длиной 4–15 символов: a-z, 0-9, _':'Username must be 4–15 characters: a-z, 0-9, _',
+ 'Подожди пару секунд перед следующей оценкой':'Wait a couple of seconds before the next rating','Ты уже оценивал этот username':'You already rated this username',
+ 'Слишком похож на уже оценённый сегодня username':'Too similar to a username already rated today','Ежедневная награда уже получена':'Daily reward already claimed',
+ 'Сейчас не удалось собрать вопрос':'Could not create a question right now','Слишком много игр подряд':'Too many games in a row',
+ 'Игра уже недоступна':'Game is no longer available','Раунд устарел':'Round expired','Раунд закончен':'Round finished',
+ 'Измени username только одним допустимым действием':'Change the username using one allowed action','Собери username только из выданных частей':'Build the username using all provided parts',
+ 'Недостаточно 💎':'Not enough 💎','Колесо уже использовано сегодня':'Wheel already used today','Выбранный username недоступен':'Selected username is unavailable',
+ 'Этот username нельзя улучшить':'This username cannot be upgraded','Предпросмотр устарел. Выберите usernames заново':'Preview expired. Select usernames again',
+ 'Состав апгрейда изменился':'Upgrade selection changed','Сейчас не удалось подобрать цели. Попробуйте ещё раз':'Could not find upgrade targets. Try again',
+ 'Telegram Stars пока недоступны':'Telegram Stars are unavailable','Получатель заблокирован':'Recipient is blocked','Слишком много действий. Попробуйте через минуту':'Too many actions. Try again in a minute',
+ 'Нет доступа':'Access denied','Некорректный username':'Invalid username','Такой username уже существует':'This username already exists',
+ 'Нельзя передать username самому себе':'You cannot transfer a username to yourself','Этот ответ уже был обработан':'This answer was already processed',
+ 'Нельзя заблокировать самого себя':'You cannot block yourself','Что-то пошло не так':'Something went wrong','Не удалось загрузить раздел':'Failed to load section',
+ 'Океан':'Ocean','Голубой акцент':'Blue accent','Фиолетовая':'Violet','Фиолетовый акцент':'Violet accent','Лайм':'Lime','Зелёный акцент':'Green accent',
+ 'Закат':'Sunset','Тёплый оранжевый акцент':'Warm orange accent','Моно':'Mono','Чёрно-белый акцент':'Black-and-white accent',
+ 'Охота за username':'Username Hunt','Выше / ниже':'Higher / Lower','Редактор':'Editor','Собери username':'Build username','Угадай цену':'Guess the price',
+ 'Коллекция':'Collection','Редкости':'Rarities','Торговля':'Trading','Прогресс':'Progress','Игры':'Games',
+ 'Читаемость':'Readability','Краткость':'Brevity','Чистота':'Cleanliness','Спрос':'Demand','Система сразу начислит':'The system will instantly credit',
+ 'Только оформление. На drop, wheel и upgrade они не влияют.':'Cosmetics only. They do not affect drops, wheel or upgrades.',
+ 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','ДРОП':'DROP'
+});
 function currentLanguage(){return state.settings?.language==='en'?'en':'ru'}
 function tx(ru,en){return currentLanguage()==='en'?en:ru}
 function translateLiteral(value){
  if(currentLanguage()!=='en')return String(value??'');
- let s=String(value??''),direct=EN_TEXT[s];if(direct)return direct;
+ let s=String(value??''),direct=EN_TEXT[s]||EN_TEXT_EXTRA[s];if(direct)return direct;
  const patterns=[
   [/^До следующего: (.+) XP$/,'To next level: $1 XP'],
   [/^Общая стоимость · (.+)$/,'Total value · $1'],
@@ -150,7 +184,7 @@ function sound(kind='tap'){
  }catch{}
 }
 function motionEnabled(){return !!state.settings.animations&&!matchMedia?.('(prefers-reduced-motion: reduce)')?.matches}
-function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
+function toast(t){toastEl.textContent=translateLiteral(t);toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
 function startParam(){
  const q=new URLSearchParams(location.search);
