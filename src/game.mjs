@@ -192,14 +192,14 @@ export function resolveDrop(db,user,instanceId,action){
       db.prepare("UPDATE username_instances SET status='owned' WHERE id=?").run(inst.id);
       db.prepare('INSERT OR IGNORE INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(inst.id,user.id,nowIso());
       db.prepare("UPDATE drop_history SET action='kept' WHERE instance_id=?").run(inst.id);
-      grantXp(db,user.id,8,'keep_username',{instanceId:inst.id,value:inst.value});
+      grantXp(db,user.id,5,'keep_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'keep',1);bumpSeasonScore(db,user.id,8);
     }else if(action==='sell'){
       const payout=systemSellValue(inst.value);
       db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(inst.id);
       db.prepare("UPDATE drop_history SET action='sold' WHERE instance_id=?").run(inst.id);
       txBalance(db,user.id,'system_sale',payout,{instanceId:inst.id,handle:inst.handle,estimatedValue:inst.value});
-      grantXp(db,user.id,6,'sell_username',{instanceId:inst.id,value:inst.value});
+      grantXp(db,user.id,5,'sell_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'sell',1);bumpSeasonScore(db,user.id,5);
     }else throw new Error('bad_action');
   })();
@@ -240,18 +240,53 @@ export function leaderboard(db){
   `).all();
   return rows.map((r,i)=>({...r,position:i+1,best_handle:r.best_handle?'@'+r.best_handle:null}));
 }
+const DAILY_TASK_POOL=Object.freeze([
+  {key:'drop1',label:'Открыть drop',target:1,reward:450,source:'drop'},
+  {key:'drop2',label:'Открыть 2 drops',target:2,reward:800,source:'drop'},
+  {key:'drop3',label:'Открыть 3 drops',target:3,reward:1200,source:'drop'},
+  {key:'drop5',label:'Открыть 5 drops',target:5,reward:1800,source:'drop'},
+  {key:'sell1',label:'Продать username',target:1,reward:700,source:'sell'},
+  {key:'sell2',label:'Продать 2 usernames',target:2,reward:1100,source:'sell'},
+  {key:'sell3',label:'Продать 3 usernames',target:3,reward:1500,source:'sell'},
+  {key:'keep1',label:'Оставить username',target:1,reward:450,source:'keep'},
+  {key:'keep2',label:'Оставить 2 usernames',target:2,reward:750,source:'keep'},
+  {key:'keep3',label:'Оставить 3 usernames',target:3,reward:1100,source:'keep'},
+  {key:'games1',label:'Сыграть игру',target:1,reward:500,source:'games'},
+  {key:'games2',label:'Сыграть 2 игры',target:2,reward:900,source:'games'},
+  {key:'games3',label:'Сыграть 3 игры',target:3,reward:1300,source:'games'},
+  {key:'games5',label:'Сыграть 5 игр',target:5,reward:1900,source:'games'},
+  {key:'hunt1',label:'Выиграть Username Hunt',target:1,reward:1000,source:'hunt_win'},
+  {key:'hunt2',label:'Выиграть Hunt дважды',target:2,reward:1700,source:'hunt_win'},
+  {key:'market1',label:'Купить username',target:1,reward:800,source:'market_buy'},
+  {key:'market2',label:'Купить 2 usernames',target:2,reward:1300,source:'market_buy'},
+  {key:'rare1',label:'Получить username от $15K',target:1,reward:1200,source:'rare'},
+  {key:'rare2',label:'Получить 2 username от $15K',target:2,reward:1800,source:'rare'},
+  {key:'nodigits1',label:'Получить username без цифр',target:1,reward:650,source:'nodigits'},
+  {key:'nodigits2',label:'Получить 2 без цифр',target:2,reward:1050,source:'nodigits'},
+  {key:'wheel1',label:'Открыть колесо',target:1,reward:500,source:'wheel'},
+  {key:'upgrade1',label:'Сделать upgrade',target:1,reward:900,source:'upgrade'},
+  {key:'upgrade2',label:'Сделать 2 upgrades',target:2,reward:1500,source:'upgrade'},
+  {key:'gift1',label:'Подарить username',target:1,reward:900,source:'gift'},
+  {key:'profile1',label:'Посмотреть профиль игрока',target:1,reward:400,source:'view_profile'},
+  {key:'invite1',label:'Пригласить друга',target:1,reward:1000,source:'invite'},
+  {key:'invite2',label:'Пригласить 2 друзей',target:2,reward:1700,source:'invite'},
+  {key:'trade3',label:'Три действия на рынке',target:3,reward:1600,source:'market_buy'}
+]);
+function dailyTaskDefs(user){
+  const seed=String(user.id)+':'+todayKey();
+  let x=0;for(let i=0;i<seed.length;i++)x=(Math.imul(x,31)+seed.charCodeAt(i))>>>0;
+  const rows=DAILY_TASK_POOL.map((task,i)=>({task,rank:((Math.imul((x^i)>>>0,2654435761)>>>0))})).sort((a,b)=>a.rank-b.rank);
+  const picked=[],sources=new Set();
+  for(const row of rows){
+    if(picked.length>=6)break;
+    if(sources.has(row.task.source)&&picked.length<4)continue;
+    picked.push(row.task);sources.add(row.task.source);
+  }
+  for(const row of rows)if(picked.length<6&&!picked.includes(row.task))picked.push(row.task);
+  return picked;
+}
 export function tasks(db,user){
-  const defs=[
-    {key:'lab3',label:'Придумать 3 usernames',target:3,reward:1000,source:'lab'},
-    {key:'drop2',label:'Открыть 2 drops',target:2,reward:800,source:'drop'},
-    {key:'rare1',label:'Получить username от $15,000',target:1,reward:1200,source:'rare'},
-    {key:'sell1',label:'Продать username',target:1,reward:750,source:'sell'},
-    {key:'market1',label:'Купить username на рынке',target:1,reward:700,source:'market_buy'},
-    {key:'keep2',label:'Оставить 2 usernames',target:2,reward:600,source:'keep'},
-    {key:'nodigits1',label:'Получить username без цифр',target:1,reward:550,source:'nodigits'},
-    {key:'invite1',label:'Пригласить друга',target:1,reward:1000,source:'invite'}
-  ];
-  return defs.map(t=>{
+  return dailyTaskDefs(user).map(t=>{
     const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,todayKey(),t.source)?.value||0;
     const claimed=!!db.prepare('SELECT 1 FROM task_claims WHERE user_id=? AND claim_date=? AND task_key=?').get(user.id,todayKey(),t.key);
     return {...t,current:Math.min(t.target,p),claimed};
