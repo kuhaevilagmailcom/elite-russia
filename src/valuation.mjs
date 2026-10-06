@@ -41,7 +41,7 @@ export function normalizeUsername(input){
 export function isGameUsername(input,{allowCuratedShort=false}={}){
   const h=normalizeUsername(input);
   if(allowCuratedShort&&/^[a-z0-9_]{3}$/.test(h))return true;
-  return /^[a-z0-9_]{4,32}$/.test(h)&&/[a-z]/.test(h);
+  return /^[a-z0-9_]{4,15}$/.test(h)&&/[a-z]/.test(h);
 }
 function pronounceability(h){
   const letters=h.replace(/[^a-z]/g,'');if(!letters)return 0;
