@@ -249,11 +249,13 @@ test('settings expose light dark system theme and vibration sound animation swit
   assert.match(uxCss,/html\[data-theme="dark"\]/);
   assert.match(uxCss,/html\.no-animations/);
 });
-test('menu has exactly the four requested sections and Hugeicons tiles',()=>{
+test('menu has exactly the four requested sections and clear Hugeicons symbols',()=>{
   for(const group of ['Играть','Торговля','Прогресс','Аккаунт'])assert.match(appSrc,new RegExp("title:'"+group+"'"));
   assert.match(appSrc,/menu-section-tile/);
   assert.match(appSrc,/hgi-stroke hgi-/);
-  assert.match(uxCss,/\.menu-sections-sheet\{/);
+  for(const icon of ['package','test-tube-01','circle-gauge','rocket-01','store-01','grid-table','gift','task-01','medal-01','trophy','chart-increase','user-circle-02','gem','settings-02'])assert.match(appSrc,new RegExp("'"+icon+"'"));
+  assert.match(uxCss,/USERNAME 6\.1\.2 — redesigned menu icons/);
+  assert.match(uxCss,/\.menu-section-tile \.ico\{[^}]*width:36px[^}]*height:36px[^}]*font-size:24px/);
 });
 test('levels and achievements are first-class pages',()=>{
   assert.match(appSrc,/function levelsView\(\)/);
