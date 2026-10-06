@@ -3,7 +3,7 @@ const root=document.documentElement,app=document.querySelector('#app'),toastEl=d
 const state={
   page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,levels:null,achievements:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
-  filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
+  filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
   pageLoadedAt:{}
 };
@@ -290,7 +290,7 @@ async function shareDropStory(item){
 }
 function selectedDropTier(){
   const tiers=state.home?.config?.dropTiers||{};
-  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'$3K',cost:3000};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'3K',cost:3000};
 }
 function dropPricePicker(tiers){
  if(!state.dropPicker)return '';
@@ -473,7 +473,7 @@ function upgraderView(){
   (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><b>'+(success?'Получено '+esc(state.upgradeOutcome.result.handle):'Не выпало')+'</b><button class="primary" data-upgrade-continue>Продолжить</button></section>':'')+
  '</div>';
 }
-function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString(currentLanguage()==='en'?'en-US':'ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
+function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Очки сезона',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString(currentLanguage()==='en'?'en-US':'ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
 function profileView(p=state.profile?.profile){
  if(!p)return '<div class="empty">Профиль не найден.</div>';
  const own=String(p.id)===String(state.user?.id),best=p.best,badges=p.achievements||[],luck=p.luckStats||{};
@@ -506,7 +506,7 @@ function settingsView(){
 function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function levelsView(){
  const l=state.levels||{},p=l.progression||state.user||{},rewards=(l.rewards||[]).filter(r=>Number(r.level)>Number(p.level||1)).slice(0,7);
- return '<div class="levels-v7"><section class="levels-main-v7"><h1>LVL '+Number(p.level||1)+'</h1><b>'+esc(p.title||state.user?.title||'Йоу')+'</b>'+xpBar(p)+'<span>До следующего: '+Number(p.remaining||0)+' XP</span></section>'+
+ return '<div class="levels-v7"><section class="levels-main-v7"><h1>LVL '+Number(p.level||1)+'</h1><b>'+esc(p.title||state.user?.title||'Новичок')+'</b>'+xpBar(p)+'<span>До следующего: '+Number(p.remaining||0)+' XP</span></section>'+
  '<div class="section-label">Ближайшие награды</div><div class="level-nearby-v7">'+(rewards.length?rewards.map(r=>'<article><b>LVL '+r.level+'</b><span>'+esc(r.title||'')+'</span><strong>'+(r.money?fmt(r.money):((r.freeDrops||0)+' DROP'))+'</strong></article>').join(''):'<div class="empty compact">Все награды получены.</div>')+'</div></div>';
 }
 function achievementsView(){
@@ -591,7 +591,7 @@ function routeLoading(on){
 }
 async function fetchPage(page){
  if(!state.user||page==='home')await refreshUser();
- if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&showcase='+state.filters.showcase+'&page='+state.filters.page);
+ if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'+'&page='+state.filters.page);
  if(page==='market')state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
  if(page==='top')state.leaderboard=await api('/api/leaderboard');
  if(page==='tasks')state.tasks=await api('/api/tasks');
