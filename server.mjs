@@ -17,7 +17,7 @@ import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,st
 import {labStatus,submitLab} from './src/lab.mjs';
 import {dailyStatus,claimDaily} from './src/daily.mjs';
 import {publicUser} from './src/game.mjs';
-import {achievementsData} from './src/achievements.mjs';
+import {achievementsData,reconcileAchievements} from './src/achievements.mjs';
 import {levelRewards,progressionFromXp} from './src/progression.mjs';
 import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema,cleanupMiniGameSessions} from './src/minigames.mjs';
 import {bumpTask} from './src/economy.mjs';
@@ -329,6 +329,10 @@ async function api(req,res,url){
       return json(res,200,{progression:progressionFromXp(user.xp),rewards:levelRewards()})
     }
     if(req.method==='GET'&&url.pathname==='/api/achievements')return json(res,200,achievementsData(db,{...user,level:progressionFromXp(user.xp).level}));
+    if(req.method==='POST'&&url.pathname==='/api/achievements/reconcile'){
+      const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+      return json(res,200,reconcileAchievements(db,{...fresh,level:progressionFromXp(fresh.xp).level}));
+    }
 
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
