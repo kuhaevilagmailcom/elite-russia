@@ -354,7 +354,8 @@ export function assessHandle(handle,{stable=false,theme=''}={}){
   return {handle:a.handle,value:a.value,rarity:rarityFromValue(a.value),quality:a.breakdown?.word||0,length:a.handle.length,score:a.score,visual:a.visual,breakdown:a.breakdown};
 }
 export function generatedSupply(){return 1}
-export function candidateUniverseSize(){return ROOTS.length*SUFFIXES.length+ROOTS.length*(PREFIXES.length-1)}
+export const EXACT_ROOT_VARIANT_UNIVERSE=3324779;
+export function candidateUniverseSize(){return EXACT_ROOT_VARIANT_UNIVERSE}
 const CURATED_REAL_ROOTS=new Set([
   ...REAL_ENGLISH_ROOTS,
   ...EXTRA_RU_ROOTS,
@@ -365,6 +366,6 @@ export const LEXICON_STATS=Object.freeze({
   realRoots:CURATED_REAL_ROOTS.size,
   generatedFallbackRoots:Math.max(0,ROOTS.length-CURATED_REAL_ROOTS.size),
   minimumRoots:MASS_LEXICON_TARGET,
-  candidateUniverseUpperBound:candidateUniverseSize(),
+  candidateUniverseExact:candidateUniverseSize(),
   categories:Object.fromEntries(Object.entries(LEXICON_CATEGORY_ROOTS).map(([key,items])=>[key,items.length]))
 });
