@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ROOTS,LEXICON_STATS,candidateUniverseSize,isValidHandle} from '../src/generator.mjs';
+import {ROOTS,LEXICON_STATS,candidateUniverseSize,isValidHandle,EXACT_ROOT_VARIANT_UNIVERSE} from '../src/generator.mjs';
 
 test('mass username lexicon stays above gameplay minimums',()=>{
   assert.ok(ROOTS.length>=120000,`expected >=120000 roots, got ${ROOTS.length}`);
-  assert.ok(candidateUniverseSize()>1000000,`expected >1M candidate upper bound, got ${candidateUniverseSize()}`);
+  assert.equal(candidateUniverseSize(),EXACT_ROOT_VARIANT_UNIVERSE);
+  assert.ok(candidateUniverseSize()>1000000,`expected >1M exact candidates, got ${candidateUniverseSize()}`);
   assert.ok(LEXICON_STATS.realRoots>100000,`expected >100k real roots, got ${LEXICON_STATS.realRoots}`);
   assert.ok(LEXICON_STATS.generatedFallbackRoots<20000,`too many generated fallback roots: ${LEXICON_STATS.generatedFallbackRoots}`);
   assert.equal(LEXICON_STATS.roots,ROOTS.length);
