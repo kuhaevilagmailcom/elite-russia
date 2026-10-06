@@ -55,6 +55,7 @@ export function adminSetBalance(db,admin,targetId,delta){
   return {ok:true,balance:result};
 }
 export function adminSetBlocked(db,admin,targetId,blocked){
+  if(Number(targetId)===Number(admin.id)&&blocked)throw new Error('self_admin_block');
   db.transaction(()=>{
     const target=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!target)throw new Error('user_not_found');
     db.prepare('UPDATE users SET blocked=? WHERE id=?').run(blocked?1:0,targetId);
@@ -136,13 +137,22 @@ export function resetSingleUser(db,admin,targetId){
   return db.transaction(()=>{
     const u=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!u)throw new Error('user_not_found');
     releaseActiveUsernames(db,u.id);
-    db.prepare('DELETE FROM drop_requests WHERE user_id=?').run(u.id);db.prepare('DELETE FROM drop_history WHERE user_id=?').run(u.id);
-    db.prepare('DELETE FROM task_progress WHERE user_id=?').run(u.id);db.prepare('DELETE FROM task_claims WHERE user_id=?').run(u.id);
-    db.prepare('DELETE FROM wheel_claims WHERE user_id=?').run(u.id);db.prepare('DELETE FROM wheel_history WHERE user_id=?').run(u.id);
-    db.prepare('DELETE FROM upgrade_sessions WHERE user_id=?').run(u.id);db.prepare('DELETE FROM upgrade_history WHERE user_id=?').run(u.id);db.prepare('DELETE FROM upgrade_progress WHERE user_id=?').run(u.id);
-    db.prepare('DELETE FROM season_stats WHERE user_id=?').run(u.id);db.prepare('DELETE FROM season_rewards WHERE user_id=?').run(u.id);db.prepare('DELETE FROM season_history WHERE user_id=?').run(u.id);
-    db.prepare('DELETE FROM balance_transactions WHERE user_id=?').run(u.id);
-    db.prepare('UPDATE users SET balance=?,free_drops=?,xp=0,level=1 WHERE id=?').run(GAME.startBalance,GAME.freeDrops,u.id);
+    const deletes=[
+      ['drop_requests','user_id'],['drop_history','user_id'],['task_progress','user_id'],['task_claims','user_id'],
+      ['xp_history','user_id'],['level_reward_claims','user_id'],['achievement_unlocks','user_id'],
+      ['mini_game_sessions','user_id'],['mini_game_records','user_id'],['mini_game_daily_earnings','user_id'],
+      ['username_lab_attempts','user_id'],['wheel_claims','user_id'],['wheel_history','user_id'],
+      ['upgrade_sessions','user_id'],['upgrade_history','user_id'],['upgrade_progress','user_id'],
+      ['season_stats','user_id'],['season_rewards','user_id'],['season_history','user_id'],
+      ['referral_rewards','user_id'],['balance_transactions','user_id'],['profile_showcase','user_id']
+    ];
+    for(const [table,col] of deletes)db.prepare(`DELETE FROM ${table} WHERE ${col}=?`).run(u.id);
+    db.prepare('DELETE FROM referrals WHERE referrer_id=? OR referred_id=?').run(u.id,u.id);
+    db.prepare('DELETE FROM friends WHERE user_id=? OR friend_id=?').run(u.id,u.id);
+    db.prepare('DELETE FROM username_transfers WHERE from_user_id=? OR to_user_id=?').run(u.id,u.id);
+    db.prepare('DELETE FROM market_transactions WHERE buyer_id=? OR seller_id=?').run(u.id,u.id);
+    db.prepare(`UPDATE users SET balance=?,free_drops=?,xp=0,level=1,luck_points=0,bad_drop_streak=0,total_earned=0,
+      best_drop_value=0,daily_streak=0,last_daily_date=NULL WHERE id=?`).run(GAME.startBalance,GAME.freeDrops,u.id);
     audit(db,admin.id,'reset_user',u.id,{});
     return {ok:true};
   })();
@@ -150,16 +160,17 @@ export function resetSingleUser(db,admin,targetId){
 export function resetAllUsers(db,admin,confirmation){
   if(String(confirmation||'')!=='RESET USERNAME')throw new Error('reset_confirmation_required');
   return db.transaction(()=>{
-    db.prepare('DELETE FROM inventory').run();db.prepare('DELETE FROM profile_showcase').run();
-    db.prepare('DELETE FROM market_listings').run();db.prepare('DELETE FROM market_transactions').run();
-    db.prepare('DELETE FROM drop_requests').run();db.prepare('DELETE FROM drop_history').run();db.prepare('DELETE FROM balance_transactions').run();
-    db.prepare('DELETE FROM task_progress').run();db.prepare('DELETE FROM task_claims').run();
-    db.prepare('DELETE FROM referrals').run();db.prepare('DELETE FROM friends').run();db.prepare('DELETE FROM referral_rewards').run();db.prepare('DELETE FROM username_transfers').run();
-    db.prepare('DELETE FROM wheel_claims').run();db.prepare('DELETE FROM wheel_history').run();
-    db.prepare('DELETE FROM upgrade_sessions').run();db.prepare('DELETE FROM upgrade_history').run();db.prepare('DELETE FROM upgrade_progress').run();
-    db.prepare('DELETE FROM season_stats').run();db.prepare('DELETE FROM season_rewards').run();db.prepare('DELETE FROM season_history').run();
-    db.prepare('DELETE FROM username_instances').run();db.prepare('UPDATE username_templates SET current_supply=0').run();
-    db.prepare('UPDATE users SET balance=?,free_drops=?,xp=0,level=1,blocked=0').run(GAME.startBalance,GAME.freeDrops);
+    const clearTables=[
+      'inventory','profile_showcase','market_listings','market_transactions','drop_requests','drop_history','balance_transactions',
+      'task_progress','task_claims','xp_history','level_reward_claims','achievement_unlocks','mini_game_sessions','mini_game_records',
+      'mini_game_daily_earnings','username_lab_attempts','referrals','friends','referral_rewards','username_transfers','wheel_claims',
+      'wheel_history','upgrade_sessions','upgrade_history','upgrade_progress','season_stats','season_rewards','season_history'
+    ];
+    for(const table of clearTables)db.prepare(`DELETE FROM ${table}`).run();
+    db.prepare('DELETE FROM username_instances').run();
+    db.prepare('UPDATE username_templates SET current_supply=0').run();
+    db.prepare(`UPDATE users SET balance=?,free_drops=?,xp=0,level=1,luck_points=0,bad_drop_streak=0,total_earned=0,
+      best_drop_value=0,daily_streak=0,last_daily_date=NULL`).run(GAME.startBalance,GAME.freeDrops);
     audit(db,admin.id,'reset_all','all',{});
     return {ok:true};
   })();
