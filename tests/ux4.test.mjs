@@ -32,11 +32,14 @@ test('all interface icons use Hugeicons Stroke Rounded without runtime hydration
   assert.match(appSrc,/home:'package'/);
   assert.match(appSrc,/market:'store-01'/);
   assert.match(appSrc,/lab:'test-tube-01'/);
-  assert.match(appSrc,/wheel:'circle-gauge'/);
+  assert.match(appSrc,/wheel:'target-01'/);
   assert.match(appSrc,/upgrade:'rocket-01'/);
-  assert.match(appSrc,/collection:'grid-table'/);
-  assert.match(appSrc,/achievements:'trophy'/);
+  assert.match(appSrc,/collection:'layers-01'/);
+  assert.match(appSrc,/tasks:'task-done-01'/);
+  assert.match(appSrc,/achievements:'crown'/);
+  assert.match(appSrc,/rank:'ranking'/);
   assert.match(appSrc,/profile:'user-circle-02'/);
+  assert.match(appSrc,/premium:'diamond-02'/);
   assert.match(appSrc,/settings:'settings-02'/);
   assert.match(appSrc,/filter:'filter'/);
   assert.doesNotMatch(appSrc,/data-lucide=|window\.lucide|lucideRetry/);
@@ -256,10 +259,12 @@ test('settings expose light dark system theme and vibration sound animation swit
 test('menu has exactly the four requested sections and clear Hugeicons symbols',()=>{
   for(const group of ['Играть','Торговля','Прогресс','Аккаунт'])assert.match(appSrc,new RegExp("title:'"+group+"'"));
   assert.match(appSrc,/menu-section-tile/);
+  assert.match(appSrc,/menu-tile-icon/);
   assert.match(appSrc,/hgi-stroke hgi-/);
-  for(const icon of ['package','test-tube-01','circle-gauge','rocket-01','store-01','grid-table','gift','task-01','medal-01','trophy','chart-increase','user-circle-02','gem','settings-02'])assert.match(appSrc,new RegExp("'"+icon+"'"));
-  assert.match(uxCss,/USERNAME 6\.1\.2 — redesigned menu icons/);
-  assert.match(uxCss,/\.menu-section-tile \.ico\{[^}]*width:36px[^}]*height:36px[^}]*font-size:24px/);
+  for(const icon of ['package','test-tube-01','target-01','rocket-01','store-01','layers-01','gift','task-done-01','medal-01','crown','ranking','user-circle-02','diamond-02','settings-02'])assert.match(appSrc,new RegExp("'"+icon+"'"));
+  assert.match(uxCss,/USERNAME 6\.1\.3 — clean Hugeicons menu/);
+  assert.match(uxCss,/\.menu-tile-icon\{[^}]*width:42px[^}]*height:42px/);
+  assert.match(uxCss,/\.menu-tile-icon \.ico\{[^}]*width:25px[^}]*height:25px[^}]*font-size:25px/);
 });
 test('levels and achievements are first-class pages',()=>{
   assert.match(appSrc,/function levelsView\(\)/);
