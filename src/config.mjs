@@ -6,8 +6,6 @@ export const GAME={
   dropCost:3000,
   maxCollection:100,
   premiumMaxCollection:250,
-  showcaseSlots:3,
-  premiumShowcaseSlots:6,
   marketFee:0.05,
   transferFee:0.05,
   seasonDays:30,
