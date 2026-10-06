@@ -27,7 +27,7 @@ export const TITLE_CONFIG=Object.freeze([
 ]);
 
 const REWARDS=new Map([
-  [5,{money:2500}],[10,{money:5000}],[15,{freeDrops:1}],[20,{money:7500}],
+  [5,{money:2500}],[10,{money:5000}],[15,{freeDrops:5}],[20,{money:7500}],
   [30,{money:10000}],[40,{money:12500}],[50,{freeDrops:1}],[60,{money:10000}],
   [70,{freeDrops:1}],[80,{money:20000}],[90,{money:25000}],[100,{freeDrops:2,money:30000}],
   [120,{money:40000}],[140,{freeDrops:2}],[150,{money:50000}],[160,{money:60000}],
