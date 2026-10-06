@@ -90,7 +90,7 @@ button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--
 
 .screen-toolbar{min-height:50px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
 .screen-toolbar>div{display:grid;gap:2px}.screen-toolbar b{font-size:15px}.screen-toolbar span{font-size:11px;color:var(--muted)}
-.collection-filter-button,.market-filter-button{width:42px;height:42px;border-radius:12px;background:var(--surface-subtle);display:grid;place-items:center;flex:none}
+.collection-filter-button,.market-filter-button,.filter-button-v7{height:42px;border-radius:12px;background:var(--surface-subtle);display:flex;align-items:center;justify-content:center;gap:5px;flex:none;padding:0 10px}.filter-button-v7 .filter-button-label{font-size:10px;font-weight:700;color:var(--muted)}.filter-button-v7 .filter-button-icon{height:20px;display:grid;place-items:center}
 .collection-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .user-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;min-width:0}
 .user-card-main{width:100%;text-align:left;background:transparent;padding:12px;display:grid;gap:5px;min-width:0}
@@ -138,7 +138,7 @@ button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--
 .profile-best{display:flex;align-items:center;justify-content:space-between;gap:8px}.profile-best b{font-size:22px}.profile-best strong{font-size:16px}
 .showcase-v7{display:flex;gap:6px;flex-wrap:wrap}.showcase-v7>span{padding:8px 10px;border-radius:10px;background:var(--surface-subtle);font-weight:750;font-size:13px}
 .profile-empty-v7{color:var(--muted);font-size:12px;padding:6px 0}.profile-edit-showcase{width:100%;margin-top:9px;min-height:40px}
-.profile-stats-v7{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.profile-achievements-v7{display:flex;gap:6px;overflow:hidden}.profile-achievements-v7>span{min-width:0;flex:1;background:var(--surface-subtle);border-radius:11px;padding:8px;display:grid;justify-items:center;gap:4px;text-align:center}.profile-achievements-v7 .ico{color:var(--gold)}.profile-achievements-v7 b{font-size:9px;line-height:1.15}.profile-stats-v7{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 
 .shop-page-v7{display:grid;align-content:start;gap:6px}.shop-wallet{height:72px;border-radius:16px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:9px}
 .shop-wallet span{font-size:25px}.shop-wallet b{font-size:25px}
