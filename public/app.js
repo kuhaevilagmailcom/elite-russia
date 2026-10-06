@@ -629,7 +629,7 @@ function routeLoading(on){
 }
 async function fetchPage(page){
  if(!state.user||page==='home')await refreshUser();
- if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'+'&page='+state.filters.page);
+ if(page==='collection')state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page='+state.filters.page);
  if(page==='market')state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);
  if(page==='top')state.leaderboard=await api('/api/leaderboard');
  if(page==='tasks')state.tasks=await api('/api/tasks');
