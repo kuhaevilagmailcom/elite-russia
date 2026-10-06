@@ -56,6 +56,25 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS level_reward_claims(
     user_id INTEGER NOT NULL,level INTEGER NOT NULL,claimed_at TEXT NOT NULL,PRIMARY KEY(user_id,level)
   );
+  CREATE TABLE IF NOT EXISTS currency_wallets(
+    user_id INTEGER PRIMARY KEY,gems INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS achievement_unlocks(
+    user_id INTEGER NOT NULL,achievement_key TEXT NOT NULL,xp_reward INTEGER NOT NULL DEFAULT 0,unlocked_at TEXT NOT NULL,
+    PRIMARY KEY(user_id,achievement_key)
+  );
+  CREATE TABLE IF NOT EXISTS mini_game_sessions(
+    id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,game_key TEXT NOT NULL,payload_json TEXT NOT NULL,state_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,expires_at TEXT NOT NULL,finished_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS mini_game_records(
+    id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,game_key TEXT NOT NULL,score INTEGER NOT NULL DEFAULT 0,
+    reward INTEGER NOT NULL DEFAULT 0,xp INTEGER NOT NULL DEFAULT 0,metadata TEXT,created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS mini_game_daily_earnings(
+    user_id INTEGER NOT NULL,earning_date TEXT NOT NULL,amount INTEGER NOT NULL DEFAULT 0,plays INTEGER NOT NULL DEFAULT 0,updated_at TEXT NOT NULL,
+    PRIMARY KEY(user_id,earning_date)
+  );
   CREATE TABLE IF NOT EXISTS username_lab_attempts(
     id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,attempt_date TEXT NOT NULL,handle TEXT NOT NULL,fingerprint TEXT NOT NULL,
     theme TEXT NOT NULL,score INTEGER NOT NULL,reward INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,handle)
@@ -113,6 +132,8 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_upgrade_sessions_user ON upgrade_sessions(user_id,expires_at,used_at);
   CREATE INDEX IF NOT EXISTS idx_lab_user_day ON username_lab_attempts(user_id,attempt_date,created_at);
   CREATE INDEX IF NOT EXISTS idx_xp_history_user ON xp_history(user_id,created_at);
+  CREATE INDEX IF NOT EXISTS idx_minigame_records_user ON mini_game_records(user_id,game_key,created_at);
+  CREATE INDEX IF NOT EXISTS idx_minigame_sessions_user ON mini_game_sessions(user_id,game_key,expires_at);
   `);
   const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
   if(!userCols.has('luck_points'))db.exec("ALTER TABLE users ADD COLUMN luck_points INTEGER NOT NULL DEFAULT 0");
