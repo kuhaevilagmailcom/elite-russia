@@ -39,9 +39,9 @@ function rowsFor(db,user){
     {key:'game25',category:'Игры',icon:'game',title:'Игрок',desc:'Сыграть 25 мини-игр',current:games,target:25,xp:100},
     {key:'streak5',category:'Игры',icon:'fire',title:'Серия',desc:'Получить результат 5',current:gameBest,target:5,xp:80},
     {key:'capital1m',category:'Прогресс',icon:'money-bag-02',title:'Миллион',desc:'Капитал 1M ₽',current:capital,target:1000000,xp:150},
-    {key:'level50',category:'Прогресс',icon:'medal-01',title:'Мастер',desc:'Достичь LVL 50',current:level,target:50,xp:120},
-    {key:'level100',category:'Прогресс',icon:'medal-01',title:'Ветеран',desc:'Достичь LVL 100',current:level,target:100,xp:250},
-    {key:'level200',category:'Прогресс',icon:'crown',title:'Легендарный',desc:'Достичь LVL 200',current:level,target:200,xp:500}
+    {key:'level50',category:'Прогресс',icon:'medal-01',title:'Мастер',desc:'Достичь 50 уровня',current:level,target:50,xp:120},
+    {key:'level100',category:'Прогресс',icon:'medal-01',title:'Ветеран',desc:'Достичь 100 уровня',current:level,target:100,xp:250},
+    {key:'level200',category:'Прогресс',icon:'crown',title:'Легендарный',desc:'Достичь 200 уровня',current:level,target:200,xp:500}
   ].map(x=>({...x,current:Math.max(0,Number(x.current)||0),done:Number(x.current)>=Number(x.target)}));
 }
 export function achievementsData(db,user){
