@@ -1,5 +1,5 @@
 import {buildGeneratedHandle,scoreHandle,isValidHandle,rarityFromValue} from './generator.mjs';
-import {uid,nowIso,bumpSeasonScore,randomUnit} from './economy.mjs';
+import {uid,nowIso,bumpTask,bumpSeasonScore,randomUnit} from './economy.mjs';
 import {grantXp} from './progression.mjs';
 
 export const UPGRADE_RULES=Object.freeze({
@@ -12,7 +12,7 @@ const shape=r=>r?{id:r.id,handle:'@'+r.handle,rarity:r.rarity,value:r.value,inst
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const TARGET_OPTION_COUNT=8;
 const TARGET_RANGE=Object.freeze({RARE:[15000,99999],EPIC:[100000,499999],LEGEND:[500000,1999999],ULTRA:[2000000,25000000]});
-const chanceFor=(sourceValue,targetValue)=>clamp(Number(sourceValue)*.90/Math.max(1,Number(targetValue)),.01,.75);
+export const chanceFor=(sourceValue,targetValue)=>clamp(Number(sourceValue)*.92/Math.max(1,Number(targetValue)),.01,.92);
 function validateIds(ids){
   if(!Array.isArray(ids)||ids.length!==1)throw new Error('bad_upgrade');
   const clean=String(ids[0]||'');if(!clean)throw new Error('bad_upgrade');return [clean];
@@ -138,7 +138,7 @@ export function performUpgrade(db,user,ids,sessionId,rng=randomUnit){
     db.prepare('INSERT INTO upgrade_history(id,user_id,request_id,source_ids,target_instance_id,from_rarity,to_rarity,success,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
       .run(uid(),user.id,String(session.id),JSON.stringify(rows.map(r=>r.id)),result?.id||'',session.from_rarity,session.target_rarity,success?1:0,used);
     grantXp(db,user.id,success?40:8,'upgrade',{success:!!success,chance:Number(session.chance),targetValue:session.target_value});
-    bumpSeasonScore(db,user.id,success?50:5);
+    bumpTask(db,user.id,'upgrade',1);bumpSeasonScore(db,user.id,success?50:5);
     return {ok:true,replayed:false,success,result,sources:rows.map(shape),chance:Number(session.chance),from:session.from_rarity,to:session.target_rarity,target:{handle:'@'+session.target_handle,rarity:session.target_rarity,value:session.target_value}};
   })();
 }
