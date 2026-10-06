@@ -60,7 +60,7 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
   }
   const profile=starter?(starterMode==='ultra'?'ULTRA':starterMode==='big'?'RARE':starterMode==='rare'?'RARE':'COMMON'):weightedTierProfile(tier,rng),now=nowIso();
 
-  // The $3K tier is cheap most of the time, but keeps tiny real jackpot chances.
+  // The basic 3K tier is cheap most of the time, but keeps tiny real jackpot chances.
   if(starter&&(starterMode==='ultra'||starterMode==='big')){
     const min=starterMode==='ultra'?STARTER_DROP_JACKPOT.ultraMin:STARTER_DROP_JACKPOT.bigMin;
     const max=starterMode==='ultra'?Number.MAX_SAFE_INTEGER:STARTER_DROP_JACKPOT.bigMax;
@@ -110,11 +110,7 @@ export function shapeInstance(r){
     quality,instanceNumber:r.instance_number,maxSupply:r.max_supply,status:r.status,obtainedAt:r.obtained_at
   };
 }
-function showcaseSlotLimit(db,user){
-  const base=isPremium(user)?GAME.premiumShowcaseSlots:GAME.showcaseSlots;
-  const extra=db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='showcase' AND key='plus2'").get(user.id)?2:0;
-  return base+extra;
-}
+
 function activeCosmetics(db,userId){
   const row=db.prepare('SELECT theme_key,frame_key,card_key FROM user_cosmetic_settings WHERE user_id=?').get(userId)||{};
   return {theme:row.theme_key||'',frame:row.frame_key||'',card:row.card_key||''};
@@ -163,7 +159,7 @@ export function createDrop(db,user,requestId,tierKey='basic'){
     if(!changed)throw new Error('sold_out');
     // pickTemplate already resolved the canonical value for this username.
     // Do not rescore it here: rescoring bypassed the starter-tier value band and
-    // was the reason $3K drops could suddenly become $10K-$15K instances.
+    // was the reason 3K drops could suddenly become 10K-15K instances.
     const value=Math.max(200,Math.round(Number(template.base_value)||200)),rarity=rarityFromValue(value),assessment=analyzeUsername(template.handle);
     const score=Number(template.username_score||assessment.score||0),visual=visualTier(value,score),quality=JSON.stringify(assessment.breakdown||{});
     if(template.rarity!==rarity||template.username_score!==score||template.visual_tier!==visual)
