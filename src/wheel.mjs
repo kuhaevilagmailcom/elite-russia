@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import {GAME} from './config.mjs';
-import {uid,nowIso,txBalance,bumpSeasonScore,collectionLimit,activeCollectionCount} from './economy.mjs';
+import {uid,nowIso,txBalance,bumpTask,bumpSeasonScore,collectionLimit,activeCollectionCount} from './economy.mjs';
 import {stableScoreHandle,rarityFromValue} from './generator.mjs';
 import {analyzeUsername,visualTier} from './valuation.mjs';
 import {grantXp} from './progression.mjs';
@@ -62,7 +62,7 @@ export function spinWheel(db,user,requestId){
     db.prepare('INSERT INTO wheel_claims(user_id,last_claim_at) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET last_claim_at=excluded.last_claim_at').run(user.id,ts);
     db.prepare('INSERT INTO wheel_history(id,user_id,request_id,reward_key,reward_label,reward_type,reward_amount,created_at) VALUES(?,?,?,?,?,?,?,?)').run(uid(),user.id,requestId,r.key,reward.label,r.type,r.amount,ts);
     grantXp(db,user.id,5,'wheel_spin',{reward:r.key});
-    bumpSeasonScore(db,user.id,5);
+    bumpTask(db,user.id,'wheel',1);bumpSeasonScore(db,user.id,5);
     return {reward,replayed:false};
   })();
 }
