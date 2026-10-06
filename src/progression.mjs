@@ -61,7 +61,7 @@ export function levelFromXp(xp){
 }
 
 export function levelTitle(level){
-  const l=Math.max(1,Math.min(MAX_LEVEL,Math.floor(Number(level)||1));
+  const l=Math.max(1,Math.min(MAX_LEVEL,Math.floor(Number(level)||1)));
   let title=TITLE_CONFIG[0][1];
   for(const [at,name] of TITLE_CONFIG)if(l>=at)title=name;
   return title;
