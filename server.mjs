@@ -19,6 +19,7 @@ import {dailyStatus,claimDaily} from './src/daily.mjs';
 import {publicUser} from './src/game.mjs';
 import {achievementsData} from './src/achievements.mjs';
 import {levelRewards,progressionFromXp} from './src/progression.mjs';
+import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema} from './src/minigames.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -38,6 +39,7 @@ const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
+ensureMiniGameSchema(db);
 const lastDropAt=new Map();
 const rateBuckets=new Map();
 const leaderboardCache=new Map();
@@ -245,6 +247,19 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/daily/claim'){
       const result=claimDaily(db,user),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
       invalidateLeaderboard();return json(res,200,{...result,user:publicUser(db,fresh),status:dailyStatus(db,fresh)})
+    }
+    if(req.method==='GET'&&url.pathname==='/api/games')return json(res,200,gamesHub(db,user));
+    const gameStart=url.pathname.match(/^\/api\/games\/([a-z]+)\/start$/);
+    if(req.method==='POST'&&gameStart){
+      if(!rateLimit(user.id,'mini_game_start',20,60000))return json(res,429,{error:'rate_limited'});
+      return json(res,200,startMiniGame(db,user,gameStart[1]));
+    }
+    const gameAnswer=url.pathname.match(/^\/api\/games\/session\/([^/]+)\/answer$/);
+    if(req.method==='POST'&&gameAnswer){
+      if(!rateLimit(user.id,'mini_game_answer',80,60000))return json(res,429,{error:'rate_limited'});
+      const b=await readBody(req),result=answerMiniGame(db,user,gameAnswer[1],b.answer);
+      const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);invalidateLeaderboard();
+      return json(res,200,{...result,user:publicUser(db,fresh)});
     }
     if(req.method==='GET'&&url.pathname==='/api/lab')return json(res,200,labStatus(db,user));
     if(req.method==='POST'&&url.pathname==='/api/lab'){
