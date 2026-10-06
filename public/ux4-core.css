@@ -1251,3 +1251,10 @@ html[data-theme="dark"] .switch:after{background:#F4F6F8}
 /* Modals */
 html[data-theme="dark"] .modal-head button{background:var(--surface-subtle);color:var(--text)}
 html[data-theme="dark"] .system-sell-copy{color:var(--muted)}
+html[data-theme="dark"] .primary:disabled,
+html[data-theme="dark"] .wheel-page-clean .wheel-spin-button:disabled{
+  background:var(--surface-subtle);color:var(--muted);border-color:var(--border);opacity:1
+}
+
+/* Value tiers never tint the card itself. */
+.last-row.value-blue,.last-row.value-purple,.last-row.value-gold{background:transparent;border-color:inherit}
