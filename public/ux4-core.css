@@ -1258,3 +1258,66 @@ html[data-theme="dark"] .wheel-page-clean .wheel-spin-button:disabled{
 
 /* Value tiers never tint the card itself. */
 .last-row.value-blue,.last-row.value-purple,.last-row.value-gold{background:transparent;border-color:inherit}
+
+
+/* USERNAME 6.1.2 — redesigned menu icons */
+.menu-section-tile{
+  height:70px;min-height:70px;
+  gap:5px;
+  background:var(--card);
+}
+.menu-section-tile .ico{
+  width:36px;height:36px;flex:0 0 36px;
+  font-size:24px;line-height:1;
+  border-radius:11px;
+  display:grid;place-items:center;
+  background:var(--surface-subtle);
+  color:#3F4750;
+}
+.menu-section-tile>span{
+  font-size:8.8px;
+  font-weight:700;
+  color:var(--text);
+}
+.menu-section:nth-child(1) .menu-section-tile .ico{
+  background:#EAF7FD;color:#168FC8;
+}
+.menu-section:nth-child(2) .menu-section-tile .ico{
+  background:#ECF8F1;color:#23945C;
+}
+.menu-section:nth-child(3) .menu-section-tile .ico{
+  background:#F2EDFF;color:#7C55D9;
+}
+.menu-section:nth-child(4) .menu-section-tile .ico{
+  background:#F0F2F4;color:#4E5660;
+}
+.menu-section-tile:active{
+  transform:scale(.985);
+  background:var(--surface-subtle);
+  border-color:var(--border);
+}
+html[data-theme="dark"] .menu-section-tile{
+  background:var(--card);
+  border-color:var(--border);
+}
+html[data-theme="dark"] .menu-section:nth-child(1) .menu-section-tile .ico{
+  background:#17313D;color:#55C1EF;
+}
+html[data-theme="dark"] .menu-section:nth-child(2) .menu-section-tile .ico{
+  background:#183126;color:#67C98F;
+}
+html[data-theme="dark"] .menu-section:nth-child(3) .menu-section-tile .ico{
+  background:#2A2340;color:#B39AF5;
+}
+html[data-theme="dark"] .menu-section:nth-child(4) .menu-section-tile .ico{
+  background:#282D34;color:#D4DAE1;
+}
+@media(max-width:370px){
+  .menu-section-tile{height:65px;min-height:65px}
+  .menu-section-tile .ico{width:33px;height:33px;flex-basis:33px;font-size:22px}
+  .menu-section-tile>span{font-size:8px}
+}
+@media(max-height:680px){
+  .menu-section-tile{height:62px;min-height:62px}
+  .menu-section-tile .ico{width:31px;height:31px;flex-basis:31px;font-size:21px}
+}
