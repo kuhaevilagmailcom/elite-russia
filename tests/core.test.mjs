@@ -56,12 +56,13 @@ test('UI icon map is Hugeicons-only and contains verified semantic icons',()=>{
   assert.doesNotMatch(block,/lucide|emoji|solid/i);
 });
 
-test('market and collection share one reusable filter icon component',()=>{
+test('market and collection share one reusable FilterButton component',()=>{
   const collection=appSrc.match(/function collectionView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   const market=appSrc.match(/function marketView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(collection,/marketFilterIcon\(\)/);
-  assert.match(market,/marketFilterIcon\(\)/);
-  assert.match(appSrc,/function marketFilterIcon\(/);
+  assert.match(collection,/FilterButton\('collection'\)/);
+  assert.match(market,/FilterButton\('market'\)/);
+  assert.match(appSrc,/function FilterButton\(scope\)/);
+  assert.match(appSrc,/filter-button-label/);
 });
 
 test('settings use theme plus three compact toggles without status copy',()=>{
