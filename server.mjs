@@ -245,7 +245,7 @@ async function api(req,res,url){
       const result=createDrop(db,user,requestId,String(b.tier||'basic'));invalidateLeaderboard();return json(res,200,result);
     }
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req),result=resolveDrop(db,user,resolve[1],b.action);invalidateLeaderboard();return json(res,200,result)}
-    if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',showcase:url.searchParams.get('showcase')||'all',page:Number(url.searchParams.get('page')||1)}));
+    if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',page:Number(url.searchParams.get('page')||1)}));
     if(req.method==='GET'&&url.pathname==='/api/leaderboard'){
       const key='capital',cached=leaderboardCache.get(key);
       if(cached&&Date.now()-cached.ts<30000)return json(res,200,{items:cached.items});
@@ -367,7 +367,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,showcase_full:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
