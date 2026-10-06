@@ -1,6 +1,6 @@
 export const GAME={
   name:'USERNAME',
-  version:'7.0.0',
+  version:'7.0.1',
   startBalance:50000,
   freeDrops:1,
   dropCost:3000,
@@ -35,8 +35,8 @@ export const RARITY_BASE={
   ULTRA:[2000000,100000000]
 };
 export const DROP_TIERS=Object.freeze({
-  basic:{key:'basic',label:'$3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
-  boosted:{key:'boosted',label:'$55K',cost:55000,weights:{COMMON:72,RARE:22,EPIC:5.25,LEGEND:.745,ULTRA:.005}},
-  strong:{key:'strong',label:'$120K',cost:120000,weights:{COMMON:48,RARE:32,EPIC:16.4,LEGEND:3.58,ULTRA:.02}},
-  max:{key:'max',label:'$300K',cost:300000,weights:{COMMON:32,RARE:33,EPIC:25,LEGEND:9.92,ULTRA:.08}}
+  basic:{key:'basic',label:'3K',cost:3000,weights:{COMMON:94,RARE:5.5,EPIC:.48,LEGEND:.019,ULTRA:.001}},
+  boosted:{key:'boosted',label:'15K',cost:15000,weights:{COMMON:84,RARE:12.5,EPIC:3,LEGEND:.48,ULTRA:.02}},
+  strong:{key:'strong',label:'50K',cost:50000,weights:{COMMON:68,RARE:20,EPIC:9,LEGEND:2.9,ULTRA:.1}},
+  max:{key:'max',label:'100K',cost:100000,weights:{COMMON:55,RARE:24,EPIC:15,LEGEND:5.8,ULTRA:.2}}
 });
