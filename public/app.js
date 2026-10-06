@@ -1,10 +1,10 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,premium:null,levels:null,achievements:null,lab:null,labResult:null,daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,levels:null,achievements:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',showcase:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
-  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,adminPage:1,adminQuery:'',adminResetStage:0,
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftSheet:'',gameFeedback:null,adminPage:1,adminQuery:'',adminResetStage:0,
   pageLoadedAt:{}
 };
 const fmt=n=>'$'+new Intl.NumberFormat('en-US').format(Math.round(Number(n)||0));
@@ -20,7 +20,7 @@ const ERR={
   unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Username уже на рынке',not_friend:'Пользователь не в списке друзей',
-  lab_invalid_username:'Username должен быть длиной 4–32 символа: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',
+  lab_invalid_username:'Username должен быть длиной 4–32 символа: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',showcase_full:'Витрина заполнена',recipient_blocked:'Получатель заблокирован',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',network:'Нет соединения с сервером'
 };
@@ -103,10 +103,10 @@ async function api(url,opts={}){
 const ICON_NAME=Object.freeze({
  home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
  market:'store-01',rank:'ranking',tasks:'task-done-01',wheel:'target-01',
- friends:'user-group',gift:'gift',upgrade:'rocket-01',season:'award-01',
- collection:'layers-01',profile:'user-circle-02',premium:'diamond-02',filter:'filter',
- search:'search-01',lab:'test-tube-01',levels:'medal-01',achievements:'crown',settings:'settings-02',
- theme:'moon-02',sound:'volume-high',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
+ collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
+ search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',settings:'settings-02',
+ theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
@@ -116,14 +116,14 @@ function metric(label,value){return '<div class="metric"><span>'+label+'</span><
 function valueClass(x){return ' value-'+(['blue','purple','gold'].includes(String(x?.visual||''))?x.visual:'normal')}
 function xpBar(u){
  const pct=Math.max(0,Math.min(100,Math.round(Number(u?.levelProgress||0)*100)));
- return '<div class="xp-block"><div class="xp-head"><b>LVL '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=100?'MAX':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' XP'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
+ return '<div class="xp-block"><div class="xp-head"><b>LVL '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=200?'MAX':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' XP'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
 }
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU_SECTIONS=[
- {title:'Играть',items:[['home','home','Дроп'],['lab','lab','Lab'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
+ {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
  {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
  {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
- {title:'Аккаунт',items:[['profile','profile','Профиль'],['premium','premium','Plus'],['settings','settings','Настройки']]}
+ {title:'Аккаунт',items:[['profile','profile','Профиль'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
 ];
 function setMenuOpen(open){
  state.menu=!!open;
@@ -174,7 +174,7 @@ function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.len
 function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result'+valueClass(x)+'">'+
    '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
-   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button><button class="story-icon-btn" data-share-story="'+x.id+'" aria-label="Выложить в историю" title="Выложить в историю">'+icon('story')+'</button></div>':'')+
+   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){
@@ -219,21 +219,22 @@ function dropPricePicker(tiers){
  return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
 function homeView(){
- const h=state.home,u=h.user,last=h.last,p=h.pending,tiers=h.config.dropTiers||{},tier=selectedDropTier(),daily=state.daily;
- const freeBasic=u.freeDrops>0&&state.dropTier==='basic',payCost=freeBasic?0:Number(tier.cost||3000),cantAfford=!freeBasic&&u.balance<payCost;
- const dailyAction=daily?'<button class="home-mini-action daily" '+(!daily.claimable?'disabled':'')+' data-daily-claim><span>Ежедневно</span><b>'+(daily.claimable?esc(daily.reward?.label||'Забрать'):'Получено')+'</b></button>':'';
- return '<div class="home home-clean">'+dropPricePicker(tiers)+
- '<div class="home-progress-card"><div class="home-progress-main">'+xpBar(u)+'</div><div class="home-progress-side"><span>Удача</span><b>'+Number(u.luck||0)+'/100</b></div></div>'+
- '<section class="home-utility-row">'+dailyAction+'<button class="home-mini-action lab" data-page="lab"><span>Username Lab</span><b>Заработать</b></button></section>'+
- '<section class="drop-zone home-drop-zone">'+(!p?'<div class="drop-price-corner"><button class="drop-cost-trigger compact" data-drop-picker-open>'+fmt(tier.cost)+' <em>'+icon('down')+'</em></button></div>':'')+
- (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="'+(cantAfford?'Недостаточно денег для дропа':'Получить случайный username')+'"><b data-fit-username data-max-size="54" data-min-size="25">@username</b></button>')+
- '</section><section class="last home-last"><div class="section-title"><span>Последний username</span></div>'+(last?'<div class="last-row'+valueClass(last)+'"><b>'+esc(last.handle)+'</b><strong>'+fmt(last.value)+'</strong></div>':'<div class="empty-line">Появится после первого дропа.</div>')+'</section></div>';
+ const h=state.home,u=h.user,p=h.pending,tier=(h.config?.dropTiers||{}).basic||{key:'basic',cost:3000},free=u.freeDrops>0,payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
+ return '<div class="home-v7">'+
+  '<section class="home-level-v7">'+xpBar(u)+'</section>'+
+  '<section class="drop-zone home-drop-v7">'+
+    (!p?'<button class="drop-price-v7" tabindex="-1">'+(free?'FREE':fmt(tier.cost))+'</button>':'')+
+    (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b></button>')+
+  '</section>'+
+ '</div>';
 }
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
- const reduced=!motionEnabled(),delays=reduced?[80,110]:[32,32,36,40,43,47,54,61,68,79,90,104,122,144,166,187,216,252,302,374],samples=buildRollSequence(delays.length,result.handle);let i=0;
- for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
- stage.innerHTML='<b data-fit-username data-max-size="54" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');haptic('medium');sound('reward');await new Promise(r=>setTimeout(r,reduced?90:120));state.home.pending=result;render();
+ const delays=motionEnabled()?[55,60,65,70,80,95,115,145]:[25],samples=buildRollSequence(delays.length,result.handle);let i=0;
+ for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="58" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
+ stage.innerHTML='<b data-fit-username data-max-size="58" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');
+ if(result.visual==='gold'){haptic('medium');sound('reward')}else if(result.visual==='purple')haptic('light');
+ await new Promise(r=>setTimeout(r,motionEnabled()?90:20));state.home.pending=result;render();
 }
 function collectionFilterSheet(){
  if(!state.collectionFilterOpen)return '';
