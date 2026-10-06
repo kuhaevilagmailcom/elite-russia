@@ -29,11 +29,15 @@ test('all interface icons use Hugeicons Stroke Rounded without runtime hydration
   assert.match(indexSrc,/use\.hugeicons\.com\/font\/icons\.css/);
   assert.match(appSrc,/const ICON_NAME=Object\.freeze/);
   assert.match(appSrc,/hgi-stroke hgi-/);
-  assert.match(appSrc,/home:'home-01'/);
-  assert.match(appSrc,/market:'shopping-bag-01'/);
+  assert.match(appSrc,/home:'package'/);
+  assert.match(appSrc,/market:'store-01'/);
+  assert.match(appSrc,/lab:'test-tube-01'/);
   assert.match(appSrc,/wheel:'circle-gauge'/);
-  assert.match(appSrc,/collection:'grid-view'/);
+  assert.match(appSrc,/upgrade:'rocket-01'/);
+  assert.match(appSrc,/collection:'grid-table'/);
+  assert.match(appSrc,/achievements:'trophy'/);
   assert.match(appSrc,/profile:'user-circle-02'/);
+  assert.match(appSrc,/settings:'settings-02'/);
   assert.match(appSrc,/filter:'filter'/);
   assert.doesNotMatch(appSrc,/data-lucide=|window\.lucide|lucideRetry/);
 });
