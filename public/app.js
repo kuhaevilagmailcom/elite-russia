@@ -375,43 +375,27 @@ function appendUpgradeBatch(){
 }
 
 function upgraderView(){
- const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),liveSource=selected[0],round=state.upgradeLastRound;
- const stage=state.upgradeStage||'source';
+ const u=state.upgrader||{available:[],maxItems:1},selected=selectedUpgradeItems(),source=selected[0],stage=state.upgradeStage||'source',round=state.upgradeLastRound;
  if(stage==='source'){
-  return '<div class="upgrade-page upgrade-source-stage">'+
-   '<div class="upgrade-step-head upgrade-source-head"><span>ШАГ 1 ИЗ 3</span><b>Выбери свой username</b></div>'+
-   '<div class="upgrade-list-title"><b>Твои usernames</b><span>'+(u.available||[]).length+' доступно</span></div>'+
-   '<div class="upgrade-list upgrade-source-list">'+((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+'</div>'+
-  '</div>';
+  return '<div class="upgrade-page upgrade-source-stage"><div class="upgrade-list-title"><b>Твой username</b><span>'+(u.available||[]).length+'</span></div><div class="upgrade-list upgrade-source-list">'+
+   ((u.available||[]).length?(u.available||[]).slice(0,state.upgradeVisibleCount||30).map(upgradeRowHtml).join(''):'<div class="empty">Нет usernames для апгрейда.</div>')+
+  '</div></div>';
  }
  if(stage==='target'){
   const targets=upgradeTargetOptions(),picked=selectedUpgradeTarget();
   return '<div class="upgrade-page upgrade-target-stage">'+
-   '<div class="upgrade-step-head with-action"><div><span>ШАГ 2 ИЗ 3</span><b>Что хочешь получить?</b><small>Чем дороже username — тем ниже шанс.</small></div><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+' Назад</button></div>'+
-   '<section class="upgrade-source-summary"><span>ТЫ СТАВИШЬ</span><div><b data-fit-username data-max-size="20" data-min-size="12">'+(liveSource?esc(liveSource.handle):'—')+'</b><strong>'+(liveSource?fmt(liveSource.value):'—')+'</strong></div></section>'+
-   '<div class="upgrade-list-title"><b>Выбери цель</b><span>'+targets.length+' вариантов</span></div>'+
-   '<div class="upgrade-target-list">'+(targets.length?targets.map(upgradeTargetRowHtml).join(''):'<div class="upgrade-target-loading"><span></span><b>Подбираем варианты…</b><small>Считаем цены и реальные шансы.</small></div>')+'</div>'+
-   '<div class="upgrade-footer upgrade-target-footer"><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>'+icon('upgrade')+' Апгрейд</button></div>'+
+   '<section class="upgrade-source-summary"><div><b data-fit-username data-max-size="20" data-min-size="12">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'—')+'</strong></div></section>'+
+   '<div class="upgrade-target-list">'+(targets.length?targets.map(upgradeTargetRowHtml).join(''):'<div class="empty">Подбираем варианты…</div>')+'</div>'+
+   '<div class="upgrade-footer"><button class="secondary upgrade-back-step" data-upgrade-back-source>'+icon('back')+'</button><div><span>Шанс</span><b>'+(picked?upgradeChanceText(picked.chance)+'%':'—')+'</b></div><button class="primary" data-upgrade '+(!picked||state.upgradeSpinning?'disabled':'')+'>Апгрейд</button></div>'+
   '</div>';
  }
- const picked=selectedUpgradeTarget(),source=round?.source||liveSource,target=round?.target||picked?.target||state.upgradeOutcome?.target;
- const chanceValue=round?.chance??picked?.chance??state.upgradeOutcome?.chance??0,chance=upgradeChanceText(chanceValue),angle=Math.max(3,Math.min(270,Number(chanceValue||0)*360)),landing=round?Number(state.upgradeLandingAngle||0):0;
- const wheelAngle=round?((360-(landing%360))%360):0;
+ const picked=selectedUpgradeTarget(),liveSource=round?.source||source,target=round?.target||picked?.target||state.upgradeOutcome?.target;
+ const chanceValue=round?.chance??picked?.chance??state.upgradeOutcome?.chance??0,chance=upgradeChanceText(chanceValue),angle=Math.max(3,Math.min(331.2,Number(chanceValue||0)*360)),landing=round?Number(state.upgradeLandingAngle||0):0,wheelAngle=round?((360-(landing%360))%360):0;
  const done=!!state.upgradeOutcome&&!state.upgradeSpinning&&!!round,success=!!state.upgradeOutcome?.success;
  return '<div class="upgrade-page upgrade-spin-stage">'+
-  '<section class="upgrade-matchup">'+
-   '<div class="upgrade-match-side source"><small>СТАВИШЬ</small><b data-fit-username data-max-size="18" data-min-size="11">'+(source?esc(source.handle):'—')+'</b><strong>'+(source?fmt(source.value):'—')+'</strong></div>'+
-   '<div class="upgrade-match-arrow">'+icon('chevron')+'</div>'+
-   '<div class="upgrade-match-side target"><small>МОЖЕШЬ ПОЛУЧИТЬ</small><b data-fit-username data-max-size="18" data-min-size="11">'+(target?esc(target.handle):'—')+'</b><strong>'+(target?fmt(target.value):'—')+'</strong></div>'+
-  '</section>'+
-  '<section class="upgrade-wheel-card ready '+(done?(success?'round-win':'round-fail'):'')+'">'+
-   '<div class="upgrade-roulette upgrade-roulette-clean" style="--chance-angle:'+angle+'deg">'+
-    '<div class="upgrade-wheel-rotor" id="upgradeRotor" style="transform:rotate('+wheelAngle+'deg)"><div class="upgrade-ring"></div></div>'+
-    '<div class="upgrade-pointer-static"></div>'+
-    '<div class="upgrade-ring-core"><b>'+chance+'%</b><span>ШАНС</span></div>'+
-   '</div>'+
-  '</section>'+
-  (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><small>'+(success?'УСПЕХ':'НЕ ПОВЕЗЛО')+'</small><b>'+(success?'Круто, апгрейд залетел!':'Апгрейд не зашёл')+'</b><span>'+(success?('Ты получил '+esc(state.upgradeOutcome.result.handle)+' · '+fmt(state.upgradeOutcome.result.value)):((source?esc(source.handle):'Username')+' сгорел. Можно рискнуть ещё раз.'))+'</span><button class="primary" data-upgrade-continue>'+(success?'Продолжить':'Попробовать ещё раз')+'</button></section>':'')+
+  '<section class="upgrade-matchup"><div class="upgrade-match-side source"><b data-fit-username data-max-size="18" data-min-size="11">'+(liveSource?esc(liveSource.handle):'—')+'</b><strong>'+(liveSource?fmt(liveSource.value):'—')+'</strong></div><div class="upgrade-match-arrow">→</div><div class="upgrade-match-side target"><b data-fit-username data-max-size="18" data-min-size="11">'+(target?esc(target.handle):'—')+'</b><strong>'+(target?fmt(target.value):'—')+'</strong></div></section>'+
+  '<section class="upgrade-wheel-card ready '+(done?(success?'round-win':'round-fail'):'')+'"><div class="upgrade-roulette upgrade-roulette-clean" style="--chance-angle:'+angle+'deg"><div class="upgrade-wheel-rotor" id="upgradeRotor" style="transform:rotate('+wheelAngle+'deg)"><div class="upgrade-ring"></div></div><div class="upgrade-pointer-static"></div><div class="upgrade-ring-core"><b>'+chance+'%</b></div></div></section>'+
+  (done?'<section class="upgrade-result-panel '+(success?'success':'fail')+'"><b>'+(success?'Получено '+esc(state.upgradeOutcome.result.handle):'Не выпало')+'</b><button class="primary" data-upgrade-continue>Продолжить</button></section>':'')+
  '</div>';
 }
 function seasonsView(){const s=state.season?.season;if(!s)return '<div class="empty">Активного сезона нет.</div>';return '<div class="page-body"><section class="season-hero"><small>ТЕКУЩИЙ СЕЗОН</small><h1>'+esc(s.name)+'</h1><div>'+metric('Осталось',s.daysLeft+' дн.')+metric('Место','#'+s.rank)+metric('Season Score',s.score)+'</div></section><div class="section-label">Награды</div><div class="season-rewards">'+s.rewards.map(x=>'<div><b>'+x.place+'</b><span>'+x.reward+'</span></div>').join('')+'</div>'+(s.series?.length?'<div class="section-label">Активные серии</div><div class="series-list">'+s.series.map(x=>'<div><b>'+esc(x.name)+'</b><span>до '+new Date(x.end_at).toLocaleDateString('ru-RU')+'</span></div>').join('')+'</div>':'')+'</div>'}
