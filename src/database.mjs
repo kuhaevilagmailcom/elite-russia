@@ -96,6 +96,7 @@ export function createDatabase(dataDir){
   );
   CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY,applied_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS runtime_locks(name TEXT PRIMARY KEY,owner TEXT NOT NULL,expires_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS api_rate_limits(rate_key TEXT PRIMARY KEY,started_at INTEGER NOT NULL,count INTEGER NOT NULL DEFAULT 0);
   CREATE TABLE IF NOT EXISTS market_listings(id TEXT PRIMARY KEY,instance_id TEXT NOT NULL,seller_id INTEGER NOT NULL,buyer_id INTEGER,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL,closed_at TEXT);
   CREATE TABLE IF NOT EXISTS market_transactions(id TEXT PRIMARY KEY,listing_id TEXT NOT NULL,instance_id TEXT NOT NULL,seller_id INTEGER NOT NULL,buyer_id INTEGER NOT NULL,price INTEGER NOT NULL,fee INTEGER NOT NULL,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS referrals(id TEXT PRIMARY KEY,referrer_id INTEGER NOT NULL,referred_id INTEGER UNIQUE NOT NULL,created_at TEXT NOT NULL,activated_at TEXT);
@@ -244,6 +245,10 @@ export function createDatabase(dataDir){
     })();
   }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_instances_handle_unique ON username_instances(handle)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_last_seen ON users(last_seen)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id,activated_at)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_drop_requests_instance ON drop_requests(instance_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_minigame_sessions_expiry ON mini_game_sessions(expires_at,finished_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_upgrade_target_active ON upgrade_sessions(target_handle,used_at,expires_at)');
 
   const valueRarityV31=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('3.1.0-value-rarity');
@@ -341,6 +346,31 @@ export function createDatabase(dataDir){
       }
       db.prepare('UPDATE users SET level=CASE WHEN level<1 THEN 1 ELSE level END,luck_points=MIN(100,MAX(0,luck_points)),bad_drop_streak=MAX(0,bad_drop_streak)').run();
       db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('6.0.0-valuation-progression',now);
+    })();
+  }
+
+  const usernameLimitV71=db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get('7.1.0-username-max-15');
+  if(!usernameLimitV71){
+    db.transaction(()=>{
+      const rows=db.prepare('SELECT id,handle FROM username_templates WHERE LENGTH(handle)>15 ORDER BY id').all();
+      for(const row of rows){
+        const clean=String(row.handle||'').toLowerCase().replace(/[^a-z0-9_]/g,'')||'username';
+        const stem=(/^[a-z]/.test(clean)?clean:'u'+clean).slice(0,10);
+        let n=0,candidate='';
+        do{
+          const suffix=(String(row.id)+String(n||'')).slice(-4).padStart(4,'0');
+          candidate=(stem+'_'+suffix).slice(0,15);n++;
+        }while(db.prepare('SELECT 1 FROM username_templates WHERE handle=? AND id<>?').get(candidate,row.id)||
+               db.prepare('SELECT 1 FROM username_instances WHERE handle=? AND template_id<>?').get(candidate,row.id));
+        db.prepare('UPDATE username_templates SET handle=? WHERE id=?').run(candidate,row.id);
+        const instances=db.prepare('SELECT id FROM username_instances WHERE template_id=?').all(row.id);
+        for(const inst of instances){
+          db.prepare('UPDATE username_instances SET handle=? WHERE id=?').run(candidate,inst.id);
+          db.prepare('UPDATE drop_history SET handle=? WHERE instance_id=?').run(candidate,inst.id);
+        }
+        db.prepare('UPDATE upgrade_sessions SET target_handle=? WHERE target_template_id=?').run(candidate,row.id);
+      }
+      db.prepare('INSERT INTO schema_migrations(version,applied_at) VALUES(?,?)').run('7.1.0-username-max-15',now);
     })();
   }
 
