@@ -39,6 +39,12 @@ export function listNotifications(db,userId,limit=80){
   return {items,unread:unreadNotificationCount(db,userId)};
 }
 
+export function markNotificationRead(db,userId,id){
+  const at=nowIso();
+  const changes=db.prepare('UPDATE notifications SET read_at=COALESCE(read_at,?) WHERE id=? AND user_id=?').run(at,String(id||''),Number(userId)).changes;
+  return {ok:!!changes,unread:unreadNotificationCount(db,userId)};
+}
+
 export function markAllNotificationsRead(db,userId){
   const at=nowIso();
   const changes=db.prepare('UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL').run(at,Number(userId)).changes;
