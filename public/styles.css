@@ -458,3 +458,55 @@ html.is-desktop .upgrade-wheel-rotor{backface-visibility:hidden;transform-style:
 @media(min-width:1380px){
  html.is-desktop .collection-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+
+
+/* USERNAME 7.3 — drop result layout */
+.pending-result{height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:18px;padding:18px 0 2px}
+.pending-result .drop-result-main{flex:1;min-height:110px;display:flex;align-items:center;justify-content:center;width:100%}
+.pending-result .drop-result-actions{position:static;left:auto;right:auto;bottom:auto;width:100%;display:grid;grid-template-columns:1fr;gap:8px;flex:none}
+.pending-result .story-action{min-height:44px;border-radius:13px;background:var(--surface-subtle);color:var(--text);display:flex;align-items:center;justify-content:center;gap:7px;font-weight:750}
+.pending-result .story-action .ico{width:17px;height:17px;color:var(--accent)}
+.drop-result-resolve{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.drop-result-resolve button{min-width:0;min-height:46px;border-radius:13px;background:var(--accent);color:#fff;font-weight:780;padding:0 10px}
+.drop-result-resolve button.secondary{background:var(--surface-subtle);color:var(--text)}
+@media(max-width:360px){
+ .pending-result{gap:12px;padding-top:12px}
+ .drop-result-resolve{grid-template-columns:1fr}
+}
+
+/* USERNAME 7.3 — redesigned fortune wheel */
+.wheel-v9{width:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:4px 2px 12px}
+.wheel-v9-card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:14px;display:grid;gap:15px;box-shadow:var(--shadow)}
+.wheel-v9-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.wheel-v9-head>div{display:grid;gap:2px;min-width:0}
+.wheel-v9-head small{font-size:8px;line-height:1.2;letter-spacing:.11em;font-weight:850;color:var(--muted)}
+.wheel-v9-head b{font-size:18px;letter-spacing:-.025em}
+.wheel-v9-head span:not(.wheel-v9-icon){font-size:10px;color:var(--muted)}
+.wheel-v9-icon{width:38px;height:38px;border-radius:12px;background:var(--surface-subtle);color:var(--accent);display:grid;place-items:center;flex:none}
+.wheel-v9-icon .ico{width:19px;height:19px}
+
+.wheel-v9-stage{width:min(78vw,332px);max-width:100%;margin:2px auto;position:relative}
+.wheel-v9-stage:before{content:"";position:absolute;inset:5%;border-radius:50%;background:var(--surface-subtle);z-index:0}
+.wheel-v9-stage .fortune-svg{position:relative;z-index:1;overflow:visible;filter:none}
+.wheel-v9-stage .fortune-slice{stroke:var(--card);stroke-width:1}
+.wheel-v9-stage .fortune-svg text{font-size:5px;font-weight:850;fill:var(--text);letter-spacing:-.025em}
+.wheel-v9-stage .fortune-rim{inset:-1px;border:7px solid var(--card);box-shadow:0 0 0 1px var(--border),0 8px 24px rgba(0,0,0,.09);z-index:2;pointer-events:none}
+.wheel-v9-stage .fortune-pointer{top:-10px;z-index:8}
+.wheel-v9-stage .fortune-pointer i{border-left:11px solid transparent;border-right:11px solid transparent;border-top:22px solid var(--accent);filter:drop-shadow(0 3px 2px rgba(0,0,0,.16))}
+.wheel-v9-stage .fortune-hub{inset:35.5%;z-index:5;background:var(--card);border:1px solid var(--border);box-shadow:0 5px 18px rgba(0,0,0,.12);display:grid;place-content:center}
+.wheel-v9-stage .fortune-hub b{font-size:20px;letter-spacing:-.04em}
+.wheel-v9-stage .fortune-hub span{font-size:6px;color:var(--muted);font-weight:850;letter-spacing:.14em}
+.wheel-v9-stage.spinning .fortune-svg{will-change:transform}
+
+.wheel-v9 .wheel-result{min-height:45px;margin:0;border-radius:12px;background:var(--surface-subtle);display:flex;align-items:center;justify-content:center;gap:6px;text-align:center;padding:8px 12px}
+.wheel-v9 .wheel-result small{font-size:9px;color:var(--muted);font-weight:650}
+.wheel-v9 .wheel-result b{font-size:12px}
+.wheel-v9 .wheel-result.show{background:color-mix(in srgb,var(--accent) 8%,var(--surface-subtle))}
+.wheel-v9-footer{display:grid;gap:8px}
+.wheel-v9 .wheel-copy{margin:0;background:transparent;border:0;padding:2px 2px 0;text-align:left;display:grid;gap:2px}
+.wheel-v9 .wheel-copy b{font-size:12px}.wheel-v9 .wheel-copy span{font-size:9.5px;color:var(--muted)}
+.wheel-v9 .wheel-spin-button{height:50px;border-radius:14px;background:var(--accent);color:#fff;font-weight:820;display:flex;align-items:center;justify-content:center;gap:7px}
+.wheel-v9 .wheel-spin-button .ico{width:17px;height:17px}
+html.is-desktop .wheel-v9{max-width:650px}
+html.is-desktop .wheel-v9-card{padding:18px}
+html.is-desktop .wheel-v9-stage{width:min(48vh,390px)}

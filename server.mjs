@@ -12,7 +12,7 @@ import {wheelStatus,spinWheel} from './src/wheel.mjs';
 import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {SHOP_PRODUCTS,shopCatalog,validProductCheckout,applyProductPayment,walletData,buyTheme} from './src/payments.mjs';
-import {adminOverview,adminUserDetail,adminSetBalance,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
+import {adminOverview,adminUserDetail,adminSetBalance,adminUpdateUserProgress,adminUsernames,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
 import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
 import {labStatus,submitLab} from './src/lab.mjs';
 import {dailyStatus,claimDaily} from './src/daily.mjs';
@@ -398,12 +398,17 @@ async function api(req,res,url){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
       return json(res,200,adminOverview(db,{q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||20)}));
     }
+    if(url.pathname==='/api/admin/usernames'&&req.method==='GET'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      return json(res,200,adminUsernames(db,{q:url.searchParams.get('q')||'',status:url.searchParams.get('status')||'active',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||30)}));
+    }
     const adminUser=url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
     if(req.method==='GET'&&adminUser){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminUserDetail(db,Number(adminUser[1])))}
-    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block|reset|add-username|message)$/);
+    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|profile|block|reset|add-username|message)$/);
     if(req.method==='POST'&&adminActionRoute){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});const targetId=Number(adminActionRoute[1]),action=adminActionRoute[2],b=await readBody(req);let result;
       if(action==='balance')result=adminSetBalance(db,user,targetId,b.delta);
+      if(action==='profile')result=adminUpdateUserProgress(db,user,targetId,{xp:b.xp,freeDrops:b.freeDrops});
       if(action==='block')result=adminSetBlocked(db,user,targetId,!!b.value);
       if(action==='reset')result=resetSingleUser(db,user,targetId);
       if(action==='add-username')result=adminAddUsername(db,user,targetId,b.handle,b.value);

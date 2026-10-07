@@ -23,6 +23,8 @@ const indexSrc=fs.readFileSync(new URL('../public/index.html',import.meta.url),'
 const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8');
 const paymentSrc=fs.readFileSync(new URL('../src/payments.mjs',import.meta.url),'utf8');
+const adminSrc=fs.readFileSync(new URL('../public/admin-ui.js',import.meta.url),'utf8');
+const adminCss=fs.readFileSync(new URL('../public/admin.css',import.meta.url),'utf8');
 
 test('v7 uses one stylesheet and cache-busts it with the current release',()=>{
   assert.match(indexSrc,new RegExp('styles\\.css\\?v='+GAME.version.split('.').join('\\.')));
@@ -38,8 +40,9 @@ test('home keeps username as the centered gameplay object',()=>{
   assert.match(dropRule,/flex:1/);
   assert.match(dropRule,/align-items:center/);
   assert.match(dropRule,/justify-content:center/);
-  const actionRule=cssSrc.match(/\.drop-result-actions\{[^}]+\}/)?.[0]||'';
-  assert.match(actionRule,/position:absolute/);
+  assert.match(appSrc,/data-share-story=/);
+  assert.match(cssSrc,/\.pending-result \.drop-result-actions\{[^}]*position:static/);
+  assert.match(cssSrc,/\.drop-result-resolve\{[^}]*grid-template-columns/);
 });
 
 test('menu has exactly the four v7 product groups and no Lab or Plus',()=>{
@@ -76,6 +79,25 @@ test('dark mode has global tokens instead of screen-specific white patches',()=>
   assert.match(cssSrc,/:root\[data-theme="dark"\]/);
   for(const token of ['--bg:','--card:','--surface:','--text:','--muted:','--border:'])assert.match(cssSrc,new RegExp(token));
   assert.match(cssSrc,/background:var\(--card\)/);
+});
+
+test('drop result restores story sharing and fortune wheel hides numeric odds',()=>{
+  const result=appSrc.match(/function resultCard\(x,pending=false\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(result,/data-share-story/);
+  assert.match(result,/В историю/);
+  const wheel=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(wheel,/wheel-v9/);
+  assert.doesNotMatch(wheel,/wheel-odds-v8|Шансы|toFixed/);
+});
+
+test('admin UI is split into users, broadcast, usernames and statistics sections',()=>{
+  for(const section of ['Пользователи','Рассылка','Usernames','Статистика'])assert.match(adminSrc,new RegExp(section));
+  for(const key of ["['users','profile','Пользователи']","['broadcast','notifications','Рассылка']","['usernames','collection','Usernames']","['stats','rank','Статистика']"])assert.ok(adminSrc.includes(key));
+  assert.match(adminSrc,/data-admin-section=/);
+  assert.match(adminSrc,/data-admin-save-progress/);
+  assert.match(adminSrc,/adminUsernameQuery/);
+  assert.match(adminCss,/\.admin-tabs\{/);
+  assert.match(adminCss,/\.admin-stats-grid\{/);
 });
 
 test('gameplay animations are controlled by the in-app setting, not OS reduced-motion',()=>{
@@ -367,7 +389,8 @@ test('leaderboard remains one total-capital ranking and publicUser agrees',()=>{
 });
 
 test('small-screen CSS keeps primary gameplay actions inside the app surface',()=>{
-  assert.match(cssSrc,/\.drop-result-actions\{[^}]*left:0;right:0;bottom:2px/);
+  assert.match(cssSrc,/\.pending-result \.drop-result-actions\{[^}]*position:static/);
+  assert.match(cssSrc,/\.drop-result-resolve\{[^}]*grid-template-columns/);
   assert.match(cssSrc,/\.gift-submit-v7\{margin-top:auto\}/);
   assert.match(cssSrc,/\.upgrade-footer\{margin-top:auto/);
 });
