@@ -231,12 +231,12 @@ async function api(url,opts={}){
 }
 const ICON_NAME=Object.freeze({
  home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
- market:'store-01',rank:'ranking',tasks:'task-done-01',wheel:'target-01',
+ market:'store-01',rank:'ranking',tasks:'layers-01',wheel:'target-01',
  friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
  collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
  search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
- down:'arrow-down-01',plus:'add-01',check:'checkmark-circle-02',promo:'coupon-01',x:'cancel-01'
+ down:'arrow-down-01',plus:'add-01',promo:'coupon-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function marketFilterIcon(){return icon('filter')}
