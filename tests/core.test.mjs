@@ -8,7 +8,7 @@ import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
 import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
 import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
-import {ensureUser,publicUser,leaderboard,tasks,DAILY_TASK_POOL,DAILY_TASK_COUNT,SPECIAL_TASKS} from '../src/game.mjs';
+import {ensureUser,publicUser,leaderboard,tasks,claimTask,DAILY_TASK_POOL,DAILY_TASK_COUNT,SPECIAL_TASKS} from '../src/game.mjs';
 import {listMarket,createListing,buyListing} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
 import {levelFromXp,progressionFromXp,xpToReachLevel,MAX_LEVEL,TITLE_CONFIG,levelTitle} from '../src/progression.mjs';
@@ -311,10 +311,21 @@ test('new user starts with configured gameplay economy',()=>{
   assert.equal(DROP_TIERS.basic.cost,3000);
 });
 
-test('tasks endpoint returns six daily templates',()=>{
+test('tasks endpoint returns nine daily templates',()=>{
   const rows=tasks(db,seller);
   assert.equal(rows.length,9);
   assert.ok(rows.every(x=>x.target>0&&x.reward>0));
+});
+
+test('channel subscription special task can only be claimed once',()=>{
+  db.prepare('INSERT INTO task_progress(user_id,progress_date,task_key,value) VALUES(?,?,?,1)').run(seller.id,'special','channel_sub');
+  const special=tasks(db,seller,{includeSpecial:true}).find(x=>x.key==='subscribe_channel');
+  assert.equal(special.reward,5000);assert.equal(special.current,1);assert.equal(special.claimed,false);
+  const before=db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance;
+  const claimed=claimTask(db,seller,'subscribe_channel',{allowSpecial:true});
+  assert.equal(claimed.reward,5000);
+  assert.equal(db.prepare('SELECT balance FROM users WHERE id=?').get(seller.id).balance,before+5000);
+  assert.throws(()=>claimTask(db,seller,'subscribe_channel',{allowSpecial:true}),/already_claimed/);
 });
 
 test('achievements provide categorized reward progress',()=>{
