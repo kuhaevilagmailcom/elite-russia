@@ -1,6 +1,7 @@
 import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 import {isValidHandle,stableScoreHandle,rarityFromValue} from './generator.mjs';
+import {progressionFromXp} from './progression.mjs';
 
 const MAX_USERNAME_VALUE=1000000000;
 function normalizeUsernameValue(value,fallback=0){
@@ -26,19 +27,30 @@ export function adminOverview(db,{q='',page=1,size=20}={}){
     const like='%'+query.toLowerCase()+'%';args.push('%'+query+'%',like,like);
   }
   const w=where.length?'WHERE '+where.join(' AND '):'';
-  const users=db.prepare(`SELECT u.id,u.telegram_id,u.username,u.first_name,u.balance,u.blocked,u.last_seen,
+  const users=db.prepare(`SELECT u.id,u.telegram_id,u.username,u.first_name,u.balance,u.xp,u.free_drops,u.blocked,u.created_at,u.last_seen,
     COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN 1 ELSE 0 END),0) username_count,
     COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) username_value,
     u.balance+COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) capital
     FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
-    ${w} GROUP BY u.id ORDER BY u.last_seen DESC LIMIT ? OFFSET ?`).all(...args,limit,off);
+    ${w} GROUP BY u.id ORDER BY u.last_seen DESC LIMIT ? OFFSET ?`).all(...args,limit,off)
+    .map(x=>({...x,level:progressionFromXp(x.xp).level}));
   const total=db.prepare(`SELECT COUNT(*) c FROM users u ${w}`).get(...args).c;
+  const now=Date.now(),m15=new Date(now-15*60000).toISOString(),h24=new Date(now-86400000).toISOString(),d7=new Date(now-7*86400000).toISOString();
   return {
     stats:{
       users:db.prepare('SELECT COUNT(*) c FROM users').get().c,
-      activeToday:db.prepare('SELECT COUNT(*) c FROM users WHERE last_seen>=?').get(new Date(Date.now()-86400000).toISOString()).c,
+      activeNow:db.prepare('SELECT COUNT(*) c FROM users WHERE last_seen>=?').get(m15).c,
+      activeToday:db.prepare('SELECT COUNT(*) c FROM users WHERE last_seen>=?').get(h24).c,
+      active7d:db.prepare('SELECT COUNT(*) c FROM users WHERE last_seen>=?').get(d7).c,
+      newUsers24h:db.prepare('SELECT COUNT(*) c FROM users WHERE created_at>=?').get(h24).c,
+      blocked:db.prepare('SELECT COUNT(*) c FROM users WHERE blocked=1').get().c,
       money:db.prepare('SELECT COALESCE(SUM(balance),0) s FROM users').get().s,
-      activeUsernames:db.prepare("SELECT COUNT(*) c FROM username_instances WHERE status IN ('pending','owned','market')").get().c
+      activeUsernames:db.prepare("SELECT COUNT(*) c FROM username_instances WHERE status IN ('pending','owned','market')").get().c,
+      totalDrops:db.prepare('SELECT COUNT(*) c FROM drop_history').get().c,
+      drops24h:db.prepare('SELECT COUNT(*) c FROM drop_history WHERE created_at>=?').get(h24).c,
+      marketDeals24h:db.prepare('SELECT COUNT(*) c FROM market_transactions WHERE created_at>=?').get(h24).c,
+      marketVolume24h:db.prepare('SELECT COALESCE(SUM(price),0) s FROM market_transactions WHERE created_at>=?').get(h24).s,
+      transfers24h:db.prepare('SELECT COUNT(*) c FROM username_transfers WHERE created_at>=?').get(h24).c
     },
     users,total,page:p,pages:Math.max(1,Math.ceil(total/limit))
   };
@@ -47,12 +59,39 @@ export function adminUserDetail(db,userId){
   const u=db.prepare('SELECT * FROM users WHERE id=?').get(Number(userId));if(!u)throw new Error('user_not_found');
   const items=db.prepare("SELECT id,handle,rarity,value,status,obtained_at FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market') ORDER BY value DESC LIMIT 250").all(u.id)
     .map(x=>({...x,handle:'@'+x.handle}));
-  return {user:{id:u.id,telegramId:u.telegram_id,username:u.username,firstName:u.first_name,balance:u.balance,blocked:!!u.blocked,premiumUntil:u.premium_until,capital:userCapital(db,u.id),usernameCount:items.length},items};
+  const prog=progressionFromXp(u.xp);
+  return {user:{id:u.id,telegramId:u.telegram_id,username:u.username,firstName:u.first_name,balance:u.balance,xp:u.xp,level:prog.level,title:prog.title,freeDrops:u.free_drops,blocked:!!u.blocked,premiumUntil:u.premium_until,createdAt:u.created_at,lastSeen:u.last_seen,capital:userCapital(db,u.id),usernameCount:items.length},items};
 }
 export function adminSetBalance(db,admin,targetId,delta){
   const n=Math.max(-1000000000,Math.min(1000000000,Math.round(Number(delta)||0)));
   const result=db.transaction(()=>{const before=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!before)throw new Error('user_not_found');const balance=txBalance(db,targetId,'admin_balance',n,{admin:admin.id});audit(db,admin.id,'balance',targetId,{delta:n,balance});return balance})();
   return {ok:true,balance:result};
+}
+export function adminUpdateUserProgress(db,admin,targetId,{xp,freeDrops}={}){
+  const target=db.prepare('SELECT * FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
+  const nextXp=Math.max(0,Math.min(1000000000,Math.round(Number(xp??target.xp)||0)));
+  const nextFree=Math.max(0,Math.min(100000,Math.round(Number(freeDrops??target.free_drops)||0)));
+  db.prepare('UPDATE users SET xp=?,free_drops=? WHERE id=?').run(nextXp,nextFree,target.id);
+  audit(db,admin.id,'user_progress',target.id,{xp:nextXp,freeDrops:nextFree});
+  const prog=progressionFromXp(nextXp);
+  return {ok:true,xp:nextXp,freeDrops:nextFree,level:prog.level,title:prog.title};
+}
+export function adminUsernames(db,{q='',status='active',page=1,size=30}={}){
+  const p=Math.max(1,Number(page)||1),limit=Math.max(10,Math.min(60,Number(size)||30)),off=(p-1)*limit,query=String(q||'').trim().toLowerCase(),filters=[],args=[];
+  if(status==='active')filters.push("i.status IN ('pending','owned','market')");
+  else if(['pending','owned','market','sold','admin_removed'].includes(status)){filters.push('i.status=?');args.push(status)}
+  if(query){
+    const like='%'+query+'%';
+    filters.push("(LOWER(i.handle) LIKE ? OR LOWER(COALESCE(u.username,'')) LIKE ? OR LOWER(COALESCE(u.first_name,'')) LIKE ? OR CAST(u.id AS TEXT) LIKE ?)");
+    args.push(like,like,like,'%'+query+'%');
+  }
+  const w=filters.length?'WHERE '+filters.join(' AND '):'';
+  const items=db.prepare(`SELECT i.id,i.handle,i.rarity,i.value,i.status,i.obtained_at,u.id owner_id,u.telegram_id,u.username owner_username,u.first_name owner_name
+    FROM username_instances i LEFT JOIN users u ON u.id=i.owner_id ${w}
+    ORDER BY i.obtained_at DESC LIMIT ? OFFSET ?`).all(...args,limit,off)
+    .map(x=>({...x,handle:'@'+x.handle}));
+  const total=db.prepare(`SELECT COUNT(*) c FROM username_instances i LEFT JOIN users u ON u.id=i.owner_id ${w}`).get(...args).c;
+  return {items,total,page:p,pages:Math.max(1,Math.ceil(total/limit)),status};
 }
 export function adminSetBlocked(db,admin,targetId,blocked){
   if(Number(targetId)===Number(admin.id)&&blocked)throw new Error('self_admin_block');
