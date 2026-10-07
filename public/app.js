@@ -552,6 +552,15 @@ function shopView(){
   '<div class="section-label">Темы</div><div class="theme-shop-grid">'+(p.themes||[]).map(x=>{const has=owned.has(x.key),active=selected===x.key;return '<article data-theme-preview="'+esc(x.key)+'"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+(has?'<button class="secondary" data-select-cosmetic="theme:'+x.key+'" '+(active?'disabled':'')+'>'+(active?'Выбрано':'Применить')+'</button>':'<button data-buy-theme="'+x.key+'">'+x.gems+' 💎</button>')+'</article>'}).join('')+'</div>'+
   '<p class="shop-note">💎 — только оформление. На дроп, колесо и апгрейд они не влияют.</p></div>';
 }
+function fmtPlain(n){return new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))}
+function promoView(){
+ const d=state.promo||{redeemed:[]};
+ return '<div class="promo-page">'+
+  '<section class="promo-hero"><span>'+icon('promo')+'</span><div><small>PROMO</small><b>Промокод</b><p>Введи код и забери фиксированную награду.</p></div></section>'+
+  '<section class="promo-redeem"><label><span>Промокод</span><input id="promoCodeInput" maxlength="24" autocomplete="off" autocapitalize="characters" placeholder="USERNAME2026"></label><button class="primary" data-promo-redeem>Активировать</button></section>'+
+  '<div class="section-label">Последние активации</div><div class="promo-history">'+((d.redeemed||[]).length?d.redeemed.map(x=>'<article><b>'+esc(x.code)+'</b><span>'+fmtPlain(x.rewardAmount)+' 💎</span><small>'+new Date(x.redeemedAt).toLocaleDateString(currentLanguage()==='en'?'en-US':'ru-RU')+'</small></article>').join(''):'<div class="empty compact">Промокоды ещё не активировались.</div>')+'</div>'+
+ '</div>';
+}
 function settingsView(){
  const s=state.settings||DEFAULT_SETTINGS,themeName={light:'Светлая',dark:'Тёмная',system:'Системная'}[s.theme]||'Системная';
  const toggle=(key,label,ico)=>'<button class="settings-row" data-setting-toggle="'+key+'"><span class="settings-row-icon">'+icon(ico)+'</span><span><b>'+label+'</b></span><i class="switch '+(s[key]?'on':'')+'"></i></button>';
@@ -621,13 +630,14 @@ function render(){const page=state.page;
  else if(page==='seasons')shell('Сезоны',seasonsView());
  else if(page==='profile')shell('Профиль',profileView());
  else if(page==='shop')shell('Магазин',shopView());
+ else if(page==='promo')shell('Промокод',promoView());
  else if(page==='games')shell('Игры',gamesView());
  else if(page==='miniGame')shell('Игра',miniGameView(),{back:true});
  else if(page==='detail')shell('Username',detailView(state.detail),{back:true});
  else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')
 }
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',games:'Игры',miniGame:'Игра',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',promo:'Промокод',games:'Игры',miniGame:'Игра',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -647,6 +657,7 @@ function pageReady(page){
   page==='seasons'?!!state.season:
   page==='profile'?!!state.profile:
   page==='shop'?!!state.shop:
+  page==='promo'?!!state.promo:
   page==='games'?!!state.games:
   page==='miniGame'?!!state.gameSession:
   page==='admin'?!!state.admin:true;
@@ -676,6 +687,7 @@ async function fetchPage(page){
  if(page==='seasons')state.season=await api('/api/seasons');
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='shop')state.shop=await api('/api/shop');
+ if(page==='promo')state.promo=await api('/api/promocode');
  if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
@@ -800,6 +812,14 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    if(state.user)state.user.unreadNotifications=Number(r.unread||0);
    state.notifications=await api('/api/notifications');render();return
  }
+ if(el.dataset.notificationId){
+   const r=await api('/api/notifications/'+encodeURIComponent(el.dataset.notificationId)+'/read',{method:'POST',body:'{}'});
+   if(state.user)state.user.unreadNotifications=Number(r.unread||0);
+   const item=state.notifications?.items?.find(x=>String(x.id)===String(el.dataset.notificationId));if(item)item.read=true;
+   const target=String(el.dataset.notificationPage||'').trim();
+   if(target){await load(target,{force:true});return}
+   render();return
+ }
  if(el.dataset.settingTheme){
    const theme=['light','dark','system'].includes(el.dataset.settingTheme)?el.dataset.settingTheme:'system';
    saveSettings({theme});sound('tap');render();return
@@ -849,6 +869,11 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
  if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page=1');render();return}
  if(el.dataset.marketFilter){state.marketFilters[el.dataset.marketFilter]=el.dataset.filterValue;state.marketFilters.page=1;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();return}
+ if(el.hasAttribute('data-promo-redeem')){
+   const code=String(document.querySelector('#promoCodeInput')?.value||'').trim();if(!code){toast('Введите промокод');return}
+   el.disabled=true;const r=await api('/api/promocode',{method:'POST',body:JSON.stringify({code})});
+   applyUserLocal(r.user);state.promo=await api('/api/promocode');sound('reward');haptic('medium');toast('+'+fmtPlain(r.rewardAmount)+' 💎');render();return
+ }
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
@@ -894,7 +919,18 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
  if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
  if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
- if(el.hasAttribute('data-gift')){const instanceId=state.giftSelectedItem,recipientUsername=String(document.querySelector('#giftRecipientUsername')?.value||state.giftRecipientUsername||'').trim();if(!instanceId||!recipientUsername){toast('Введите @username');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,recipientUsername})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftRecipientUsername='';await refreshUser();toast(r.handle+' → '+(r.recipientUsername||r.recipient));render();return}
+ if(el.hasAttribute('data-gift')){
+   const instanceId=state.giftSelectedItem,recipientUsername=String(document.querySelector('#giftRecipientUsername')?.value||state.giftRecipientUsername||'').trim();
+   if(!instanceId||!recipientUsername){toast('Введите @username');return}
+   try{
+    const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,recipientUsername})});
+    removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftRecipientUsername='';await refreshUser();toast(r.handle+' → '+(r.recipientUsername||r.recipient));render();
+   }catch(err){
+    if(err.message==='user_not_found'){toast('Данный человек не играет в USERNAME');return}
+    throw err
+   }
+   return
+ }
  if(el.dataset.upItem){
    const id=el.dataset.upItem,max=Number(state.upgrader?.maxItems||3),list=[...(state.upgradeSelectedIds||[])],at=list.indexOf(id);
    if(at>=0)list.splice(at,1);else{if(list.length>=max){toast('Максимум '+max);return}const next=state.upgrader?.available?.find(x=>x.id===id),first=state.upgrader?.available?.find(x=>x.id===list[0]);if(first&&next&&first.rarity!==next.rarity){toast('Выбирай usernames одной редкости');return}list.push(id)}
@@ -939,6 +975,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.3.0').catch(()=>{});
-const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|games|admin)$/);return m?m[1]:'home'})();
+import('/admin-ui.js?v=7.4.0').catch(()=>{});
+const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
