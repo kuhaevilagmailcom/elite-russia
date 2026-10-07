@@ -78,6 +78,18 @@ test('dark mode has global tokens instead of screen-specific white patches',()=>
   assert.match(cssSrc,/background:var\(--card\)/);
 });
 
+test('gameplay animations are controlled by the in-app setting, not OS reduced-motion',()=>{
+  const motion=appSrc.match(/function motionEnabled\(\)\{[^}]+\}/)?.[0]||'';
+  assert.match(motion,/state\.settings\.animations/);
+  assert.doesNotMatch(motion,/prefers-reduced-motion/);
+  assert.doesNotMatch(cssSrc,/@media\s*\(prefers-reduced-motion:reduce\)\{\*\{/);
+  assert.match(cssSrc,/\.no-animations \*\{/);
+  const drop=appSrc.match(/async function animateDrop\(result\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(drop,/\[55,60,65,70,80,95,115,145\]/);
+  const rotation=appSrc.match(/async function animateRotation\(el,degrees,duration,easing\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(rotation,/requestAnimationFrame\(frame\)/);
+});
+
 test('desktop keeps Mini App width while narrow screens have compact overrides',()=>{
   assert.match(cssSrc,/max-width:520px/);
   assert.match(cssSrc,/@media \(max-width:359px\)/);

@@ -214,7 +214,7 @@ button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--
 
 @keyframes settle{0%{transform:scale(.97);opacity:.8}100%{transform:none;opacity:1}}
 @keyframes route{0%,100%{transform:translateX(-25px);opacity:.35}50%{transform:translateX(25px);opacity:1}}
-@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* Game motion is controlled by the in-app Animations setting. */
 @media (max-width:359px){
  .topbar{padding:0 9px}.home-v7,.page-body,.page-scroll,.settings-page,.levels-v7,.achievements-v7,.profile-v7,.shop-page-v7,.gift-page-v7,.games-hub-v7,.mini-game-v7,.detail-v7,.wheel-page,.upgrade-page,.friends-page{padding-left:9px;padding-right:9px}
  .menu-section-tile{height:53px}.menu-tile-label{font-size:10px}.handle-stage b{font-size:46px}.drop-result-main h1{font-size:42px}
