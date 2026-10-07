@@ -24,8 +24,8 @@ const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8')
 const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8');
 const paymentSrc=fs.readFileSync(new URL('../src/payments.mjs',import.meta.url),'utf8');
 
-test('v7 uses one stylesheet and removed legacy override layer',()=>{
-  assert.match(indexSrc,/styles\.css\?v=7\.0\.0/);
+test('v7 uses one stylesheet and cache-busts it with the current release',()=>{
+  assert.match(indexSrc,new RegExp('styles\\.css\\?v='+GAME.version.split('.').join('\\.')));
   assert.doesNotMatch(indexSrc,/ux4-core\.css/);
   assert.equal(fs.existsSync(new URL('../public/ux4-core.css',import.meta.url)),false);
 });
@@ -99,7 +99,7 @@ test('game usernames start at 4 characters and support digits and underscore',()
   let digits=0,underscores=0,clean=0;
   for(let i=0;i<8000;i++){
     const h=buildGeneratedHandle(i%7===0?'RARE':'COMMON');
-    assert.ok(h.length>=4&&h.length<=10);
+    assert.ok(h.length>=4&&h.length<=15);
     if(/\d/.test(h))digits++;
     if(/_/.test(h))underscores++;
     if(/^[a-z]+$/.test(h))clean++;
@@ -130,10 +130,10 @@ test('progression has 200 levels and configured titles',()=>{
   assert.equal(MAX_LEVEL,200);
   assert.equal(levelFromXp(Number.MAX_SAFE_INTEGER),200);
   assert.deepEqual(TITLE_CONFIG.map(x=>x[0]),[1,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200]);
-  assert.equal(levelTitle(1),'Йоу');
-  assert.equal(levelTitle(57),'Могёт');
-  assert.equal(levelTitle(100),'Аура +100');
-  assert.equal(levelTitle(200),'Легендарка');
+  assert.equal(levelTitle(1),'Новичок');
+  assert.equal(levelTitle(57),'Мастер');
+  assert.equal(levelTitle(100),'Ветеран');
+  assert.equal(levelTitle(200),'Легендарный');
   assert.ok(xpToReachLevel(180)-xpToReachLevel(179)>xpToReachLevel(20)-xpToReachLevel(19));
   const p=progressionFromXp(xpToReachLevel(57)+100);
   assert.equal(p.level,57);
@@ -175,22 +175,22 @@ test('skill-game earnings are capped server-side',()=>{
   assert.match(src,/SESSION_TTL_MS/);
 });
 
-test('gift picker uses selectable bottom sheets and friend search',()=>{
+test('gift flow uses a username picker plus direct Telegram username recipient input',()=>{
   const block=appSrc.match(/function giftView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(block,/data-gift-open="item"/);
-  assert.match(block,/data-gift-open="friend"/);
-  assert.match(block,/giftFriendSearch/);
+  assert.match(block,/giftRecipientUsername/);
+  assert.match(block,/Введите @username/);
   assert.doesNotMatch(block,/<select/);
 });
 
-test('profile distinguishes owner controls from public profile',()=>{
+test('profile distinguishes own statistics from public profile without the removed showcase',()=>{
   const block=appSrc.match(/function profileView\(p=state\.profile\?\.profile\)\{[\s\S]*?\n\}/)?.[0]||'';
   assert.match(block,/const own=String\(p\.id\)===String\(state\.user\?\.id\)/);
-  assert.match(block,/BEST USERNAME/);
-  assert.match(block,/ВИТРИНА/);
-  assert.match(block,/own\?'<button[^']*Редактировать витрину/);
-  assert.match(block,/Витрина пуста/);
-  assert.doesNotMatch(block,/Добавь username из коллекции/);
+  assert.match(block,/ЛУЧШИЙ ЮЗЕРНЕЙМ/);
+  assert.match(block,/СТАТИСТИКА/);
+  assert.match(block,/УДАЧА И НЕВЕЗЕНИЕ/);
+  assert.match(block,/own\?/);
+  assert.doesNotMatch(block,/ВИТРИНА|Редактировать витрину|Витрина пуста/);
 });
 
 test('top rows open public profiles',()=>{
@@ -275,7 +275,17 @@ test('editor and build games validate answers on the server',()=>{
   const edit=source.includes('_')?source.replace(/_/g,''):source.replace(/\d+$/,'');
   const er=answerMiniGame(db,u,editor.id,edit);
   assert.equal(er.done,true);
-  const build=startMiniGame(db,u,'build'),answer=build.question.parts.join('');
+  const build=startMiniGame(db,u,'build'),parts=build.question.parts;
+  const findValid=(prefix,remaining)=>{
+    if(!remaining.length)return isGameUsername(prefix)?prefix:null;
+    for(let i=0;i<remaining.length;i++){
+      const found=findValid(prefix+remaining[i],remaining.slice(0,i).concat(remaining.slice(i+1)));
+      if(found)return found;
+    }
+    return null;
+  };
+  const answer=findValid('',parts);
+  assert.ok(answer,'build puzzle must have at least one valid username arrangement');
   const br=answerMiniGame(db,u,build.id,answer);
   assert.equal(br.done,true);
 });

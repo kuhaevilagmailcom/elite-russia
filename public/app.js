@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,levels:null,achievements:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
@@ -26,11 +26,13 @@ const ERR={
 };
 let viewportFrame=0,lastViewportKey='';
 function syncViewportNow(){
- const h=Math.round(TG?.viewportStableHeight||TG?.viewportHeight||innerHeight||0),s=TG?.safeAreaInset||{},safe=TG?.contentSafeAreaInset||{};
- const top=Math.max(s.top||0,safe.top||0),bottom=Math.max(s.bottom||0,safe.bottom||0),key=h+':'+top+':'+bottom;
+ const vv=window.visualViewport,h=Math.round(TG?.viewportStableHeight||TG?.viewportHeight||vv?.height||innerHeight||0),w=Math.round(vv?.width||innerWidth||0),s=TG?.safeAreaInset||{},safe=TG?.contentSafeAreaInset||{};
+ const top=Math.max(s.top||0,safe.top||0),bottom=Math.max(s.bottom||0,safe.bottom||0),platform=String(TG?.platform||'browser').toLowerCase(),fine=!!matchMedia?.('(pointer:fine)')?.matches;
+ const desktop=['tdesktop','macos','web','weba','webk','browser'].includes(platform)&&fine,key=[h,w,top,bottom,platform,desktop?1:0].join(':');
  if(key===lastViewportKey)return;lastViewportKey=key;
- if(h)root.style.setProperty('--app-h',h+'px');
+ if(h)root.style.setProperty('--app-h',h+'px');if(w)root.style.setProperty('--app-w',w+'px');
  root.style.setProperty('--safe-t',top+'px');root.style.setProperty('--safe-b',bottom+'px');
+ root.dataset.platform=platform;root.classList.toggle('is-desktop',desktop);root.classList.toggle('is-mobile',!desktop);
 }
 function syncViewport(){
  if(viewportFrame)return;
@@ -217,7 +219,7 @@ const ICON_NAME=Object.freeze({
  market:'store-01',rank:'ranking',tasks:'task-done-01',wheel:'target-01',
  friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
  collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
- search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',settings:'settings-02',
+ search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
  down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
 });
@@ -239,7 +241,7 @@ const MENU_SECTIONS=[
  {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
  {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
  {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
- {title:'Аккаунт',items:[['profile','profile','Профиль'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
+ {title:'Аккаунт',items:[['profile','profile','Профиль'],['notifications','notifications','Уведомления'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
 ];
 function setMenuOpen(open){
  state.menu=!!open;
@@ -255,7 +257,7 @@ function menuHtml(){
   '<div class="menu-sections-scroll">'+groups+'</div>'+
  '</aside></div>'
 }
-function topbar(title,{back=false}={}){return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button data-menu-open>'+icon('menu')+'</button></div></header>'}
+function topbar(title,{back=false}={}){const unread=Number(state.user?.unreadNotifications||0);return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button class="notification-top" data-page="notifications" aria-label="Уведомления">'+icon('notifications')+(unread?'<i>'+Math.min(unread,99)+(unread>99?'+':'')+'</i>':'')+'</button><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){
  window.__USERNAME_READY=true;applyPreferences();
  app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';localizeDom(app);
@@ -560,6 +562,11 @@ function detailView(x){
   metric('Читаемость',Number(q.pronounceability||0))+metric('Краткость',Number(q.length||0))+metric('Чистота',Number(q.cleanliness||0))+metric('Спрос',Number(q.semantic||0))+
  '</div><div class="detail-actions-v7"><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="secondary" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать</button></div></div>';
 }
+function notificationsView(){
+ const d=state.notifications||{items:[],unread:0},items=d.items||[];
+ return '<div class="notifications-page"><div class="notifications-head"><div><b>Уведомления</b><span>'+(d.unread?('Непрочитанных: '+d.unread):'Всё прочитано')+'</span></div>'+(d.unread?'<button class="secondary" data-notifications-read>Прочитать все</button>':'')+'</div>'+
+  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" '+(n.page?'data-page="'+esc(n.page)+'"':'')+'><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
+}
 function gamesView(){
  const g=state.games||{games:[],daily:{earned:0,cap:0}};
  return '<div class="games-hub-v7"><div class="games-cap-v7"><span>Сегодня</span><b>'+fmt(g.daily?.earned||0)+' / '+fmt(g.daily?.cap||0)+'</b></div><div class="games-grid-v7">'+(g.games||[]).map(x=>'<button data-game-start="'+x.key+'"><span>'+iconRaw(x.icon||'gamepad')+'</span><b>'+esc(x.title)+'</b><small>'+esc(x.bestLabel||'Лучший')+' · '+Number(x.best||0)+'</small></button>').join('')+'</div></div>';
@@ -585,6 +592,7 @@ function render(){const page=state.page;
  else if(page==='tasks')shell('Задания',tasksView());
  else if(page==='levels')shell('Уровни',levelsView());
  else if(page==='achievements')shell('Достижения',achievementsView());
+ else if(page==='notifications')shell('Уведомления',notificationsView());
  else if(page==='settings')shell('Настройки',settingsView());
  else if(page==='wheel')shell('Колесо',wheelView());
  else if(page==='friends')shell('Друзья',friendsView());
@@ -599,7 +607,7 @@ function render(){const page=state.page;
  else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')
 }
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',games:'Игры',miniGame:'Игра',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',games:'Игры',miniGame:'Игра',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -610,6 +618,7 @@ function pageReady(page){
   page==='tasks'?!!state.tasks:
   page==='levels'?!!state.levels:
   page==='achievements'?!!state.achievements:
+  page==='notifications'?!!state.notifications:
   page==='settings'?true:
   page==='wheel'?!!state.wheel:
   page==='friends'?!!state.friends:
@@ -635,6 +644,7 @@ async function fetchPage(page){
  if(page==='tasks')state.tasks=await api('/api/tasks');
  if(page==='levels')state.levels=await api('/api/levels');
  if(page==='achievements')state.achievements=await api('/api/achievements/reconcile',{method:'POST',body:'{}'});
+ if(page==='notifications'){state.notifications=await api('/api/notifications');if(state.user)state.user.unreadNotifications=Number(state.notifications.unread||0)}
  if(page==='games')state.games=await api('/api/games');
  if(page==='wheel')state.wheel=await api('/api/wheel');
  if(page==='friends')state.friends=await api('/api/friends');
@@ -672,24 +682,22 @@ function openSystemSellModal(id,handle,value){
 function closeModal(el){el?.closest('.modal-root')?.remove()}
 async function animateRotation(el,degrees,duration,easing){
  if(!el)return;
- const end='rotate('+Number(degrees||0)+'deg)';
- const reduced=!motionEnabled();
- el.style.transition='none';el.style.transform='rotate(0deg)';void el.offsetWidth;
- if(reduced){el.style.transform=end;return}
- if(typeof el.animate==='function'){
-  const animation=el.animate([{transform:'rotate(0deg)'},{transform:end}],{duration,easing,fill:'forwards'});
-  try{await animation.finished}catch{}
-  el.style.transform=end;animation.cancel();return
- }
+ const target=Number(degrees||0),ms=Math.max(0,Number(duration)||0),end='rotate('+target+'deg)';
+ el.style.transition='none';el.style.transform='rotate(0deg)';
+ if(!motionEnabled()||ms<32){el.style.transform=end;return}
  await new Promise(resolve=>{
-  let settled=false;
-  const finish=()=>{if(settled)return;settled=true;el.removeEventListener('transitionend',finish);el.style.transform=end;resolve()};
-  el.addEventListener('transitionend',finish,{once:true});
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-   el.style.transition='transform '+duration+'ms '+easing;
-   el.style.transform=end;
-  }));
-  setTimeout(finish,duration+160);
+  const started=performance.now();
+  let finished=false;
+  const done=()=>{if(finished)return;finished=true;el.style.transform=end;resolve()};
+  const frame=now=>{
+   if(!el.isConnected)return done();
+   const raw=Math.max(0,Math.min(1,(now-started)/ms));
+   const eased=1-Math.pow(1-raw,5);
+   el.style.transform='rotate('+(target*eased)+'deg)';
+   if(raw>=1)return done();
+   requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
  });
 }
 async function spinWheelUi(){
@@ -767,6 +775,11 @@ async function submitGameAnswer(answer){
 document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-picker-close]')){state.dropPicker=false;render();return}if(e.target.matches('[data-menu-close]')){setMenuOpen(false);return}if(e.target.matches('[data-modal-close]')){e.target.closest('.modal-root')?.remove();return}const el=e.target.closest('button');if(!el)return;try{
  if(el.hasAttribute('data-menu-open')){sound('tap');setMenuOpen(true);return}
  if(el.hasAttribute('data-menu-close')){setMenuOpen(false);return}
+ if(el.hasAttribute('data-notifications-read')){
+   const r=await api('/api/notifications/read-all',{method:'POST',body:'{}'});
+   if(state.user)state.user.unreadNotifications=Number(r.unread||0);
+   state.notifications=await api('/api/notifications');render();return
+ }
  if(el.dataset.settingTheme){
    const theme=['light','dark','system'].includes(el.dataset.settingTheme)?el.dataset.settingTheme:'system';
    saveSettings({theme});sound('tap');render();return
@@ -906,5 +919,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.1.0').catch(()=>{});
-load('home');
+import('/admin-ui.js?v=7.2.0').catch(()=>{});
+const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|games|admin)$/);return m?m[1]:'home'})();
+load(deepPage);

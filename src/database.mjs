@@ -83,6 +83,11 @@ export function createDatabase(dataDir){
   CREATE TABLE IF NOT EXISTS season_history(user_id INTEGER NOT NULL,season_id INTEGER NOT NULL,position INTEGER,score INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,season_id));
   CREATE TABLE IF NOT EXISTS premium_subscriptions(user_id INTEGER PRIMARY KEY,active_until TEXT,source TEXT,created_at TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS admin_audit(id TEXT PRIMARY KEY,admin_id INTEGER NOT NULL,action TEXT NOT NULL,target TEXT,metadata TEXT,created_at TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS notifications(
+    id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,type TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',
+    page TEXT NOT NULL DEFAULT '',read_at TEXT,created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
   CREATE TABLE IF NOT EXISTS payments(
     telegram_charge_id TEXT PRIMARY KEY,provider_charge_id TEXT,user_id INTEGER NOT NULL,payload TEXT NOT NULL,
     currency TEXT NOT NULL,total_amount INTEGER NOT NULL,product TEXT NOT NULL,created_at TEXT NOT NULL
@@ -135,6 +140,7 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_xp_history_user ON xp_history(user_id,created_at);
   CREATE INDEX IF NOT EXISTS idx_minigame_records_user ON mini_game_records(user_id,game_key,created_at);
   CREATE INDEX IF NOT EXISTS idx_minigame_sessions_user ON mini_game_sessions(user_id,game_key,expires_at);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,read_at,created_at DESC);
   `);
   const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
   if(!userCols.has('luck_points'))db.exec("ALTER TABLE users ADD COLUMN luck_points INTEGER NOT NULL DEFAULT 0");

@@ -50,3 +50,14 @@ html[data-theme="dark"] .danger-sheet p{color:#C7AFB2}
 html[data-theme="dark"] .danger-soft{
   background:#3B2327!important;color:#FF9BA4!important
 }
+
+
+/* USERNAME 7.2 admin messaging */
+.admin-broadcast,.admin-message{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:8px;display:grid;gap:7px}
+.admin-broadcast>div:first-child,.admin-message{min-width:0}.admin-broadcast b,.admin-message>b{font-size:12px}.admin-broadcast span,.admin-message>span{font-size:9.5px;color:var(--muted);line-height:1.35}
+.admin-broadcast textarea,.admin-message textarea{width:100%;min-height:84px;resize:vertical;border:1px solid var(--border);border-radius:11px;background:var(--surface-subtle);color:var(--text);padding:10px;font:inherit;font-size:11px;outline:none}
+.admin-broadcast textarea:focus,.admin-message textarea:focus{border-color:#4DA3FF}
+.admin-broadcast-row{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:6px}
+.admin-broadcast-row input,.admin-broadcast-row select{width:100%;height:42px;border:1px solid var(--border);border-radius:10px;background:var(--surface-subtle);color:var(--text);padding:0 10px;font-size:10px}
+.admin-broadcast>button,.admin-message>button{width:100%;min-height:42px;border-radius:11px}
+@media(max-width:520px){.admin-broadcast-row{grid-template-columns:1fr}}
