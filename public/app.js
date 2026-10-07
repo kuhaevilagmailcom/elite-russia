@@ -179,15 +179,30 @@ function saveSettings(patch){
 try{matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change',()=>{if(state.settings.theme==='system'){applyPreferences();render()}})}catch{}
 function haptic(type='light'){if(!state.settings.vibration)return;try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
 let audioCtx;
-function sound(kind='tap'){
+function tone(hz,{delay=0,duration=.08,volume=.026,type='sine'}={}){
  if(!state.settings.sound)return;
  try{
   audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;
-  const hz=kind==='reward'?660:kind==='fail'?190:360;o.frequency.setValueAtTime(hz,now);o.type='sine';
-  g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(.035,now+.01);g.gain.exponentialRampToValueAtTime(.0001,now+.09);
-  o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+.1);
+  if(audioCtx.state==='suspended')audioCtx.resume?.();
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),at=audioCtx.currentTime+Math.max(0,delay);
+  o.type=type;o.frequency.setValueAtTime(Math.max(40,Number(hz)||360),at);
+  g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(Math.max(.001,volume),at+.008);g.gain.exponentialRampToValueAtTime(.0001,at+duration);
+  o.connect(g);g.connect(audioCtx.destination);o.start(at);o.stop(at+duration+.02);
  }catch{}
+}
+function sound(kind='tap'){
+ if(!state.settings.sound)return;
+ const map={
+  tap:[[420,{duration:.045,volume:.018,type:'triangle'}]],
+  select:[[520,{duration:.055,volume:.02,type:'triangle'}],[660,{delay:.035,duration:.055,volume:.014,type:'triangle'}]],
+  tick:[[780,{duration:.028,volume:.012,type:'square'}]],
+  spin:[[220,{duration:.09,volume:.018,type:'triangle'}],[330,{delay:.07,duration:.1,volume:.016,type:'triangle'}],[440,{delay:.15,duration:.11,volume:.014,type:'triangle'}]],
+  reveal:[[360,{duration:.07,volume:.02,type:'triangle'}],[520,{delay:.055,duration:.09,volume:.022,type:'triangle'}]],
+  story:[[560,{duration:.06,volume:.018,type:'triangle'}],[760,{delay:.05,duration:.09,volume:.019,type:'triangle'}]],
+  reward:[[523,{duration:.11,volume:.024,type:'sine'}],[659,{delay:.055,duration:.13,volume:.022,type:'sine'}],[784,{delay:.11,duration:.16,volume:.02,type:'sine'}]],
+  fail:[[190,{duration:.12,volume:.022,type:'sawtooth'}],[140,{delay:.08,duration:.16,volume:.018,type:'sawtooth'}]]
+ };
+ for(const [hz,opts] of (map[kind]||map.tap))tone(hz,opts);
 }
 function motionEnabled(){return !!state.settings.animations}
 function toast(t){toastEl.textContent=translateLiteral(t);toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
@@ -290,9 +305,12 @@ function buildRollSequence(count,finalHandle=''){const used=new Set();const rows
 function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.length-1;i>0;i--){const j=rollRandomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}return out}
 
 function resultCard(x,pending=false){
- return '<article class="drop-result-card minimal-result'+valueClass(x)+'">'+
+ return '<article class="drop-result-card minimal-result'+(pending?' pending-result':'')+valueClass(x)+'">'+
    '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
-   (pending?'<div class="drop-result-actions compact-actions"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>':'')+
+   (pending?'<div class="drop-result-actions">'+
+     '<button class="story-action" data-share-story="'+x.id+'">'+icon('story')+'<span>В историю</span></button>'+
+     '<div class="drop-result-resolve"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>'+
+   '</div>':'')+
  '</article>';
 }
 function storyRoundRect(ctx,x,y,w,h,r){
@@ -351,9 +369,9 @@ function homeView(){
 async function animateDrop(result){
  const stage=document.querySelector('#handleStage');if(!stage)return;stage.disabled=true;
  const delays=motionEnabled()?[55,60,65,70,80,95,115,145]:[25],samples=buildRollSequence(delays.length,result.handle);let i=0;
- for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="58" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();await new Promise(r=>setTimeout(r,d))}
+ for(const d of delays){stage.classList.add('rolling');stage.innerHTML='<b data-fit-username data-max-size="58" data-min-size="25">'+samples[i++]+'</b>';fitAllUsernames();sound('tick');await new Promise(r=>setTimeout(r,d))}
  stage.innerHTML='<b data-fit-username data-max-size="58" data-min-size="25">'+esc(result.handle)+'</b>';fitAllUsernames();stage.classList.remove('rolling');stage.classList.add('land');
- if(result.visual==='gold'){haptic('medium');sound('reward')}else if(result.visual==='purple')haptic('light');
+ sound(result.visual==='gold'?'reward':'reveal');if(result.visual==='gold')haptic('medium');else if(result.visual==='purple')haptic('light');
  await new Promise(r=>setTimeout(r,motionEnabled()?90:20));state.home.pending=result;render();
 }
 function collectionFilterSheet(){
@@ -412,10 +430,10 @@ function wheelSlicePath(start,end,r=48){
  return 'M50 50 L'+x1.toFixed(3)+' '+y1.toFixed(3)+' A'+r+' '+r+' 0 '+large+' 1 '+x2.toFixed(3)+' '+y2.toFixed(3)+' Z';
 }
 function wheelSliceFill(x,i){
- if(x.type==='username')return 'var(--accent-bg)';
- if(x.type==='drop')return 'var(--surface-subtle)';
- if(x.type==='xp')return 'var(--surface-subtle)';
- return i%2?'var(--surface-subtle)':'var(--card)';
+ if(x.type==='username')return 'color-mix(in srgb,var(--accent) 30%,var(--card))';
+ if(x.type==='drop')return 'color-mix(in srgb,var(--gold) 24%,var(--card))';
+ if(x.type==='xp')return 'color-mix(in srgb,var(--profit) 20%,var(--card))';
+ return i%2?'color-mix(in srgb,var(--text) 7%,var(--card))':'var(--card)';
 }
 function wheelLabelRotation(angle){
  const base=Number(angle)-90;
@@ -433,13 +451,14 @@ function wheelSvgMarkup(rows){
  '</svg>';
 }
 function wheelView(){
- const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),last=state.wheelLastResult,total=Math.max(1,(w.rewards||[]).reduce((s,x)=>s+Number(x.weight||0),0));
- return '<div class="wheel-page wheel-v8"><section class="wheel-v8-card"><div class="wheel-v8-head"><div><small>КОЛЕСО УДАЧИ</small><b>РАЗ В 24 ЧАСА</b></div><span>'+icon('wheel')+'</span></div>'+
-  '<div class="fortune-stage wheel-v8-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>24Ч</b><span>КРУТИ</span></div></div>'+
-  '<div class="wheel-odds-v8"><span>Шансы</span><div>'+(w.rewards||[]).map(x=>'<small><b>'+esc(wheelShortLabel(x))+'</b><em>'+((Number(x.weight||0)/total)*100).toFixed(Number(x.weight||0)<5?1:0)+'%</em></small>').join('')+'</div></div>'+
- '</section><div class="wheel-copy"><b>'+(w.available?'Бесплатное вращение':'Уже использовано')+'</b><span>'+(w.available?'Одно вращение раз в 24 часа':('Следующее вращение через '+untilText(w.nextAt)))+'</span></div>'+
- '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+(w.available?'Крутить':'Недоступно')+'</button>'+
- '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('Выпало: '+esc(last.label)):'')+'</div></div>';
+ const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),last=state.wheelLastResult;
+ return '<div class="wheel-page wheel-v9"><section class="wheel-v9-card">'+
+  '<div class="wheel-v9-head"><div><small>БЕСПЛАТНОЕ КОЛЕСО</small><b>Колесо удачи</b><span>Одно вращение раз в 24 часа</span></div><span class="wheel-v9-icon">'+icon('wheel')+'</span></div>'+
+  '<div class="fortune-stage wheel-v9-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>GO</b><span>USERNAME</span></div></div>'+
+  '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('<small>Выпало</small><b>'+esc(last.label)+'</b>'):'<small>Нажми кнопку — колесо остановится на награде</small>')+'</div>'+
+ '</section>'+
+ '<div class="wheel-v9-footer"><div class="wheel-copy"><b>'+(w.available?'Вращение доступно':'Следующее вращение позже')+'</b><span>'+(w.available?'Сегодня ты ещё не крутил колесо':('Через '+untilText(w.nextAt)))+'</span></div>'+
+ '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+icon('play')+'<span>'+(w.available?'Крутить':'Недоступно')+'</span></button></div></div>';
 }
 function friendsView(){
  const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
@@ -707,7 +726,7 @@ async function spinWheelUi(){
   const items=state.wheel.rewards||[],g=wheelGeometry(items),target=g.rows.find(x=>x.key===r.reward.key),disc=document.querySelector('#wheelDisc'),res=document.querySelector('#wheelResult');
   if(disc&&target){
    const margin=Math.min(2.2,Math.max(.35,target.span*.12)),room=Math.max(.25,target.span-margin*2),landing=target.start+margin+(rollRandomInt(10000)/10000)*room,final=10*360-landing;
-   const stage=disc.closest('.fortune-stage');stage?.classList.add('spinning');
+   const stage=disc.closest('.fortune-stage');stage?.classList.add('spinning');sound('spin');
    await animateRotation(disc,final,5600,'cubic-bezier(.06,.76,.08,1)');
    stage?.classList.remove('spinning');
   }
@@ -734,7 +753,7 @@ async function animateUpgradeWheel(result){
  const winArc=Math.max(3,Math.min(270,Number(result.chance||0)*360)),margin=Math.min(5,winArc/3),unit=rollRandomInt(10000)/10000;
  const landing=result.success?(margin+unit*Math.max(1,winArc-margin*2)):(winArc+margin+unit*Math.max(1,360-winArc-margin*2));
  const wheelDegrees=360*9-landing;
- rotor.closest('.upgrade-roulette-clean')?.classList.add('spinning');
+ rotor.closest('.upgrade-roulette-clean')?.classList.add('spinning');sound('spin');
  await animateRotation(rotor,wheelDegrees,6200,'cubic-bezier(.055,.72,.075,1)');
  rotor.closest('.upgrade-roulette-clean')?.classList.remove('spinning');
  haptic(result.success?'medium':'light');sound(result.success?'reward':'fail');
@@ -838,7 +857,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
    if(!item){toast('Username уже недоступен для истории');return}
    el.disabled=true;
-   try{await shareDropStory(item)}finally{el.disabled=false}
+   try{sound('story');await shareDropStory(item);toast('Открываю редактор истории')}finally{el.disabled=false}
    return
  }
  if(el.dataset.resolve){
@@ -919,6 +938,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.2.1').catch(()=>{});
+import('/admin-ui.js?v=7.3.0').catch(()=>{});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
