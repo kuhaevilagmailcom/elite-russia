@@ -1,7 +1,9 @@
 export const BOT_COMMANDS=Object.freeze([
   {command:'start',description:'Открыть главное меню'},
   {command:'play',description:'Начать играть'},
-  {command:'help',description:'Как играть'}
+  {command:'help',description:'Как играть'},
+  {command:'admin',description:'Админ-панель'},
+  {command:'broadcast',description:'Рассылка (только админ)'}
 ]);
 
 export const BOT_DESCRIPTION='USERNAME — игра про редкие Telegram-имена. Выбивай уникальные usernames, собирай коллекцию, торгуй и поднимайся в рейтинге.';
