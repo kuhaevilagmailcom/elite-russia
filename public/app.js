@@ -529,7 +529,7 @@ function upgradeRowHtml(x){
 }
 function upgradeTargetRowHtml(x){
  const selected=String(state.upgradeTargetSessionId||'')===String(x.sessionId),chance=upgradeChanceText(x.chance);
- return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
+ return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span>'+(selected?'<i class="upgrade-selected-dot"></i>':'<i>'+icon('chevron')+'</i>')+'</button>';
 }
 function appendUpgradeBatch(){
  const list=document.querySelector('.upgrade-list'),all=state.upgrader?.available||[];if(!list)return;
@@ -610,7 +610,7 @@ function achievementsView(){
  const a=state.achievements||{items:[],completed:0,total:0};
  return '<div class="achievements-v7"><div class="achievement-summary-v7"><span>Получено</span><b>'+a.completed+' / '+a.total+'</b></div><div class="achievement-grid-v7">'+(a.items||[]).map(x=>{
    const pct=Math.max(0,Math.min(100,Math.round(Number(x.current||0)/Math.max(1,Number(x.target||1))*100)));
-   return '<article class="'+(x.done?'done':'locked')+'"><div class="achievement-badge-icon">'+iconRaw(x.icon||'medal-01')+'</div><b>'+(x.done?esc(x.title):'????')+'</b><small>'+esc(x.category||'')+'</small>'+(x.done?'<span>'+icon('check')+'</span>':'<em>'+Math.min(Number(x.current||0),Number(x.target||0))+' / '+Number(x.target||0)+'</em><i style="--p:'+pct+'%"></i>')+'</article>';
+   return '<article class="'+(x.done?'done':'locked')+'"><div class="achievement-badge-icon">'+iconRaw(x.icon||'medal-01')+'</div><b>'+(x.done?esc(x.title):'????')+'</b><small>'+esc(x.category||'')+'</small>'+(x.done?'<span class="achievement-opened">Открыто</span>':'<em>'+Math.min(Number(x.current||0),Number(x.target||0))+' / '+Number(x.target||0)+'</em><i style="--p:'+pct+'%"></i>')+'</article>';
  }).join('')+'</div></div>';
 }
 function detailView(x){
@@ -624,7 +624,7 @@ function detailView(x){
 function notificationsView(){
  const d=state.notifications||{items:[],unread:0},items=d.items||[];
  return '<div class="notifications-page"><div class="notifications-head"><div><b>Уведомления</b><span>'+(d.unread?('Непрочитанных: '+d.unread):'Всё прочитано')+'</span></div>'+(d.unread?'<button class="secondary" data-notifications-read>Прочитать все</button>':'')+'</div>'+
-  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" data-notification-id="'+esc(n.id)+'" data-notification-page="'+esc(n.page||'')+'"><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span class="notification-copy"><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span><span class="notification-state">'+(n.read?'':icon('check'))+'</span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
+  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" data-notification-id="'+esc(n.id)+'" data-notification-page="'+esc(n.page||'')+'"><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span class="notification-copy"><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span><span class="notification-state">'+(n.read?'':'<i></i>')+'</span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
 }
 function gamesView(){
  const g=state.games||{games:[],daily:{earned:0,cap:0}};
@@ -640,7 +640,7 @@ function miniGameView(){
  if(g.gameKey==='editor')body='<div class="game-question-v7"><h2>'+esc(q.source||'')+'</h2><span>'+fmt(q.sourceValue||0)+'</span><label class="game-input-v7">@<input id="gameEditorInput" maxlength="15" autocomplete="off" placeholder="сделай дороже"></label><button class="primary" data-game-editor-submit>Проверить</button></div>';
  if(g.gameKey==='build')body='<div class="game-question-v7"><h2>@'+esc(state.gameBuildValue||'')+'</h2><div class="parts-v7">'+(q.parts||[]).map(x=>'<button data-game-part="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div><div class="game-two-actions"><button class="secondary" data-game-build-clear>Сбросить</button><button class="primary" data-game-build-submit '+(!state.gameBuildValue?'disabled':'')+'>Готово</button></div></div>';
  if(g.gameKey==='price')body='<div class="game-question-v7"><h2>'+esc(q.item?.handle||'')+'</h2><div class="price-options-v7">'+(q.bands||[]).map(x=>'<button data-game-answer="'+x.key+'">'+esc(x.label)+'</button>').join('')+'</div></div>';
- const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'">'+(state.gameFeedback.correct?icon('check'):'×')+' +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
+ const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'"><b>'+(state.gameFeedback.correct?'Верно':'Мимо')+'</b> +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
  return '<div class="mini-game-v7">'+head+body+feedback+'</div>';
 }
 function render(){const page=state.page;
