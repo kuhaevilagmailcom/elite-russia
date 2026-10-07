@@ -12,7 +12,7 @@ import {wheelStatus,spinWheel} from './src/wheel.mjs';
 import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from './src/upgrader.mjs';
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {SHOP_PRODUCTS,shopCatalog,validProductCheckout,applyProductPayment,walletData,buyTheme} from './src/payments.mjs';
-import {adminOverview,adminUserDetail,adminSetBalance,adminUpdateUserProgress,adminUsernames,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
+import {adminOverview,adminUserDetail,adminSetBalance,adminGrantGems,adminUpdateUserProgress,adminUsernames,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
 import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
 import {labStatus,submitLab} from './src/lab.mjs';
 import {dailyStatus,claimDaily} from './src/daily.mjs';
@@ -21,7 +21,8 @@ import {achievementsData,reconcileAchievements} from './src/achievements.mjs';
 import {levelRewards,progressionFromXp} from './src/progression.mjs';
 import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema,cleanupMiniGameSessions} from './src/minigames.mjs';
 import {bumpTask} from './src/economy.mjs';
-import {createNotification,listNotifications,unreadNotificationCount,markAllNotificationsRead} from './src/notifications.mjs';
+import {createNotification,listNotifications,unreadNotificationCount,markNotificationRead,markAllNotificationsRead} from './src/notifications.mjs';
+import {promoStatus,redeemPromo,adminPromoList,adminCreatePromo,adminSetPromoActive} from './src/promocodes.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -350,6 +351,14 @@ async function api(req,res,url){
 
     if(req.method==='GET'&&url.pathname==='/api/notifications')return json(res,200,listNotifications(db,user.id,100));
     if(req.method==='POST'&&url.pathname==='/api/notifications/read-all')return json(res,200,markAllNotificationsRead(db,user.id));
+    const notificationRead=url.pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);
+    if(req.method==='POST'&&notificationRead)return json(res,200,markNotificationRead(db,user.id,notificationRead[1]));
+
+    if(req.method==='GET'&&url.pathname==='/api/promocode')return json(res,200,promoStatus(db,user));
+    if(req.method==='POST'&&url.pathname==='/api/promocode'){
+      const b=await readBody(req),result=redeemPromo(db,user,b.code),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
+      invalidateLeaderboard();return json(res,200,{...result,user:publicUser(db,fresh),wallet:walletData(db,user.id)});
+    }
 
     if(req.method==='GET'&&url.pathname==='/api/wheel')return json(res,200,wheelStatus(db,user));
     if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req),result=spinWheel(db,user,String(b.requestId||''));invalidateLeaderboard();return json(res,200,result)}
@@ -402,12 +411,26 @@ async function api(req,res,url){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
       return json(res,200,adminUsernames(db,{q:url.searchParams.get('q')||'',status:url.searchParams.get('status')||'active',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||30)}));
     }
+    if(url.pathname==='/api/admin/promocodes'&&req.method==='GET'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      return json(res,200,adminPromoList(db));
+    }
+    if(url.pathname==='/api/admin/promocodes'&&req.method==='POST'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const b=await readBody(req);return json(res,200,adminCreatePromo(db,user,b));
+    }
+    const promoToggle=url.pathname.match(/^\/api\/admin\/promocodes\/([^/]+)\/active$/);
+    if(req.method==='POST'&&promoToggle){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const b=await readBody(req);return json(res,200,adminSetPromoActive(db,user,decodeURIComponent(promoToggle[1]),!!b.active));
+    }
     const adminUser=url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
     if(req.method==='GET'&&adminUser){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminUserDetail(db,Number(adminUser[1])))}
-    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|profile|block|reset|add-username|message)$/);
+    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|gems|profile|block|reset|add-username|message)$/);
     if(req.method==='POST'&&adminActionRoute){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});const targetId=Number(adminActionRoute[1]),action=adminActionRoute[2],b=await readBody(req);let result;
       if(action==='balance')result=adminSetBalance(db,user,targetId,b.delta);
+      if(action==='gems')result=adminGrantGems(db,user,targetId,b.delta);
       if(action==='profile')result=adminUpdateUserProgress(db,user,targetId,{xp:b.xp,freeDrops:b.freeDrops});
       if(action==='block')result=adminSetBlocked(db,user,targetId,!!b.value);
       if(action==='reset')result=resetSingleUser(db,user,targetId);
@@ -446,7 +469,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
