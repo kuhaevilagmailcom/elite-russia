@@ -308,8 +308,8 @@ function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result'+(pending?' pending-result':'')+valueClass(x)+'">'+
    '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
    (pending?'<div class="drop-result-actions">'+
-     '<button class="story-action" data-share-story="'+x.id+'">'+icon('story')+'<span>В историю</span></button>'+
      '<div class="drop-result-resolve"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>'+
+     '<button class="story-action" data-share-story="'+x.id+'" aria-label="В историю" title="В историю">'+icon('story')+'</button>'+
    '</div>':'')+
  '</article>';
 }
@@ -327,11 +327,11 @@ function generateStoryImage(item){
   ctx.fillStyle='#68717d';ctx.font='600 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,166);
   ctx.fillStyle='#ffffff';storyRoundRect(ctx,60,280,960,1120,44);ctx.fill();
   ctx.strokeStyle='#dde1e5';ctx.lineWidth=2;storyRoundRect(ctx,60,280,960,1120,44);ctx.stroke();
-  ctx.fillStyle='#68717d';ctx.font='750 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('Я ВЫИГРАЛ USERNAME',540,455);
-  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,820);
-  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,205,1010,670,100,28);ctx.fill();
-  ctx.fillStyle='#111318';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ЗАХОДИ В USERNAME',540,1073);
-  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Попробуй выбить свой уникальный username',540,1170);
+  ctx.fillStyle='#68717d';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('МНЕ ВЫПАЛ ЮЗЕРНЕЙМ',540,455);
+  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,800);
+  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,250,1000,580,104,30);ctx.fill();
+  ctx.fillStyle='#111318';ctx.font='800 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ИГРАЙ СО МНОЙ',540,1067);
+  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME · коллекционная игра',540,1170);
   ctx.textAlign='left';ctx.fillStyle='#111318';ctx.font='800 34px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1770);
   ctx.fillStyle='#69727d';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Каждый username существует в игре только один раз',72,1815);
   return canvas.toDataURL('image/jpeg',.92);
@@ -452,13 +452,12 @@ function wheelSvgMarkup(rows){
 }
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),last=state.wheelLastResult;
- return '<div class="wheel-page wheel-v9"><section class="wheel-v9-card">'+
-  '<div class="wheel-v9-head"><div><small>БЕСПЛАТНОЕ КОЛЕСО</small><b>Колесо удачи</b><span>Одно вращение раз в 24 часа</span></div><span class="wheel-v9-icon">'+icon('wheel')+'</span></div>'+
-  '<div class="fortune-stage wheel-v9-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>GO</b><span>USERNAME</span></div></div>'+
-  '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('<small>Выпало</small><b>'+esc(last.label)+'</b>'):'<small>Нажми кнопку — колесо остановится на награде</small>')+'</div>'+
- '</section>'+
- '<div class="wheel-v9-footer"><div class="wheel-copy"><b>'+(w.available?'Вращение доступно':'Следующее вращение позже')+'</b><span>'+(w.available?'Сегодня ты ещё не крутил колесо':('Через '+untilText(w.nextAt)))+'</span></div>'+
- '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+icon('play')+'<span>'+(w.available?'Крутить':'Недоступно')+'</span></button></div></div>';
+ return '<div class="wheel-page wheel-v10">'+
+  '<div class="wheel-v10-status"><i class="'+(w.available?'ready':'wait')+'"></i><span>'+(w.available?'Доступно сейчас':('Через '+untilText(w.nextAt)))+'</span></div>'+
+  '<div class="fortune-stage wheel-v10-stage">'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><span>USERNAME</span><b>'+icon('wheel')+'</b></div></div>'+
+  '<div id="wheelResult" class="wheel-result wheel-v10-result '+(last?'show':'')+'">'+(last?('<span>Выпало</span><b>'+esc(last.label)+'</b>'):'<span>1 вращение в сутки</span>')+'</div>'+
+  '<button class="primary wheel-spin-button wheel-v10-button" data-wheel '+(!w.available?'disabled':'')+'><span>'+(w.available?'Крутить':'Уже использовано')+'</span></button>'+
+ '</div>';
 }
 function friendsView(){
  const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
@@ -577,9 +576,11 @@ function achievementsView(){
 }
 function detailView(x){
  const q=x.quality||{};
- return '<div class="detail-v7">'+resultCard(x,false)+'<div class="username-value-v7">'+fmt(x.value)+'</div><div class="quality-list-v7">'+
-  metric('Читаемость',Number(q.pronounceability||0))+metric('Краткость',Number(q.length||0))+metric('Чистота',Number(q.cleanliness||0))+metric('Спрос',Number(q.semantic||0))+
- '</div><div class="detail-actions-v7"><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="secondary" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать</button></div></div>';
+ return '<div class="detail-v10">'+
+  '<section class="username-detail-hero'+valueClass(x)+'"><small>ТВОЙ USERNAME</small><h1 data-fit-username data-max-size="54" data-min-size="24">'+esc(x.handle)+'</h1><div class="username-detail-price"><span>Стоимость</span><b>'+fmt(x.value)+'</b></div></section>'+
+  '<section class="username-detail-quality"><div>'+metric('Читаемость',Number(q.pronounceability||0))+metric('Краткость',Number(q.length||0))+metric('Чистота',Number(q.cleanliness||0))+metric('Спрос',Number(q.semantic||0))+'</div></section>'+
+  '<div class="username-detail-actions"><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">'+icon('market')+'<span>На рынок</span></button><button class="secondary" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'"><span>Продать</span></button></div>'+
+ '</div>';
 }
 function notificationsView(){
  const d=state.notifications||{items:[],unread:0},items=d.items||[];
