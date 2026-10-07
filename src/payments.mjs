@@ -26,7 +26,7 @@ export function walletData(db,userId){
   const row=db.prepare('SELECT gems FROM currency_wallets WHERE user_id=?').get(userId);
   return {gems:Number(row?.gems||0)};
 }
-function addGems(db,userId,amount){
+export function grantGems(db,userId,amount){
   ensureWallet(db);const ts=new Date().toISOString(),add=Math.max(0,Math.round(Number(amount)||0));
   db.prepare(`INSERT INTO currency_wallets(user_id,gems,updated_at) VALUES(?,?,?)
     ON CONFLICT(user_id) DO UPDATE SET gems=gems+excluded.gems,updated_at=excluded.updated_at`).run(userId,add,ts);
@@ -65,7 +65,7 @@ export function applyProductPayment(db,message,payment){
     const ts=new Date().toISOString();
     db.prepare('INSERT INTO payments(telegram_charge_id,provider_charge_id,user_id,payload,currency,total_amount,product,created_at) VALUES(?,?,?,?,?,?,?,?)')
       .run(charge,String(payment.provider_payment_charge_id||''),user.id,payment.invoice_payload,payment.currency,payment.total_amount,product.key,ts);
-    const wallet=addGems(db,user.id,product.gems);
+    const wallet=grantGems(db,user.id,product.gems);
     return {applied:true,user,product,wallet};
   })();
 }
