@@ -189,7 +189,7 @@ function sound(kind='tap'){
   o.connect(g);g.connect(audioCtx.destination);o.start(now);o.stop(now+.1);
  }catch{}
 }
-function motionEnabled(){return !!state.settings.animations&&!matchMedia?.('(prefers-reduced-motion: reduce)')?.matches}
+function motionEnabled(){return !!state.settings.animations}
 function toast(t){toastEl.textContent=translateLiteral(t);toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
 function startParam(){
@@ -919,6 +919,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.2.0').catch(()=>{});
+import('/admin-ui.js?v=7.2.1').catch(()=>{});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
