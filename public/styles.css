@@ -587,3 +587,28 @@ html.is-desktop .username-detail-hero{min-height:300px}
 .promo-history{display:grid;gap:6px}.promo-history article{min-height:58px;border:1px solid var(--border);background:var(--card);border-radius:13px;padding:9px 10px;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
 .promo-history article b{font-size:11px}.promo-history article span{font-size:11px;font-weight:800}.promo-history article small{grid-column:1/-1;font-size:8px;color:var(--muted)}
 html.is-desktop .promo-page{width:100%;max-width:660px;margin:0 auto;padding-left:22px;padding-right:22px}
+
+
+/* USERNAME 7.5 — tasks without checkmarks */
+.tasks-v10{display:flex;flex-direction:column;gap:7px;padding:10px 12px 18px}
+.tasks-v10-hero{min-height:92px;border:1px solid var(--border);background:var(--card);border-radius:18px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tasks-v10-hero>div{display:grid;gap:2px}.tasks-v10-hero small{font-size:8px;font-weight:850;letter-spacing:.11em;color:var(--muted)}.tasks-v10-hero b{font-size:20px;letter-spacing:-.03em}.tasks-v10-hero span{font-size:10px;color:var(--muted)}
+.tasks-v10-hero>strong{min-width:42px;height:42px;border-radius:13px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:16px}
+.task-v10{border:1px solid var(--border);background:var(--card);border-radius:16px;padding:11px;display:grid;gap:9px}
+.task-v10.special{border-color:color-mix(in srgb,var(--accent) 32%,var(--border));background:color-mix(in srgb,var(--accent) 4%,var(--card))}
+.task-v10.claimed{opacity:.68}.task-v10.ready{border-color:color-mix(in srgb,var(--accent) 42%,var(--border))}
+.task-v10-top{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:9px}
+.task-v10-icon{width:38px;height:38px;border-radius:11px;background:var(--surface-subtle);color:var(--accent);display:grid;place-items:center}.task-v10-icon .ico{width:18px;height:18px}
+.task-v10-copy{min-width:0;display:grid;gap:2px}.task-v10-copy b{font-size:12px;white-space:normal;line-height:1.25}.task-v10-copy span{font-size:8.5px;color:var(--muted)}
+.task-v10-top>strong{font-size:10px;color:var(--profit);white-space:nowrap}
+.task-v10-progress{height:5px;border-radius:99px;background:var(--surface-subtle);overflow:hidden}.task-v10-progress i{display:block;height:100%;width:var(--p);background:var(--accent);border-radius:99px}
+.task-v10-bottom{display:flex;align-items:center;justify-content:flex-end;min-height:34px}
+.task-progress-label{font-size:10px;color:var(--muted);font-weight:700}
+.task-claim{min-height:36px;padding:0 12px;border-radius:10px;background:var(--accent);color:#fff;font-weight:780;font-size:10px}.task-claim b{font-weight:850}
+.task-claimed-badge{min-height:28px;padding:0 9px;border-radius:9px;background:var(--surface-subtle);display:inline-flex;align-items:center;color:var(--muted);font-size:9px;font-weight:750}
+.task-channel-actions{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}.task-channel-actions button{min-height:40px;border-radius:11px;background:var(--accent);color:#fff;font-size:10px;font-weight:780}.task-channel-actions button.secondary{background:var(--surface-subtle);color:var(--text)}
+.upgrade-selected-dot{width:10px!important;height:10px!important;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);flex:none}
+.achievement-opened{position:absolute;right:9px;top:9px!important;min-height:22px;padding:0 7px;border-radius:8px;background:var(--surface-subtle);display:flex;align-items:center;color:var(--muted)!important;font-size:8px!important;font-weight:750}
+.notification-state>i{display:block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.game-feedback-v7 b{font-size:10px}
+html.is-desktop .tasks-v10{width:100%;max-width:760px;margin:0 auto;padding-left:22px;padding-right:22px}
