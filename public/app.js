@@ -407,10 +407,40 @@ function topView(){
  const card=(r,pos,hero=false)=>r?'<button class="money-rank '+(hero?'hero':'')+'" data-profile="'+r.id+'"><small>#'+pos+'</small><b>'+esc(r.first_name||r.username||'Игрок')+'</b><strong>'+fmt(r.capital)+'</strong><span>'+(r.best_handle||'Без usernames')+'</span></button>':'';
  return '<div class="page-body rank-page"><div class="rank-summary money"><span>ОБЩИЙ КАПИТАЛ</span><b>Кто богаче</b><small>Баланс + стоимость всех активных usernames</small></div><div class="podium">'+card(top[0],1,true)+'<div>'+card(top[1],2)+card(top[2],3)+'</div></div><div class="rank-list money-list">'+list.map(r=>'<button class="rank-row" data-profile="'+r.id+'"><span class="pos">#'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'Без usernames')+'</small></div><strong>'+fmt(r.capital)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>';
 }
-function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>{
- const done=t.current>=t.target,status=t.claimed?'<span class="task-status done">'+icon('check')+' Получено</span>':done?'<button class="task-claim" data-claim="'+t.key+'">Забрать</button>':'<span class="task-status">В процессе</span>';
- return '<article class="task compact-task"><div class="task-head"><div><b>'+esc(t.label)+'</b><strong>+'+fmt(t.reward)+'</strong></div><span>'+t.current+' / '+t.target+'</span></div><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><div class="task-foot">'+status+'</div></article>';
- }).join('')+'</div>'}
+function taskIcon(t){
+ const src=String(t?.source||'');
+ if(src==='channel_sub')return 'notifications';
+ if(src==='market_buy')return 'market';
+ if(src==='upgrade')return 'upgrade';
+ if(src==='gift')return 'gift';
+ if(src==='invite')return 'friends';
+ if(src==='view_profile')return 'profile';
+ if(src==='wheel')return 'wheel';
+ if(src.startsWith('game_')||src==='games'||src==='hunt_win')return 'games';
+ if(src==='drop'||src==='rare'||src==='nodigits'||src==='keep'||src==='sell')return 'collection';
+ return 'tasks';
+}
+function tasksView(){
+ const d=state.tasks||{items:[],completed:0,total:0,ready:0},items=d.items||[],regular=items.filter(x=>!x.special),special=items.filter(x=>x.special);
+ const card=t=>{
+  const done=Number(t.current)>=Number(t.target),pct=Math.max(0,Math.min(100,Math.round(Number(t.current||0)/Math.max(1,Number(t.target||1))*100)));
+  let action='';
+  if(t.claimed)action='<span class="task-claimed-badge">Получено</span>';
+  else if(done)action='<button class="task-claim" data-claim="'+esc(t.key)+'">Забрать <b>+'+fmt(t.reward)+'</b></button>';
+  else if(t.special)action='<div class="task-channel-actions"><button class="secondary" data-task-channel-open="'+esc(t.channelUrl||'')+'">Подписаться</button><button data-task-channel-verify>Проверить</button></div>';
+  else action='<span class="task-progress-label">'+Number(t.current||0)+' / '+Number(t.target||0)+'</span>';
+  return '<article class="task-v10 '+(t.special?'special ':'')+(t.claimed?'claimed ':'')+(done&&!t.claimed?'ready':'')+'">'+
+    '<div class="task-v10-top"><span class="task-v10-icon">'+icon(taskIcon(t))+'</span><div class="task-v10-copy"><b>'+esc(t.label)+'</b><span>'+(t.special?'Специальное задание':'Ежедневное задание')+'</span></div><strong>+'+fmt(t.reward)+'</strong></div>'+
+    (!t.special?'<div class="task-v10-progress"><i style="--p:'+pct+'%"></i></div>':'')+
+    '<div class="task-v10-bottom">'+action+'</div>'+
+  '</article>';
+ };
+ return '<div class="page-scroll tasks-v10">'+
+  '<section class="tasks-v10-hero"><div><small>СЕГОДНЯ</small><b>Задания</b><span>Выполнено '+Number(d.completed||0)+' из '+Number(d.total||items.length)+'</span></div><strong>'+Number(d.ready||0)+'</strong></section>'+
+  (special.length?'<div class="section-label">Специальное</div>'+special.map(card).join(''):'')+
+  '<div class="section-label">Ежедневные · '+regular.length+'</div>'+regular.map(card).join('')+
+ '</div>';
+}
 function wheelGeometry(items){
  const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||0),0));let cursor=0;
  const colors=['#ffffff','#eef1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||0);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2,span:end-start}});
