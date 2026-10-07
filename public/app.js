@@ -22,7 +22,7 @@ const ERR={
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
 function syncViewportNow(){
@@ -231,12 +231,12 @@ async function api(url,opts={}){
 }
 const ICON_NAME=Object.freeze({
  home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
- market:'store-01',rank:'ranking',tasks:'task-done-01',wheel:'target-01',
+ market:'store-01',rank:'ranking',tasks:'layers-01',wheel:'target-01',
  friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
  collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
  search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
- down:'arrow-down-01',plus:'add-01',check:'checkmark-circle-02',promo:'coupon-01',x:'cancel-01'
+ down:'arrow-down-01',plus:'add-01',promo:'coupon-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function marketFilterIcon(){return icon('filter')}
@@ -407,10 +407,40 @@ function topView(){
  const card=(r,pos,hero=false)=>r?'<button class="money-rank '+(hero?'hero':'')+'" data-profile="'+r.id+'"><small>#'+pos+'</small><b>'+esc(r.first_name||r.username||'Игрок')+'</b><strong>'+fmt(r.capital)+'</strong><span>'+(r.best_handle||'Без usernames')+'</span></button>':'';
  return '<div class="page-body rank-page"><div class="rank-summary money"><span>ОБЩИЙ КАПИТАЛ</span><b>Кто богаче</b><small>Баланс + стоимость всех активных usernames</small></div><div class="podium">'+card(top[0],1,true)+'<div>'+card(top[1],2)+card(top[2],3)+'</div></div><div class="rank-list money-list">'+list.map(r=>'<button class="rank-row" data-profile="'+r.id+'"><span class="pos">#'+r.position+'</span><div><b>'+esc(r.first_name||r.username||'Игрок')+'</b><small>'+(r.best_handle||'Без usernames')+'</small></div><strong>'+fmt(r.capital)+'</strong></button>').join('')+'</div>'+pager(state.rankPage,pages,'rank')+'</div>';
 }
-function tasksView(){return '<div class="page-scroll task-list">'+(state.tasks?.items||[]).map(t=>{
- const done=t.current>=t.target,status=t.claimed?'<span class="task-status done">'+icon('check')+' Получено</span>':done?'<button class="task-claim" data-claim="'+t.key+'">Забрать</button>':'<span class="task-status">В процессе</span>';
- return '<article class="task compact-task"><div class="task-head"><div><b>'+esc(t.label)+'</b><strong>+'+fmt(t.reward)+'</strong></div><span>'+t.current+' / '+t.target+'</span></div><div class="progress"><i style="width:'+Math.min(100,t.current/t.target*100)+'%"></i></div><div class="task-foot">'+status+'</div></article>';
- }).join('')+'</div>'}
+function taskIcon(t){
+ const src=String(t?.source||'');
+ if(src==='channel_sub')return 'notifications';
+ if(src==='market_buy')return 'market';
+ if(src==='upgrade')return 'upgrade';
+ if(src==='gift')return 'gift';
+ if(src==='invite')return 'friends';
+ if(src==='view_profile')return 'profile';
+ if(src==='wheel')return 'wheel';
+ if(src.startsWith('game_')||src==='games'||src==='hunt_win')return 'games';
+ if(src==='drop'||src==='rare'||src==='nodigits'||src==='keep'||src==='sell')return 'collection';
+ return 'tasks';
+}
+function tasksView(){
+ const d=state.tasks||{items:[],completed:0,total:0,ready:0},items=d.items||[],regular=items.filter(x=>!x.special),special=items.filter(x=>x.special);
+ const card=t=>{
+  const done=Number(t.current)>=Number(t.target),pct=Math.max(0,Math.min(100,Math.round(Number(t.current||0)/Math.max(1,Number(t.target||1))*100)));
+  let action='';
+  if(t.claimed)action='<span class="task-claimed-badge">Получено</span>';
+  else if(done)action='<button class="task-claim" data-claim="'+esc(t.key)+'">Забрать <b>+'+fmt(t.reward)+'</b></button>';
+  else if(t.special)action='<div class="task-channel-actions"><button class="secondary" data-task-channel-open="'+esc(t.channelUrl||'')+'">Подписаться</button><button data-task-channel-verify>Проверить</button></div>';
+  else action='<span class="task-progress-label">'+Number(t.current||0)+' / '+Number(t.target||0)+'</span>';
+  return '<article class="task-v10 '+(t.special?'special ':'')+(t.claimed?'claimed ':'')+(done&&!t.claimed?'ready':'')+'">'+
+    '<div class="task-v10-top"><span class="task-v10-icon">'+icon(taskIcon(t))+'</span><div class="task-v10-copy"><b>'+esc(t.label)+'</b><span>'+(t.special?'Специальное задание':'Ежедневное задание')+'</span></div><strong>+'+fmt(t.reward)+'</strong></div>'+
+    (!t.special?'<div class="task-v10-progress"><i style="--p:'+pct+'%"></i></div>':'')+
+    '<div class="task-v10-bottom">'+action+'</div>'+
+  '</article>';
+ };
+ return '<div class="page-scroll tasks-v10">'+
+  '<section class="tasks-v10-hero"><div><small>СЕГОДНЯ</small><b>Задания</b><span>Выполнено '+Number(d.completed||0)+' из '+Number(d.total||items.length)+'</span></div><strong>'+Number(d.ready||0)+'</strong></section>'+
+  (special.length?'<div class="section-label">Специальное</div>'+special.map(card).join(''):'')+
+  '<div class="section-label">Ежедневные · '+regular.length+'</div>'+regular.map(card).join('')+
+ '</div>';
+}
 function wheelGeometry(items){
  const total=Math.max(1,items.reduce((s,x)=>s+Number(x.weight||0),0));let cursor=0;
  const colors=['#ffffff','#eef1f4'],segments=[],rows=items.map((x,i)=>{const start=cursor/total*360;cursor+=Number(x.weight||0);const end=cursor/total*360;segments.push(colors[i%2]+' '+start+'deg '+end+'deg');return {...x,start,end,center:(start+end)/2,span:end-start}});
@@ -499,7 +529,7 @@ function upgradeRowHtml(x){
 }
 function upgradeTargetRowHtml(x){
  const selected=String(state.upgradeTargetSessionId||'')===String(x.sessionId),chance=upgradeChanceText(x.chance);
- return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span><i>'+(selected?icon('check'):icon('chevron'))+'</i></button>';
+ return '<button class="upgrade-target-pick '+(selected?'selected':'')+'" data-up-target="'+esc(x.sessionId)+'"><span class="upgrade-target-main"><b data-fit-username data-max-size="18" data-min-size="12">'+esc(x.target.handle)+'</b><small>'+fmt(x.target.value)+'</small></span><span class="upgrade-target-chance"><small>ШАНС</small><strong>'+chance+'%</strong></span>'+(selected?'<i class="upgrade-selected-dot"></i>':'<i>'+icon('chevron')+'</i>')+'</button>';
 }
 function appendUpgradeBatch(){
  const list=document.querySelector('.upgrade-list'),all=state.upgrader?.available||[];if(!list)return;
@@ -580,7 +610,7 @@ function achievementsView(){
  const a=state.achievements||{items:[],completed:0,total:0};
  return '<div class="achievements-v7"><div class="achievement-summary-v7"><span>Получено</span><b>'+a.completed+' / '+a.total+'</b></div><div class="achievement-grid-v7">'+(a.items||[]).map(x=>{
    const pct=Math.max(0,Math.min(100,Math.round(Number(x.current||0)/Math.max(1,Number(x.target||1))*100)));
-   return '<article class="'+(x.done?'done':'locked')+'"><div class="achievement-badge-icon">'+iconRaw(x.icon||'medal-01')+'</div><b>'+(x.done?esc(x.title):'????')+'</b><small>'+esc(x.category||'')+'</small>'+(x.done?'<span>'+icon('check')+'</span>':'<em>'+Math.min(Number(x.current||0),Number(x.target||0))+' / '+Number(x.target||0)+'</em><i style="--p:'+pct+'%"></i>')+'</article>';
+   return '<article class="'+(x.done?'done':'locked')+'"><div class="achievement-badge-icon">'+iconRaw(x.icon||'medal-01')+'</div><b>'+(x.done?esc(x.title):'????')+'</b><small>'+esc(x.category||'')+'</small>'+(x.done?'<span class="achievement-opened">Открыто</span>':'<em>'+Math.min(Number(x.current||0),Number(x.target||0))+' / '+Number(x.target||0)+'</em><i style="--p:'+pct+'%"></i>')+'</article>';
  }).join('')+'</div></div>';
 }
 function detailView(x){
@@ -594,7 +624,7 @@ function detailView(x){
 function notificationsView(){
  const d=state.notifications||{items:[],unread:0},items=d.items||[];
  return '<div class="notifications-page"><div class="notifications-head"><div><b>Уведомления</b><span>'+(d.unread?('Непрочитанных: '+d.unread):'Всё прочитано')+'</span></div>'+(d.unread?'<button class="secondary" data-notifications-read>Прочитать все</button>':'')+'</div>'+
-  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" data-notification-id="'+esc(n.id)+'" data-notification-page="'+esc(n.page||'')+'"><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span class="notification-copy"><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span><span class="notification-state">'+(n.read?'':icon('check'))+'</span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
+  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" data-notification-id="'+esc(n.id)+'" data-notification-page="'+esc(n.page||'')+'"><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span class="notification-copy"><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span><span class="notification-state">'+(n.read?'':'<i></i>')+'</span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
 }
 function gamesView(){
  const g=state.games||{games:[],daily:{earned:0,cap:0}};
@@ -610,7 +640,7 @@ function miniGameView(){
  if(g.gameKey==='editor')body='<div class="game-question-v7"><h2>'+esc(q.source||'')+'</h2><span>'+fmt(q.sourceValue||0)+'</span><label class="game-input-v7">@<input id="gameEditorInput" maxlength="15" autocomplete="off" placeholder="сделай дороже"></label><button class="primary" data-game-editor-submit>Проверить</button></div>';
  if(g.gameKey==='build')body='<div class="game-question-v7"><h2>@'+esc(state.gameBuildValue||'')+'</h2><div class="parts-v7">'+(q.parts||[]).map(x=>'<button data-game-part="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div><div class="game-two-actions"><button class="secondary" data-game-build-clear>Сбросить</button><button class="primary" data-game-build-submit '+(!state.gameBuildValue?'disabled':'')+'>Готово</button></div></div>';
  if(g.gameKey==='price')body='<div class="game-question-v7"><h2>'+esc(q.item?.handle||'')+'</h2><div class="price-options-v7">'+(q.bands||[]).map(x=>'<button data-game-answer="'+x.key+'">'+esc(x.label)+'</button>').join('')+'</div></div>';
- const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'">'+(state.gameFeedback.correct?icon('check'):'×')+' +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
+ const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'"><b>'+(state.gameFeedback.correct?'Верно':'Мимо')+'</b> +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
  return '<div class="mini-game-v7">'+head+body+feedback+'</div>';
 }
 function render(){const page=state.page;
@@ -894,12 +924,20 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.pager){const d=Number(el.dataset.dir);if(el.dataset.pager==='collection'){state.filters.page+=d;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page='+state.filters.page);render()}if(el.dataset.pager==='market'){state.marketFilters.page+=d;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page='+state.marketFilters.page);render()}if(el.dataset.pager==='rank'){state.rankPage+=d;render()}return}
  if(el.dataset.marketBuy){const id=el.dataset.marketBuy,r=await api('/api/market/'+id+'/buy',{method:'POST'});removeMarketLocal(id);toast('Куплено '+r.handle);await refreshUser();render();return}
  if(el.dataset.marketCancel){const id=el.dataset.marketCancel;await api('/api/market/'+id+'/cancel',{method:'POST'});removeMarketLocal(id);toast('Лот снят');render();return}
+ if(el.dataset.taskChannelOpen){
+   const url=String(el.dataset.taskChannelOpen||'');if(!url)return;
+   if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(url);else window.open(url,'_blank','noopener');return
+ }
+ if(el.hasAttribute('data-task-channel-verify')){
+   el.disabled=true;
+   const r=await api('/api/tasks/channel/verify',{method:'POST',body:'{}'});
+   state.tasks=r;haptic('medium');toast('Подписка подтверждена');render();return
+ }
  if(el.dataset.claim){
    const key=String(el.dataset.claim||'');if(!key||el.disabled)return;
    el.disabled=true;el.classList.add('is-claiming');
    const r=await api('/api/tasks/'+key+'/claim',{method:'POST'});
-   const task=state.tasks?.items?.find(x=>String(x.key)===key);if(task)task.claimed=true;
-   applyUserLocal(r.user);haptic('light');toast('+'+fmt(r.reward));render();return
+   applyUserLocal(r.user);state.tasks=await api('/api/tasks');haptic('light');toast('+'+fmt(r.reward));render();return
  }
  if(el.dataset.profile){const r=await api('/api/profile/'+el.dataset.profile);state.backPage='top';state.page='profile';state.profile=r;render();return}
  if(el.dataset.detail){const item=state.collection?.items.find(x=>x.id===el.dataset.detail);if(item){state.backPage='collection';state.detail=item;state.page='detail';render()}return}
@@ -975,6 +1013,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.4.0').catch(()=>{});
+import('/admin-ui.js?v=7.5.0').catch(()=>{});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);

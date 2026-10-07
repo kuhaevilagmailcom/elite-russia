@@ -244,67 +244,126 @@ export function leaderboard(db){
   `).all();
   return rows.map((r,i)=>({...r,position:i+1,best_handle:r.best_handle?'@'+r.best_handle:null}));
 }
+export const DAILY_TASK_COUNT=9;
 export const DAILY_TASK_POOL=Object.freeze([
-  {key:'drop1',label:'Открыть дроп',target:1,reward:450,source:'drop'},
+  {key:'drop1',label:'Открыть 1 дроп',target:1,reward:450,source:'drop'},
   {key:'drop2',label:'Открыть 2 дропа',target:2,reward:800,source:'drop'},
   {key:'drop3',label:'Открыть 3 дропа',target:3,reward:1200,source:'drop'},
+  {key:'drop4',label:'Открыть 4 дропа',target:4,reward:1500,source:'drop'},
   {key:'drop5',label:'Открыть 5 дропов',target:5,reward:1800,source:'drop'},
-  {key:'sell1',label:'Продать юзернейм',target:1,reward:700,source:'sell'},
-  {key:'sell2',label:'Продать 2 юзернейма',target:2,reward:1100,source:'sell'},
-  {key:'sell3',label:'Продать 3 юзернейма',target:3,reward:1500,source:'sell'},
-  {key:'keep1',label:'Оставить юзернейм',target:1,reward:450,source:'keep'},
-  {key:'keep2',label:'Оставить 2 юзернейма',target:2,reward:750,source:'keep'},
+  {key:'drop6',label:'Открыть 6 дропов',target:6,reward:2200,source:'drop'},
+  {key:'drop8',label:'Открыть 8 дропов',target:8,reward:2900,source:'drop'},
+  {key:'drop10',label:'Открыть 10 дропов',target:10,reward:3600,source:'drop'},
+
+  {key:'sell1',label:'Продать 1 username',target:1,reward:700,source:'sell'},
+  {key:'sell2',label:'Продать 2 usernames',target:2,reward:1100,source:'sell'},
+  {key:'sell3',label:'Продать 3 usernames',target:3,reward:1500,source:'sell'},
+  {key:'sell4',label:'Продать 4 usernames',target:4,reward:1900,source:'sell'},
+  {key:'sell5',label:'Продать 5 usernames',target:5,reward:2300,source:'sell'},
+  {key:'sell7',label:'Продать 7 usernames',target:7,reward:3100,source:'sell'},
+
+  {key:'keep1',label:'Оставить 1 username',target:1,reward:450,source:'keep'},
+  {key:'keep2',label:'Оставить 2 usernames',target:2,reward:750,source:'keep'},
+  {key:'keep3',label:'Оставить 3 usernames',target:3,reward:1050,source:'keep'},
+  {key:'keep4',label:'Оставить 4 usernames',target:4,reward:1350,source:'keep'},
+  {key:'keep5',label:'Оставить 5 usernames',target:5,reward:1650,source:'keep'},
+  {key:'keep7',label:'Оставить 7 usernames',target:7,reward:2250,source:'keep'},
+
   {key:'games1',label:'Сыграть 1 мини-игру',target:1,reward:500,source:'games'},
+  {key:'games2',label:'Сыграть 2 мини-игры',target:2,reward:900,source:'games'},
   {key:'games3',label:'Сыграть 3 мини-игры',target:3,reward:1300,source:'games'},
   {key:'games5',label:'Сыграть 5 мини-игр',target:5,reward:1900,source:'games'},
   {key:'games7',label:'Сыграть 7 мини-игр',target:7,reward:2600,source:'games'},
   {key:'games10',label:'Сыграть 10 мини-игр',target:10,reward:3800,source:'games'},
-  {key:'hunt1',label:'Выиграть Охоту за юзернеймом',target:1,reward:1000,source:'hunt_win'},
-  {key:'hunt2',label:'Выиграть Охоту за юзернеймом дважды',target:2,reward:1700,source:'hunt_win'},
-  {key:'play_hunt',label:'Сыграть в Охоту за юзернеймом',target:1,reward:700,source:'game_hunt'},
+  {key:'games12',label:'Сыграть 12 мини-игр',target:12,reward:4400,source:'games'},
+  {key:'games15',label:'Сыграть 15 мини-игр',target:15,reward:5200,source:'games'},
+
+  {key:'play_hunt',label:'Сыграть в Охоту за username',target:1,reward:700,source:'game_hunt'},
+  {key:'play_hunt3',label:'Сыграть в Охоту 3 раза',target:3,reward:1600,source:'game_hunt'},
   {key:'play_higher',label:'Сыграть в Выше / ниже',target:1,reward:700,source:'game_higher'},
+  {key:'play_higher3',label:'Сыграть в Выше / ниже 3 раза',target:3,reward:1600,source:'game_higher'},
   {key:'play_editor',label:'Сыграть в Редактор',target:1,reward:700,source:'game_editor'},
-  {key:'play_build',label:'Сыграть в Собери юзернейм',target:1,reward:700,source:'game_build'},
+  {key:'play_editor3',label:'Сыграть в Редактор 3 раза',target:3,reward:1600,source:'game_editor'},
+  {key:'play_build',label:'Сыграть в Собери username',target:1,reward:700,source:'game_build'},
+  {key:'play_build3',label:'Сыграть в Собери username 3 раза',target:3,reward:1600,source:'game_build'},
   {key:'play_price',label:'Сыграть в Угадай цену',target:1,reward:700,source:'game_price'},
-  {key:'market1',label:'Купить юзернейм',target:1,reward:800,source:'market_buy'},
-  {key:'market2',label:'Купить 2 юзернейма',target:2,reward:1300,source:'market_buy'},
-  {key:'rare1',label:'Получить юзернейм от 15K ₽',target:1,reward:1200,source:'rare'},
-  {key:'rare2',label:'Получить 2 юзернейма от 15K ₽',target:2,reward:1800,source:'rare'},
-  {key:'nodigits1',label:'Получить юзернейм без цифр',target:1,reward:650,source:'nodigits'},
-  {key:'nodigits2',label:'Получить 2 юзернейма без цифр',target:2,reward:1050,source:'nodigits'},
-  {key:'wheel1',label:'Открыть колесо',target:1,reward:500,source:'wheel'},
-  {key:'upgrade1',label:'Сделать апгрейд',target:1,reward:900,source:'upgrade'},
+  {key:'play_price3',label:'Сыграть в Угадай цену 3 раза',target:3,reward:1600,source:'game_price'},
+
+  {key:'hunt1',label:'Выиграть Охоту за username',target:1,reward:1000,source:'hunt_win'},
+  {key:'hunt2',label:'Выиграть Охоту дважды',target:2,reward:1700,source:'hunt_win'},
+  {key:'hunt3',label:'Выиграть Охоту 3 раза',target:3,reward:2400,source:'hunt_win'},
+
+  {key:'market1',label:'Купить 1 username на рынке',target:1,reward:800,source:'market_buy'},
+  {key:'market2',label:'Купить 2 usernames на рынке',target:2,reward:1300,source:'market_buy'},
+  {key:'market3',label:'Купить 3 usernames на рынке',target:3,reward:1800,source:'market_buy'},
+  {key:'market4',label:'Купить 4 usernames на рынке',target:4,reward:2300,source:'market_buy'},
+  {key:'market5',label:'Купить 5 usernames на рынке',target:5,reward:2800,source:'market_buy'},
+
+  {key:'rare1',label:'Получить username стоимостью от 15K ₽',target:1,reward:1200,source:'rare'},
+  {key:'rare2',label:'Получить 2 usernames от 15K ₽',target:2,reward:1800,source:'rare'},
+  {key:'rare3',label:'Получить 3 usernames от 15K ₽',target:3,reward:2400,source:'rare'},
+  {key:'rare4',label:'Получить 4 usernames от 15K ₽',target:4,reward:3000,source:'rare'},
+  {key:'rare5',label:'Получить 5 usernames от 15K ₽',target:5,reward:3600,source:'rare'},
+
+  {key:'nodigits1',label:'Получить username без цифр',target:1,reward:650,source:'nodigits'},
+  {key:'nodigits2',label:'Получить 2 usernames без цифр',target:2,reward:1050,source:'nodigits'},
+  {key:'nodigits3',label:'Получить 3 usernames без цифр',target:3,reward:1450,source:'nodigits'},
+  {key:'nodigits4',label:'Получить 4 usernames без цифр',target:4,reward:1850,source:'nodigits'},
+  {key:'nodigits5',label:'Получить 5 usernames без цифр',target:5,reward:2250,source:'nodigits'},
+
+  {key:'wheel1',label:'Прокрутить колесо дня',target:1,reward:500,source:'wheel'},
+
+  {key:'upgrade1',label:'Сделать 1 апгрейд',target:1,reward:900,source:'upgrade'},
   {key:'upgrade2',label:'Сделать 2 апгрейда',target:2,reward:1500,source:'upgrade'},
-  {key:'gift1',label:'Передать юзернейм',target:1,reward:900,source:'gift'},
+  {key:'upgrade3',label:'Сделать 3 апгрейда',target:3,reward:2100,source:'upgrade'},
+  {key:'upgrade4',label:'Сделать 4 апгрейда',target:4,reward:2700,source:'upgrade'},
+  {key:'upgrade5',label:'Сделать 5 апгрейдов',target:5,reward:3300,source:'upgrade'},
+
+  {key:'gift1',label:'Передать 1 username',target:1,reward:900,source:'gift'},
+  {key:'gift2',label:'Передать 2 usernames',target:2,reward:1500,source:'gift'},
+  {key:'gift3',label:'Передать 3 usernames',target:3,reward:2100,source:'gift'},
+  {key:'gift4',label:'Передать 4 usernames',target:4,reward:2700,source:'gift'},
+
   {key:'profile1',label:'Посмотреть профиль игрока',target:1,reward:400,source:'view_profile'},
-  {key:'invite1',label:'Пригласить друга',target:1,reward:1000,source:'invite'},
+  {key:'profile2',label:'Посмотреть 2 профиля игроков',target:2,reward:700,source:'view_profile'},
+  {key:'profile3',label:'Посмотреть 3 профиля игроков',target:3,reward:1000,source:'view_profile'},
+  {key:'profile5',label:'Посмотреть 5 профилей игроков',target:5,reward:1500,source:'view_profile'},
+
+  {key:'invite1',label:'Пригласить 1 друга',target:1,reward:1000,source:'invite'},
   {key:'invite2',label:'Пригласить 2 друзей',target:2,reward:1700,source:'invite'},
-  {key:'trade3',label:'Купить 3 юзернейма на рынке',target:3,reward:1600,source:'market_buy'}
+  {key:'invite3',label:'Пригласить 3 друзей',target:3,reward:2400,source:'invite'}
+]);
+export const SPECIAL_TASKS=Object.freeze([
+  {key:'subscribe_channel',label:'Подпишись на Telegram-канал',target:1,reward:5000,source:'channel_sub',special:true}
 ]);
 function dailyTaskDefs(user){
   const seed=String(user.id)+':'+todayKey();
   let x=0;for(let i=0;i<seed.length;i++)x=(Math.imul(x,31)+seed.charCodeAt(i))>>>0;
   const rows=DAILY_TASK_POOL.map((task,i)=>({task,rank:((Math.imul((x^i)>>>0,2654435761)>>>0))})).sort((a,b)=>a.rank-b.rank);
-  const picked=[],sources=new Set();
+  const picked=[],perSource=new Map();
   for(const row of rows){
-    if(picked.length>=6)break;
-    if(sources.has(row.task.source)&&picked.length<4)continue;
-    picked.push(row.task);sources.add(row.task.source);
+    if(picked.length>=DAILY_TASK_COUNT)break;
+    const used=Number(perSource.get(row.task.source)||0);
+    if(used>=2)continue;
+    picked.push(row.task);perSource.set(row.task.source,used+1);
   }
-  for(const row of rows)if(picked.length<6&&!picked.includes(row.task))picked.push(row.task);
+  for(const row of rows)if(picked.length<DAILY_TASK_COUNT&&!picked.includes(row.task))picked.push(row.task);
   return picked;
 }
-export function tasks(db,user){
-  return dailyTaskDefs(user).map(t=>{
-    const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,todayKey(),t.source)?.value||0;
-    const claimed=!!db.prepare('SELECT 1 FROM task_claims WHERE user_id=? AND claim_date=? AND task_key=?').get(user.id,todayKey(),t.key);
-    return {...t,current:Math.min(t.target,p),claimed};
-  });
+function taskState(db,user,t){
+  const scope=t.special?'special':todayKey();
+  const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,scope,t.source)?.value||0;
+  const claimed=!!db.prepare('SELECT 1 FROM task_claims WHERE user_id=? AND claim_date=? AND task_key=?').get(user.id,scope,t.key);
+  return {...t,current:Math.min(t.target,p),claimed};
 }
-export function claimTask(db,user,key){
-  const t=tasks(db,user).find(x=>x.key===key);if(!t)throw new Error('task_not_found');if(t.current<t.target)throw new Error('task_not_done');if(t.claimed)throw new Error('already_claimed');
+export function tasks(db,user,{includeSpecial=false}={}){
+  const defs=[...dailyTaskDefs(user),...(includeSpecial?SPECIAL_TASKS:[])];
+  return defs.map(t=>taskState(db,user,t));
+}
+export function claimTask(db,user,key,{allowSpecial=false}={}){
+  const t=tasks(db,user,{includeSpecial:allowSpecial}).find(x=>x.key===key);if(!t)throw new Error('task_not_found');if(t.current<t.target)throw new Error('task_not_done');if(t.claimed)throw new Error('already_claimed');
   db.transaction(()=>{
-    db.prepare('INSERT INTO task_claims(user_id,claim_date,task_key) VALUES(?,?,?)').run(user.id,todayKey(),key);
+    db.prepare('INSERT INTO task_claims(user_id,claim_date,task_key) VALUES(?,?,?)').run(user.id,t.special?'special':todayKey(),key);
     txBalance(db,user.id,'task_reward',t.reward,{key});
     grantXp(db,user.id,25,'task',{key});bumpSeasonScore(db,user.id,25);
   })();
