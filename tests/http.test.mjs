@@ -157,6 +157,37 @@ test('HTTP admin block immediately blocks target API access',async()=>{
   const blocked=await json('/api/home',{headers:headers('30002')});assert.equal(blocked.r.status,403);assert.equal(blocked.body.error,'blocked');
 });
 
+test('HTTP notification can be marked read individually',async()=>{
+  const uid='30410';await json('/api/home',{headers:headers(uid)});
+  const overview=await json('/api/admin/overview',{headers:headers('10001')});
+  const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
+  const sent=await json('/api/admin/users/'+target.id+'/message',{method:'POST',headers:headers('10001'),body:JSON.stringify({text:'Проверка уведомления'})});
+  assert.equal(sent.r.status,200);
+  const before=await json('/api/notifications',{headers:headers(uid)});assert.equal(before.r.status,200);
+  const item=before.body.items.find(x=>x.type==='ADMIN_MESSAGE'&&!x.read);assert.ok(item);assert.ok(before.body.unread>=1);
+  const read=await json('/api/notifications/'+encodeURIComponent(item.id)+'/read',{method:'POST',headers:headers(uid),body:'{}'});
+  assert.equal(read.r.status,200);
+  const after=await json('/api/notifications',{headers:headers(uid)});
+  assert.equal(after.body.items.find(x=>x.id===item.id).read,true);
+});
+
+test('HTTP admin can grant crystals and create a gems-only promo code',async()=>{
+  const uid='30411';await json('/api/home',{headers:headers(uid)});
+  const overview=await json('/api/admin/overview',{headers:headers('10001')});
+  const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
+  const gems=await json('/api/admin/users/'+target.id+'/gems',{method:'POST',headers:headers('10001'),body:JSON.stringify({delta:600})});
+  assert.equal(gems.r.status,200);assert.equal(gems.body.wallet.gems,600);
+  const detail=await json('/api/admin/users/'+target.id,{headers:headers('10001')});assert.equal(detail.body.user.gems,600);
+  const code='PROMO740TEST';
+  const created=await json('/api/admin/promocodes',{method:'POST',headers:headers('10001'),body:JSON.stringify({code,rewardType:'gems',rewardAmount:250,maxUses:2})});
+  assert.equal(created.r.status,200);assert.equal(created.body.code,code);
+  const redeemed=await json('/api/promocode',{method:'POST',headers:headers(uid),body:JSON.stringify({code})});
+  assert.equal(redeemed.r.status,200);assert.equal(redeemed.body.rewardType,'gems');assert.equal(redeemed.body.wallet.gems,850);
+  const again=await json('/api/promocode',{method:'POST',headers:headers(uid),body:JSON.stringify({code})});
+  assert.equal(again.r.status,409);assert.equal(again.body.error,'promo_used');
+  const list=await json('/api/admin/promocodes',{headers:headers('10001')});assert.equal(list.r.status,200);assert.ok(list.body.items.some(x=>x.code===code));
+});
+
 test('HTTP gem invoice is unavailable without bot token',async()=>{
   await json('/api/home',{headers:headers('30003')});
   const p=await json('/api/shop/invoice',{method:'POST',headers:headers('30003'),body:JSON.stringify({productKey:'gems_500'})});

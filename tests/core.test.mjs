@@ -86,18 +86,40 @@ test('drop result restores story sharing and fortune wheel hides numeric odds',(
   assert.match(result,/data-share-story/);
   assert.match(result,/В историю/);
   const wheel=appSrc.match(/function wheelView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
-  assert.match(wheel,/wheel-v9/);
+  assert.match(wheel,/wheel-v10/);
   assert.doesNotMatch(wheel,/wheel-odds-v8|Шансы|toFixed/);
 });
 
-test('admin UI is split into users, broadcast, usernames and statistics sections',()=>{
-  for(const section of ['Пользователи','Рассылка','Usernames','Статистика'])assert.match(adminSrc,new RegExp(section));
-  for(const key of ["['users','profile','Пользователи']","['broadcast','notifications','Рассылка']","['usernames','collection','Usernames']","['stats','rank','Статистика']"])assert.ok(adminSrc.includes(key));
+test('admin UI has users, broadcast, usernames, promos and statistics sections',()=>{
+  for(const section of ['Пользователи','Рассылка','Usernames','Промокоды','Статистика'])assert.match(adminSrc,new RegExp(section));
+  for(const key of ["['users','profile','Пользователи']","['broadcast','notifications','Рассылка']","['usernames','collection','Usernames']","['promocodes','promo','Промокоды']","['stats','rank','Статистика']"])assert.ok(adminSrc.includes(key));
   assert.match(adminSrc,/data-admin-section=/);
   assert.match(adminSrc,/data-admin-save-progress/);
+  assert.match(adminSrc,/data-admin-gems=/);
+  assert.match(adminSrc,/data-admin-promo-create/);
   assert.match(adminSrc,/adminUsernameQuery/);
   assert.match(adminCss,/\.admin-tabs\{/);
   assert.match(adminCss,/\.admin-stats-grid\{/);
+  assert.match(adminCss,/\.admin-promo-card\{/);
+});
+
+test('v7.4 notifications are individually readable and promo UI is available',()=>{
+  const notifications=appSrc.match(/function notificationsView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(notifications,/data-notification-id/);
+  assert.match(appSrc,/\/api\/notifications\/.*\/read/);
+  assert.match(appSrc,/function promoView\(\)/);
+  assert.match(appSrc,/data-promo-redeem/);
+  assert.match(appSrc,/checkmark-circle-02/);
+  assert.doesNotMatch(appSrc,/tick-01|✓/);
+});
+
+test('v7.4 username detail emphasizes price and the two primary actions',()=>{
+  const detail=appSrc.match(/function detailView\(x\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(detail,/username-detail-price/);
+  assert.match(detail,/На рынок/);
+  assert.match(detail,/Продать/);
+  assert.match(cssSrc,/\.username-detail-price\{/);
+  assert.match(cssSrc,/\.username-detail-actions\{/);
 });
 
 test('gameplay animations are controlled by the in-app setting, not OS reduced-motion',()=>{

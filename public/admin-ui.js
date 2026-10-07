@@ -5,14 +5,19 @@ state.adminUsernameQuery=state.adminUsernameQuery||'';
 state.adminUsernameStatus=state.adminUsernameStatus||'active';
 state.adminUsernamePage=state.adminUsernamePage||1;
 state.adminUsernames=state.adminUsernames||null;
+state.adminPromos=state.adminPromos||null;
 state.adminBroadcastResult=state.adminBroadcastResult||null;
 
 async function refreshAdmin(){
   state.admin=await api('/api/admin/overview?q='+encodeURIComponent(state.adminQuery||'')+'&page='+(state.adminPage||1)+'&size=20');
   if(state.adminSection==='usernames')await refreshAdminUsernames();
+  if(state.adminSection==='promocodes')await refreshAdminPromos();
 }
 async function refreshAdminUsernames(){
   state.adminUsernames=await api('/api/admin/usernames?q='+encodeURIComponent(state.adminUsernameQuery||'')+'&status='+encodeURIComponent(state.adminUsernameStatus||'active')+'&page='+(state.adminUsernamePage||1)+'&size=30');
+}
+async function refreshAdminPromos(){
+  state.adminPromos=await api('/api/admin/promocodes');
 }
 function adminResetSheet(){
   if(!state.adminResetStage)return '';
@@ -24,6 +29,7 @@ function adminTabs(){
     ['users','profile','Пользователи'],
     ['broadcast','notifications','Рассылка'],
     ['usernames','collection','Usernames'],
+    ['promocodes','promo','Промокоды'],
     ['stats','rank','Статистика']
   ];
   return '<nav class="admin-tabs">'+tabs.map(([key,ico,label])=>'<button data-admin-section="'+key+'" class="'+(state.adminSection===key?'active':'')+'"><span>'+icon(ico)+'</span><b>'+label+'</b></button>').join('')+'</nav>';
@@ -73,6 +79,23 @@ function usernamesSection(){
     (d.pages>1?'<div class="pager admin-pager"><button data-admin-username-pager="-1" '+(d.page<=1?'disabled':'')+'>Назад</button><span>'+d.page+' / '+d.pages+'</span><button data-admin-username-pager="1" '+(d.page>=d.pages?'disabled':'')+'>Дальше</button></div>':'')+
   '</section>';
 }
+function promocodesSection(){
+  const d=state.adminPromos||{items:[]};
+  return '<section class="admin-section">'+
+    '<div class="admin-section-head"><div><small>НАГРАДЫ</small><b>Промокоды</b><span>Создавай коды на фиксированные кристаллы.</span></div><span class="admin-head-icon">'+icon('promo')+'</span></div>'+
+    '<div class="admin-form-card admin-promo-create">'+
+      '<div class="admin-card-title"><span>'+icon('promo')+'</span><div><b>Новый промокод</b><small>Каждый пользователь может активировать один раз</small></div></div>'+
+      '<div class="admin-form-grid"><label><span>Код</span><input id="adminPromoCode" maxlength="24" autocapitalize="characters" placeholder="USERNAME2026"></label><label><span>Кристаллы</span><input id="adminPromoAmount" inputmode="numeric" placeholder="500"></label></div>'+
+      '<div class="admin-form-grid"><label><span>Лимит активаций</span><input id="adminPromoUses" inputmode="numeric" placeholder="0 = без лимита"></label><label><span>Срок действия</span><input id="adminPromoExpires" type="datetime-local"></label></div>'+
+      '<button class="primary" data-admin-promo-create>'+icon('plus')+'<span>Создать промокод</span></button>'+
+    '</div>'+
+    '<div class="admin-promo-list">'+((d.items||[]).length?d.items.map(x=>'<article class="admin-promo-card '+(x.active?'':'disabled')+'">'+
+      '<div><b>'+esc(x.code)+'</b><span>'+Number(x.rewardAmount||0).toLocaleString('ru-RU')+' 💎</span></div>'+
+      '<small>Активаций: '+Number(x.uses||0)+(Number(x.maxUses||0)>0?' / '+Number(x.maxUses):' / ∞')+(x.expiresAt?' · до '+new Date(x.expiresAt).toLocaleString('ru-RU'):'')+'</small>'+
+      '<button data-admin-promo-active="'+esc(x.code)+'" data-active="'+(x.active?'0':'1')+'" class="'+(x.active?'danger-soft':'secondary')+'">'+(x.active?'Выключить':'Включить')+'</button>'+
+    '</article>').join(''):'<div class="empty">Промокодов пока нет.</div>')+'</div>'+
+  '</section>';
+}
 function statsSection(){
   const s=state.admin?.stats||{};
   const cards=[
@@ -107,6 +130,9 @@ function userDetailView(d){
         '<button class="secondary" data-admin-save-progress>Сохранить прогресс</button>'+
         '<label><span>Изменить баланс на сумму</span><input id="adminMoney" inputmode="numeric" placeholder="Например 5000"></label>'+
         '<div class="admin-inline-actions"><button data-admin-money="add">+ Добавить</button><button data-admin-money="take" class="secondary">− Забрать</button></div>'+
+        '<div class="admin-gems-balance"><span>Кристаллы</span><b>'+Number(u.gems||0).toLocaleString('ru-RU')+' 💎</b></div>'+
+        '<label><span>Изменить кристаллы на сумму</span><input id="adminGems" inputmode="numeric" placeholder="Например 500"></label>'+
+        '<div class="admin-inline-actions"><button data-admin-gems="add">+ Выдать</button><button data-admin-gems="take" class="secondary">− Забрать</button></div>'+
       '</section>'+
       '<section class="admin-form-card"><div class="admin-card-title"><span>'+icon('admin')+'</span><div><b>Аккаунт</b><small>Доступ и служебные действия</small></div></div>'+
         '<button data-admin-block="'+(u.blocked?'0':'1')+'" class="'+(u.blocked?'secondary':'danger-soft')+'">'+(u.blocked?'Разблокировать пользователя':'Заблокировать пользователя')+'</button>'+
@@ -120,12 +146,13 @@ function userDetailView(d){
 }
 function adminView(){
   if(state.adminDetail)return '<div class="page-body admin-page">'+userDetailView(state.adminDetail)+'</div>';
-  const body=state.adminSection==='broadcast'?broadcastSection():state.adminSection==='usernames'?usernamesSection():state.adminSection==='stats'?statsSection():usersSection();
+  const body=state.adminSection==='broadcast'?broadcastSection():state.adminSection==='usernames'?usernamesSection():state.adminSection==='promocodes'?promocodesSection():state.adminSection==='stats'?statsSection():usersSection();
   return '<div class="page-body admin-page">'+adminResetSheet()+adminTabs()+body+'</div>';
 }
 async function refreshCurrentAdminList(){
   if(state.adminDetail){state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);return}
   if(state.adminSection==='usernames')await refreshAdminUsernames();
+  else if(state.adminSection==='promocodes')await refreshAdminPromos();
   else await refreshAdmin();
 }
 document.addEventListener('click',async e=>{
@@ -134,6 +161,7 @@ document.addEventListener('click',async e=>{
     if(el.dataset.adminSection){
       state.adminSection=el.dataset.adminSection;state.adminDetail=null;
       if(state.adminSection==='usernames')await refreshAdminUsernames();
+      if(state.adminSection==='promocodes')await refreshAdminPromos();
       render();return
     }
     if(el.hasAttribute('data-admin-search')){state.adminQuery=document.querySelector('#adminQuery')?.value||'';state.adminPage=1;await refreshAdmin();render();return}
@@ -149,6 +177,7 @@ document.addEventListener('click',async e=>{
       state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast('Прогресс обновлён');render();return
     }
     if(el.dataset.adminMoney){const n=Math.abs(Number(document.querySelector('#adminMoney')?.value)||0);if(!n){toast('Введите сумму');return}await api('/api/admin/users/'+state.adminDetail.user.id+'/balance',{method:'POST',body:JSON.stringify({delta:el.dataset.adminMoney==='add'?n:-n})});state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast('Баланс обновлён');render();return}
+    if(el.dataset.adminGems){const n=Math.abs(Number(document.querySelector('#adminGems')?.value)||0);if(!n){toast('Введите количество кристаллов');return}await api('/api/admin/users/'+state.adminDetail.user.id+'/gems',{method:'POST',body:JSON.stringify({delta:el.dataset.adminGems==='add'?n:-n})});state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast('Кристаллы обновлены');render();return}
     if(el.dataset.adminBlock!==undefined){await api('/api/admin/users/'+state.adminDetail.user.id+'/block',{method:'POST',body:JSON.stringify({value:el.dataset.adminBlock==='1'})});state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast(el.dataset.adminBlock==='1'?'Пользователь заблокирован':'Пользователь разблокирован');render();return}
     if(el.hasAttribute('data-admin-user-reset')){if(!confirm('Сбросить игровой прогресс этого пользователя?'))return;await api('/api/admin/users/'+state.adminDetail.user.id+'/reset',{method:'POST',body:'{}'});state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast('Прогресс пользователя сброшен');render();return}
     if(el.hasAttribute('data-admin-add-username')){const handle=document.querySelector('#adminHandle')?.value||'',value=document.querySelector('#adminValue')?.value||'';await api('/api/admin/users/'+state.adminDetail.user.id+'/add-username',{method:'POST',body:JSON.stringify({handle,value})});state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);toast('Username добавлен');render();return}
@@ -160,6 +189,20 @@ document.addEventListener('click',async e=>{
     if(el.dataset.adminRemove){if(!confirm('Удалить этот username?'))return;await api('/api/admin/usernames/'+el.dataset.adminRemove+'/remove',{method:'POST',body:'{}'});await refreshCurrentAdminList();toast('Username удалён');render();return}
     if(el.dataset.adminTransfer){const target=prompt('UID пользователя, которому передать username:');if(!target)return;await api('/api/admin/usernames/'+el.dataset.adminTransfer+'/transfer',{method:'POST',body:JSON.stringify({targetId:Number(target)})});await refreshCurrentAdminList();toast('Username передан');render();return}
     if(el.dataset.adminValue){const value=prompt('Новая игровая стоимость username:');if(!value)return;await api('/api/admin/usernames/'+el.dataset.adminValue+'/value',{method:'POST',body:JSON.stringify({value:Number(value)})});await refreshCurrentAdminList();toast('Стоимость обновлена');render();return}
+    if(el.hasAttribute('data-admin-promo-create')){
+      const code=String(document.querySelector('#adminPromoCode')?.value||'').trim();
+      const rewardAmount=Math.max(0,Number(document.querySelector('#adminPromoAmount')?.value)||0);
+      const maxUses=Math.max(0,Number(document.querySelector('#adminPromoUses')?.value)||0);
+      const localExpiry=String(document.querySelector('#adminPromoExpires')?.value||'').trim();
+      if(!code||!rewardAmount){toast('Введите код и количество кристаллов');return}
+      const expiresAt=localExpiry?new Date(localExpiry).toISOString():null;
+      await api('/api/admin/promocodes',{method:'POST',body:JSON.stringify({code,rewardType:'gems',rewardAmount,maxUses,expiresAt})});
+      await refreshAdminPromos();toast('Промокод создан');render();return
+    }
+    if(el.dataset.adminPromoActive){
+      await api('/api/admin/promocodes/'+encodeURIComponent(el.dataset.adminPromoActive)+'/active',{method:'POST',body:JSON.stringify({active:el.dataset.active==='1'})});
+      await refreshAdminPromos();toast(el.dataset.active==='1'?'Промокод включён':'Промокод выключен');render();return
+    }
     if(el.hasAttribute('data-admin-broadcast')){
       const text=String(document.querySelector('#adminBroadcastText')?.value||'').trim();if(!text){toast('Введите текст рассылки');return}
       if(!confirm('Отправить сообщение всем активным пользователям?'))return;

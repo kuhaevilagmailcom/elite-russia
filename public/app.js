@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
@@ -22,7 +22,7 @@ const ERR={
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
 function syncViewportNow(){
@@ -236,7 +236,7 @@ const ICON_NAME=Object.freeze({
  collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
  search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
  theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
- down:'arrow-down-01',plus:'add-01',check:'tick-01',x:'cancel-01'
+ down:'arrow-down-01',plus:'add-01',check:'checkmark-circle-02',promo:'coupon-01',x:'cancel-01'
 });
 function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function marketFilterIcon(){return icon('filter')}
@@ -256,7 +256,7 @@ const MENU_SECTIONS=[
  {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
  {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
  {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
- {title:'Аккаунт',items:[['profile','profile','Профиль'],['notifications','notifications','Уведомления'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
+ {title:'Аккаунт',items:[['profile','profile','Профиль'],['notifications','notifications','Уведомления'],['promo','promo','Промокод'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
 ];
 function setMenuOpen(open){
  state.menu=!!open;
@@ -308,8 +308,8 @@ function resultCard(x,pending=false){
  return '<article class="drop-result-card minimal-result'+(pending?' pending-result':'')+valueClass(x)+'">'+
    '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
    (pending?'<div class="drop-result-actions">'+
-     '<button class="story-action" data-share-story="'+x.id+'">'+icon('story')+'<span>В историю</span></button>'+
      '<div class="drop-result-resolve"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>'+
+     '<button class="story-action" data-share-story="'+x.id+'" aria-label="В историю" title="В историю">'+icon('story')+'</button>'+
    '</div>':'')+
  '</article>';
 }
@@ -327,11 +327,11 @@ function generateStoryImage(item){
   ctx.fillStyle='#68717d';ctx.font='600 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,166);
   ctx.fillStyle='#ffffff';storyRoundRect(ctx,60,280,960,1120,44);ctx.fill();
   ctx.strokeStyle='#dde1e5';ctx.lineWidth=2;storyRoundRect(ctx,60,280,960,1120,44);ctx.stroke();
-  ctx.fillStyle='#68717d';ctx.font='750 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('Я ВЫИГРАЛ USERNAME',540,455);
-  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,820);
-  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,205,1010,670,100,28);ctx.fill();
-  ctx.fillStyle='#111318';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ЗАХОДИ В USERNAME',540,1073);
-  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Попробуй выбить свой уникальный username',540,1170);
+  ctx.fillStyle='#68717d';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('МНЕ ВЫПАЛ ЮЗЕРНЕЙМ',540,455);
+  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,800);
+  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,250,1000,580,104,30);ctx.fill();
+  ctx.fillStyle='#111318';ctx.font='800 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ИГРАЙ СО МНОЙ',540,1067);
+  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME · коллекционная игра',540,1170);
   ctx.textAlign='left';ctx.fillStyle='#111318';ctx.font='800 34px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1770);
   ctx.fillStyle='#69727d';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Каждый username существует в игре только один раз',72,1815);
   return canvas.toDataURL('image/jpeg',.92);
@@ -452,13 +452,12 @@ function wheelSvgMarkup(rows){
 }
 function wheelView(){
  const w=state.wheel||{rewards:[],available:false},g=wheelGeometry(w.rewards||[]),last=state.wheelLastResult;
- return '<div class="wheel-page wheel-v9"><section class="wheel-v9-card">'+
-  '<div class="wheel-v9-head"><div><small>БЕСПЛАТНОЕ КОЛЕСО</small><b>Колесо удачи</b><span>Одно вращение раз в 24 часа</span></div><span class="wheel-v9-icon">'+icon('wheel')+'</span></div>'+
-  '<div class="fortune-stage wheel-v9-stage"><div class="fortune-rim"></div>'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><b>GO</b><span>USERNAME</span></div></div>'+
-  '<div id="wheelResult" class="wheel-result '+(last?'show':'')+'">'+(last?('<small>Выпало</small><b>'+esc(last.label)+'</b>'):'<small>Нажми кнопку — колесо остановится на награде</small>')+'</div>'+
- '</section>'+
- '<div class="wheel-v9-footer"><div class="wheel-copy"><b>'+(w.available?'Вращение доступно':'Следующее вращение позже')+'</b><span>'+(w.available?'Сегодня ты ещё не крутил колесо':('Через '+untilText(w.nextAt)))+'</span></div>'+
- '<button class="primary wheel-spin-button" data-wheel '+(!w.available?'disabled':'')+'>'+icon('play')+'<span>'+(w.available?'Крутить':'Недоступно')+'</span></button></div></div>';
+ return '<div class="wheel-page wheel-v10">'+
+  '<div class="wheel-v10-status"><i class="'+(w.available?'ready':'wait')+'"></i><span>'+(w.available?'Доступно сейчас':('Через '+untilText(w.nextAt)))+'</span></div>'+
+  '<div class="fortune-stage wheel-v10-stage">'+wheelSvgMarkup(g.rows)+'<div class="fortune-pointer"><i></i></div><div class="fortune-hub"><span>USERNAME</span><b>'+icon('wheel')+'</b></div></div>'+
+  '<div id="wheelResult" class="wheel-result wheel-v10-result '+(last?'show':'')+'">'+(last?('<span>Выпало</span><b>'+esc(last.label)+'</b>'):'<span>1 вращение в сутки</span>')+'</div>'+
+  '<button class="primary wheel-spin-button wheel-v10-button" data-wheel '+(!w.available?'disabled':'')+'><span>'+(w.available?'Крутить':'Уже использовано')+'</span></button>'+
+ '</div>';
 }
 function friendsView(){
  const f=state.friends||{friends:[],rewards:[],invited:0,active:0},link=f.referralLink||'';
@@ -553,6 +552,15 @@ function shopView(){
   '<div class="section-label">Темы</div><div class="theme-shop-grid">'+(p.themes||[]).map(x=>{const has=owned.has(x.key),active=selected===x.key;return '<article data-theme-preview="'+esc(x.key)+'"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+(has?'<button class="secondary" data-select-cosmetic="theme:'+x.key+'" '+(active?'disabled':'')+'>'+(active?'Выбрано':'Применить')+'</button>':'<button data-buy-theme="'+x.key+'">'+x.gems+' 💎</button>')+'</article>'}).join('')+'</div>'+
   '<p class="shop-note">💎 — только оформление. На дроп, колесо и апгрейд они не влияют.</p></div>';
 }
+function fmtPlain(n){return new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))}
+function promoView(){
+ const d=state.promo||{redeemed:[]};
+ return '<div class="promo-page">'+
+  '<section class="promo-hero"><span>'+icon('promo')+'</span><div><small>PROMO</small><b>Промокод</b><p>Введи код и забери фиксированную награду.</p></div></section>'+
+  '<section class="promo-redeem"><label><span>Промокод</span><input id="promoCodeInput" maxlength="24" autocomplete="off" autocapitalize="characters" placeholder="USERNAME2026"></label><button class="primary" data-promo-redeem>Активировать</button></section>'+
+  '<div class="section-label">Последние активации</div><div class="promo-history">'+((d.redeemed||[]).length?d.redeemed.map(x=>'<article><b>'+esc(x.code)+'</b><span>'+fmtPlain(x.rewardAmount)+' 💎</span><small>'+new Date(x.redeemedAt).toLocaleDateString(currentLanguage()==='en'?'en-US':'ru-RU')+'</small></article>').join(''):'<div class="empty compact">Промокоды ещё не активировались.</div>')+'</div>'+
+ '</div>';
+}
 function settingsView(){
  const s=state.settings||DEFAULT_SETTINGS,themeName={light:'Светлая',dark:'Тёмная',system:'Системная'}[s.theme]||'Системная';
  const toggle=(key,label,ico)=>'<button class="settings-row" data-setting-toggle="'+key+'"><span class="settings-row-icon">'+icon(ico)+'</span><span><b>'+label+'</b></span><i class="switch '+(s[key]?'on':'')+'"></i></button>';
@@ -577,14 +585,16 @@ function achievementsView(){
 }
 function detailView(x){
  const q=x.quality||{};
- return '<div class="detail-v7">'+resultCard(x,false)+'<div class="username-value-v7">'+fmt(x.value)+'</div><div class="quality-list-v7">'+
-  metric('Читаемость',Number(q.pronounceability||0))+metric('Краткость',Number(q.length||0))+metric('Чистота',Number(q.cleanliness||0))+metric('Спрос',Number(q.semantic||0))+
- '</div><div class="detail-actions-v7"><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">На рынок</button><button class="secondary" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">Продать</button></div></div>';
+ return '<div class="detail-v10">'+
+  '<section class="username-detail-hero'+valueClass(x)+'"><small>ТВОЙ USERNAME</small><h1 data-fit-username data-max-size="54" data-min-size="24">'+esc(x.handle)+'</h1><div class="username-detail-price"><span>Стоимость</span><b>'+fmt(x.value)+'</b></div></section>'+
+  '<section class="username-detail-quality"><div>'+metric('Читаемость',Number(q.pronounceability||0))+metric('Краткость',Number(q.length||0))+metric('Чистота',Number(q.cleanliness||0))+metric('Спрос',Number(q.semantic||0))+'</div></section>'+
+  '<div class="username-detail-actions"><button class="primary" data-list-market="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'">'+icon('market')+'<span>На рынок</span></button><button class="secondary" data-sell-system="'+x.id+'" data-handle="'+esc(x.handle)+'" data-value="'+x.value+'"><span>Продать</span></button></div>'+
+ '</div>';
 }
 function notificationsView(){
  const d=state.notifications||{items:[],unread:0},items=d.items||[];
  return '<div class="notifications-page"><div class="notifications-head"><div><b>Уведомления</b><span>'+(d.unread?('Непрочитанных: '+d.unread):'Всё прочитано')+'</span></div>'+(d.unread?'<button class="secondary" data-notifications-read>Прочитать все</button>':'')+'</div>'+
-  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" '+(n.page?'data-page="'+esc(n.page)+'"':'')+'><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
+  '<div class="notifications-list">'+(items.length?items.map(n=>'<button class="notification-item '+(n.read?'':'unread')+'" data-notification-id="'+esc(n.id)+'" data-notification-page="'+esc(n.page||'')+'"><span class="notification-icon">'+icon(n.type==='USERNAME_RECEIVED'?'gift':n.type==='ADMIN_MESSAGE'?'admin':'notifications')+'</span><span class="notification-copy"><b>'+esc(n.title)+'</b><small>'+esc(n.body||'')+'</small><em>'+new Date(n.createdAt).toLocaleString(currentLanguage()==='en'?'en-US':'ru-RU')+'</em></span><span class="notification-state">'+(n.read?'':icon('check'))+'</span></button>').join(''):'<div class="empty">Пока уведомлений нет.</div>')+'</div></div>';
 }
 function gamesView(){
  const g=state.games||{games:[],daily:{earned:0,cap:0}};
@@ -600,7 +610,7 @@ function miniGameView(){
  if(g.gameKey==='editor')body='<div class="game-question-v7"><h2>'+esc(q.source||'')+'</h2><span>'+fmt(q.sourceValue||0)+'</span><label class="game-input-v7">@<input id="gameEditorInput" maxlength="15" autocomplete="off" placeholder="сделай дороже"></label><button class="primary" data-game-editor-submit>Проверить</button></div>';
  if(g.gameKey==='build')body='<div class="game-question-v7"><h2>@'+esc(state.gameBuildValue||'')+'</h2><div class="parts-v7">'+(q.parts||[]).map(x=>'<button data-game-part="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div><div class="game-two-actions"><button class="secondary" data-game-build-clear>Сбросить</button><button class="primary" data-game-build-submit '+(!state.gameBuildValue?'disabled':'')+'>Готово</button></div></div>';
  if(g.gameKey==='price')body='<div class="game-question-v7"><h2>'+esc(q.item?.handle||'')+'</h2><div class="price-options-v7">'+(q.bands||[]).map(x=>'<button data-game-answer="'+x.key+'">'+esc(x.label)+'</button>').join('')+'</div></div>';
- const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'">'+(state.gameFeedback.correct?'✓':'×')+' +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
+ const feedback=state.gameFeedback?'<div class="game-feedback-v7 '+(state.gameFeedback.correct?'ok':'bad')+'">'+(state.gameFeedback.correct?icon('check'):'×')+' +'+fmt(state.gameFeedback.reward||0)+'</div>':'';
  return '<div class="mini-game-v7">'+head+body+feedback+'</div>';
 }
 function render(){const page=state.page;
@@ -620,13 +630,14 @@ function render(){const page=state.page;
  else if(page==='seasons')shell('Сезоны',seasonsView());
  else if(page==='profile')shell('Профиль',profileView());
  else if(page==='shop')shell('Магазин',shopView());
+ else if(page==='promo')shell('Промокод',promoView());
  else if(page==='games')shell('Игры',gamesView());
  else if(page==='miniGame')shell('Игра',miniGameView(),{back:true});
  else if(page==='detail')shell('Username',detailView(state.detail),{back:true});
  else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')
 }
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',games:'Игры',miniGame:'Игра',admin:'Админка'};
+const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',promo:'Промокод',games:'Игры',miniGame:'Игра',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -646,6 +657,7 @@ function pageReady(page){
   page==='seasons'?!!state.season:
   page==='profile'?!!state.profile:
   page==='shop'?!!state.shop:
+  page==='promo'?!!state.promo:
   page==='games'?!!state.games:
   page==='miniGame'?!!state.gameSession:
   page==='admin'?!!state.admin:true;
@@ -675,6 +687,7 @@ async function fetchPage(page){
  if(page==='seasons')state.season=await api('/api/seasons');
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='shop')state.shop=await api('/api/shop');
+ if(page==='promo')state.promo=await api('/api/promocode');
  if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
@@ -730,7 +743,7 @@ async function spinWheelUi(){
    await animateRotation(disc,final,5600,'cubic-bezier(.06,.76,.08,1)');
    stage?.classList.remove('spinning');
   }
-  state.wheelLastResult=r.reward;if(res){res.textContent='Выпало: '+r.reward.label;res.classList.add('show')}haptic('medium');sound('reward');await refreshUser();state.wheel=await api('/api/wheel');render();
+  state.wheelLastResult=r.reward;if(res){res.innerHTML='<span>Выпало</span><b>'+esc(r.reward.label)+'</b>';res.classList.add('show')}haptic('medium');sound('reward');await refreshUser();state.wheel=await api('/api/wheel');render();
  }finally{state.busy=false}
 }
 let upgradePreviewSeq=0;
@@ -799,6 +812,14 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    if(state.user)state.user.unreadNotifications=Number(r.unread||0);
    state.notifications=await api('/api/notifications');render();return
  }
+ if(el.dataset.notificationId){
+   const r=await api('/api/notifications/'+encodeURIComponent(el.dataset.notificationId)+'/read',{method:'POST',body:'{}'});
+   if(state.user)state.user.unreadNotifications=Number(r.unread||0);
+   const item=state.notifications?.items?.find(x=>String(x.id)===String(el.dataset.notificationId));if(item)item.read=true;
+   const target=String(el.dataset.notificationPage||'').trim();
+   if(target){await load(target,{force:true});return}
+   render();return
+ }
  if(el.dataset.settingTheme){
    const theme=['light','dark','system'].includes(el.dataset.settingTheme)?el.dataset.settingTheme:'system';
    saveSettings({theme});sound('tap');render();return
@@ -848,6 +869,11 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-sheet-close')){state.collectionFilterOpen=false;state.marketFilterOpen=false;render();return}
  if(el.dataset.collectionFilter){state.filters[el.dataset.collectionFilter]=el.dataset.filterValue;state.filters.page=1;state.collection=await api('/api/collection?sort='+state.filters.sort+'&digits='+state.filters.digits+'&page=1');render();return}
  if(el.dataset.marketFilter){state.marketFilters[el.dataset.marketFilter]=el.dataset.filterValue;state.marketFilters.page=1;state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();return}
+ if(el.hasAttribute('data-promo-redeem')){
+   const code=String(document.querySelector('#promoCodeInput')?.value||'').trim();if(!code){toast('Введите промокод');return}
+   el.disabled=true;const r=await api('/api/promocode',{method:'POST',body:JSON.stringify({code})});
+   applyUserLocal(r.user);state.promo=await api('/api/promocode');sound('reward');haptic('medium');toast('+'+fmtPlain(r.rewardAmount)+' 💎');render();return
+ }
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
@@ -893,7 +919,18 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.hasAttribute('data-wheel')){await spinWheelUi();return}
  if(el.hasAttribute('data-copy-ref')){if(!state.friends.referralLink){toast('Ссылка недоступна');return}await navigator.clipboard.writeText(state.friends.referralLink);toast('Ссылка скопирована');return}
  if(el.hasAttribute('data-share-ref')){const f=state.friends;if(!f?.referralLink)return;const share='https://t.me/share/url?url='+encodeURIComponent(f.referralLink)+'&text='+encodeURIComponent(f.shareText||'Я играю в USERNAME. Залетай 👇');if(typeof TG?.openTelegramLink==='function')TG.openTelegramLink(share);else window.open(share,'_blank','noopener');return}
- if(el.hasAttribute('data-gift')){const instanceId=state.giftSelectedItem,recipientUsername=String(document.querySelector('#giftRecipientUsername')?.value||state.giftRecipientUsername||'').trim();if(!instanceId||!recipientUsername){toast('Введите @username');return}const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,recipientUsername})});removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftRecipientUsername='';await refreshUser();toast(r.handle+' → '+(r.recipientUsername||r.recipient));render();return}
+ if(el.hasAttribute('data-gift')){
+   const instanceId=state.giftSelectedItem,recipientUsername=String(document.querySelector('#giftRecipientUsername')?.value||state.giftRecipientUsername||'').trim();
+   if(!instanceId||!recipientUsername){toast('Введите @username');return}
+   try{
+    const r=await api('/api/gift',{method:'POST',body:JSON.stringify({instanceId,recipientUsername})});
+    removeGiftLocal(instanceId);removeCollectionLocal(instanceId);state.giftSelectedItem='';state.giftRecipientUsername='';await refreshUser();toast(r.handle+' → '+(r.recipientUsername||r.recipient));render();
+   }catch(err){
+    if(err.message==='user_not_found'){toast('Данный человек не играет в USERNAME');return}
+    throw err
+   }
+   return
+ }
  if(el.dataset.upItem){
    const id=el.dataset.upItem,max=Number(state.upgrader?.maxItems||3),list=[...(state.upgradeSelectedIds||[])],at=list.indexOf(id);
    if(at>=0)list.splice(at,1);else{if(list.length>=max){toast('Максимум '+max);return}const next=state.upgrader?.available?.find(x=>x.id===id),first=state.upgrader?.available?.find(x=>x.id===list[0]);if(first&&next&&first.rarity!==next.rarity){toast('Выбирай usernames одной редкости');return}list.push(id)}
@@ -938,6 +975,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.3.0').catch(()=>{});
-const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|games|admin)$/);return m?m[1]:'home'})();
+import('/admin-ui.js?v=7.4.0').catch(()=>{});
+const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);

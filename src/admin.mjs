@@ -2,6 +2,7 @@ import {GAME} from './config.mjs';
 import {uid,nowIso,txBalance,collectionLimit,activeCollectionCount,compactShowcase} from './economy.mjs';
 import {isValidHandle,stableScoreHandle,rarityFromValue} from './generator.mjs';
 import {progressionFromXp} from './progression.mjs';
+import {walletData,grantGems} from './payments.mjs';
 
 const MAX_USERNAME_VALUE=1000000000;
 function normalizeUsernameValue(value,fallback=0){
@@ -60,12 +61,27 @@ export function adminUserDetail(db,userId){
   const items=db.prepare("SELECT id,handle,rarity,value,status,obtained_at FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market') ORDER BY value DESC LIMIT 250").all(u.id)
     .map(x=>({...x,handle:'@'+x.handle}));
   const prog=progressionFromXp(u.xp);
-  return {user:{id:u.id,telegramId:u.telegram_id,username:u.username,firstName:u.first_name,balance:u.balance,xp:u.xp,level:prog.level,title:prog.title,freeDrops:u.free_drops,blocked:!!u.blocked,premiumUntil:u.premium_until,createdAt:u.created_at,lastSeen:u.last_seen,capital:userCapital(db,u.id),usernameCount:items.length},items};
+  return {user:{id:u.id,telegramId:u.telegram_id,username:u.username,firstName:u.first_name,balance:u.balance,gems:walletData(db,u.id).gems,xp:u.xp,level:prog.level,title:prog.title,freeDrops:u.free_drops,blocked:!!u.blocked,premiumUntil:u.premium_until,createdAt:u.created_at,lastSeen:u.last_seen,capital:userCapital(db,u.id),usernameCount:items.length},items};
 }
 export function adminSetBalance(db,admin,targetId,delta){
   const n=Math.max(-1000000000,Math.min(1000000000,Math.round(Number(delta)||0)));
   const result=db.transaction(()=>{const before=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!before)throw new Error('user_not_found');const balance=txBalance(db,targetId,'admin_balance',n,{admin:admin.id});audit(db,admin.id,'balance',targetId,{delta:n,balance});return balance})();
   return {ok:true,balance:result};
+}
+export function adminGrantGems(db,admin,targetId,amount){
+  const target=db.prepare('SELECT id FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
+  const add=Math.max(-100000,Math.min(100000,Math.round(Number(amount)||0)));
+  if(!add)throw new Error('bad_gems');
+  const current=walletData(db,target.id);
+  if(add<0&&current.gems<Math.abs(add))throw new Error('insufficient_gems');
+  let wallet;
+  if(add>0)wallet=grantGems(db,target.id,add);
+  else{
+    db.prepare('UPDATE currency_wallets SET gems=gems+?,updated_at=? WHERE user_id=?').run(add,nowIso(),target.id);
+    wallet=walletData(db,target.id);
+  }
+  audit(db,admin.id,'gems',target.id,{delta:add,gems:wallet.gems});
+  return {ok:true,wallet};
 }
 export function adminUpdateUserProgress(db,admin,targetId,{xp,freeDrops}={}){
   const target=db.prepare('SELECT * FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
