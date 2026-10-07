@@ -30,6 +30,12 @@ const BOT_TOKEN=process.env.BOT_TOKEN||'';
 let BOT_USERNAME=(process.env.BOT_USERNAME||'').replace(/^@/,'');
 const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
 const MINIAPP_LINK=process.env.MINIAPP_LINK||'https://t.me/usernamegamebot/usernamegame';
+const TASK_CHANNEL_CHAT=String(process.env.TASK_CHANNEL_CHAT||process.env.TASK_CHANNEL_USERNAME||'').trim();
+const TASK_CHANNEL_URL=String(process.env.TASK_CHANNEL_URL||'').trim()||(()=>{
+  const name=TASK_CHANNEL_CHAT.replace(/^@/,'');
+  return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(name)?'https://t.me/'+name:'';
+})();
+const channelTaskEnabled=()=>!!(BOT_TOKEN&&TASK_CHANNEL_CHAT&&TASK_CHANNEL_URL);
 const NODE_ENV=process.env.NODE_ENV||'development';
 const ALLOW_DEV_AUTH=process.env.ALLOW_DEV_AUTH==='1';
 const DEV_ADMIN=process.env.DEV_ADMIN==='1';
@@ -303,8 +309,26 @@ async function api(req,res,url){
       if(cached&&Date.now()-cached.ts<30000)return json(res,200,{items:cached.items});
       const items=leaderboard(db);leaderboardCache.set(key,{ts:Date.now(),items});return json(res,200,{items});
     }
-    if(req.method==='GET'&&url.pathname==='/api/tasks')return json(res,200,{items:tasks(db,user)});
-    const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim){const result=claimTask(db,user,claim[1]);invalidateLeaderboard();return json(res,200,result)}
+    if(req.method==='GET'&&url.pathname==='/api/tasks'){
+      const channelEnabled=channelTaskEnabled(),items=tasks(db,user,{includeSpecial:channelEnabled}).map(t=>t.special?{...t,channelUrl:TASK_CHANNEL_URL}:t);
+      return json(res,200,{items,total:items.length,completed:items.filter(x=>x.claimed).length,ready:items.filter(x=>!x.claimed&&x.current>=x.target).length});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/tasks/channel/verify'){
+      if(!channelTaskEnabled())throw new Error('channel_task_unavailable');
+      if(!rateLimit(user.id,'channel_task_verify',10,60000))return json(res,429,{error:'rate_limited'});
+      let member;
+      try{member=await telegramApi('getChatMember',{chat_id:TASK_CHANNEL_CHAT,user_id:Number(user.telegram_id)})}
+      catch(e){console.error('Telegram channel task:',e.message);throw new Error('channel_task_unavailable')}
+      const subscribed=['creator','administrator','member'].includes(String(member?.status||''))||(member?.status==='restricted'&&member?.is_member!==false);
+      if(!subscribed)throw new Error('channel_subscription_required');
+      db.prepare('INSERT INTO task_progress(user_id,progress_date,task_key,value) VALUES(?,?,?,1) ON CONFLICT(user_id,progress_date,task_key) DO UPDATE SET value=MAX(value,1)')
+        .run(user.id,new Date(Date.now()+Number(GAME.dayTimezoneOffsetMinutes||0)*60000).toISOString().slice(0,10),'channel_sub');
+      const items=tasks(db,user,{includeSpecial:true}).map(t=>t.special?{...t,channelUrl:TASK_CHANNEL_URL}:t);
+      return json(res,200,{ok:true,items,total:items.length,completed:items.filter(x=>x.claimed).length,ready:items.filter(x=>!x.claimed&&x.current>=x.target).length});
+    }
+    const claim=url.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);if(req.method==='POST'&&claim){
+      const result=claimTask(db,user,claim[1],{allowSpecial:channelTaskEnabled()});invalidateLeaderboard();return json(res,200,result)
+    }
     if(req.method==='GET'&&url.pathname==='/api/daily')return json(res,200,dailyStatus(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id)));
     if(req.method==='POST'&&url.pathname==='/api/daily/claim'){
       const result=claimDaily(db,user),fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);
@@ -469,7 +493,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
