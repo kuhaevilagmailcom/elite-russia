@@ -92,7 +92,8 @@ test('drop result restores story sharing and fortune wheel hides numeric odds',(
 
 test('admin UI is split into users, broadcast, usernames and statistics sections',()=>{
   for(const section of ['Пользователи','Рассылка','Usernames','Статистика'])assert.match(adminSrc,new RegExp(section));
-  for(const key of ['data-admin-section="users"','data-admin-section="broadcast"','data-admin-section="usernames"','data-admin-section="stats"'])assert.match(adminSrc,new RegExp(key));
+  for(const key of ["['users','profile','Пользователи']","['broadcast','notifications','Рассылка']","['usernames','collection','Usernames']","['stats','rank','Статистика']"])assert.ok(adminSrc.includes(key));
+  assert.match(adminSrc,/data-admin-section=/);
   assert.match(adminSrc,/data-admin-save-progress/);
   assert.match(adminSrc,/adminUsernameQuery/);
   assert.match(adminCss,/\.admin-tabs\{/);
