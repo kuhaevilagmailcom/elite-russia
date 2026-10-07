@@ -21,6 +21,7 @@ import {achievementsData,reconcileAchievements} from './src/achievements.mjs';
 import {levelRewards,progressionFromXp} from './src/progression.mjs';
 import {gamesHub,startMiniGame,answerMiniGame,ensureMiniGameSchema,cleanupMiniGameSessions} from './src/minigames.mjs';
 import {bumpTask} from './src/economy.mjs';
+import {createNotification,listNotifications,unreadNotificationCount,markAllNotificationsRead} from './src/notifications.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=Number(process.env.PORT||8080);
@@ -144,6 +145,39 @@ async function sendStartMessage(chatId,firstName='',ref=''){
 async function sendHelpMessage(chatId){
   return sendBotMenuMessage(chatId,helpMessage(),publicMiniAppLink(),'🎮 Начать играть');
 }
+async function notifyUser(userId,type,title,body='',page='home'){
+  const target=db.prepare('SELECT id,telegram_id,username,first_name FROM users WHERE id=?').get(Number(userId));
+  if(!target)return {stored:false,sent:false};
+  const stored=!!createNotification(db,target.id,type,title,body,page);
+  let sent=false;
+  if(BOT_TOKEN&&target.telegram_id){
+    const text='<b>'+escapeTelegramHtml(title)+'</b>'+(body?'\n\n'+escapeTelegramHtml(body):'');
+    const payload={chat_id:target.telegram_id,text,parse_mode:'HTML',disable_web_page_preview:true};
+    const url=publicMiniAppLink(page?('page_'+page):'');
+    if(url)payload.reply_markup={inline_keyboard:[[{text:'🎮 Открыть USERNAME',url}]]};
+    try{await telegramApi('sendMessage',payload);sent=true}catch(e){console.error('Telegram user notification:',e.message)}
+  }
+  return {stored,sent};
+}
+async function runBroadcast(message,{page='home',buttonLabel='🎮 Открыть игру'}={}){
+  const text=String(message||'').trim();if(!text)throw new Error('bad_message');
+  const users=db.prepare("SELECT id,telegram_id FROM users WHERE blocked=0 AND telegram_id IS NOT NULL AND telegram_id<>'' ORDER BY id").all();
+  let sent=0,failed=0;
+  const url=publicMiniAppLink(page?('page_'+page):'');
+  for(let offset=0;offset<users.length;offset+=20){
+    const chunk=users.slice(offset,offset+20);
+    const results=await Promise.allSettled(chunk.map(async target=>{
+      createNotification(db,target.id,'ADMIN_MESSAGE','Сообщение от USERNAME',text,page);
+      if(!BOT_TOKEN)return false;
+      const payload={chat_id:target.telegram_id,text:'<b>USERNAME</b>\n\n'+escapeTelegramHtml(text),parse_mode:'HTML',disable_web_page_preview:true};
+      if(url)payload.reply_markup={inline_keyboard:[[{text:String(buttonLabel||'🎮 Открыть игру').slice(0,64),url}]]};
+      await telegramApi('sendMessage',payload);return true;
+    }));
+    for(const r of results){if(r.status==='fulfilled')sent++;else failed++}
+    if(offset+20<users.length)await new Promise(r=>setTimeout(r,750));
+  }
+  return {ok:true,total:users.length,sent,failed};
+}
 async function handleTelegramUpdate(u){
   if(u?.pre_checkout_query){
     const q=u.pre_checkout_query,ok=validProductCheckout(q);
@@ -164,6 +198,23 @@ async function handleTelegramUpdate(u){
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
   if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
+  if(/^\/admin(?:@\w+)?$/i.test(text)){
+    if(!ADMIN_IDS.has(String(m.from?.id)))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
+    const s=adminOverview(db,{page:1,size:5}).stats;
+    const body='<b>🛠 Админ-панель USERNAME</b>\n\n'+
+      '👥 Пользователей: <b>'+Number(s.users||0)+'</b>\n'+
+      '🟢 За 24 часа: <b>'+Number(s.activeToday||0)+'</b>\n'+
+      '🧩 Активных usernames: <b>'+Number(s.activeUsernames||0)+'</b>\n\n'+
+      '<code>/broadcast текст</code> — рассылка всем игрокам';
+    return sendBotMenuMessage(m.chat.id,body,publicMiniAppLink('page_admin'),'🛠 Открыть админку');
+  }
+  const broadcast=text.match(/^\/broadcast(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+  if(broadcast){
+    if(!ADMIN_IDS.has(String(m.from?.id)))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
+    if(!String(broadcast[1]||'').trim())return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Использование: /broadcast текст сообщения'});
+    const result=await runBroadcast(broadcast[1],{page:'home'});
+    return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Рассылка завершена.\n\nОтправлено: '+result.sent+'\nОшибок: '+result.failed+'\nВсего: '+result.total});
+  }
 }
 let telegramPolling=false;
 function acquirePollLease(){
@@ -226,7 +277,7 @@ async function api(req,res,url){
     const user=auth(req);if(!user)return json(res,401,{error:'unauthorized'});if(user.blocked)return json(res,403,{error:'blocked'});
     ensureSeasonLifecycle(db);
     if(!rateLimit(user.id,'global',120,60000))return json(res,429,{error:'rate_limited'});
-    if(req.method==='GET'&&url.pathname==='/api/home'){const h=homeData(db,user);h.user.isAdmin=isAdmin(user);return json(res,200,h)}
+    if(req.method==='GET'&&url.pathname==='/api/home'){const h=homeData(db,user);h.user.isAdmin=isAdmin(user);h.user.unreadNotifications=unreadNotificationCount(db,user.id);return json(res,200,h)}
     if(req.method==='POST'&&url.pathname==='/api/story-share'){
       if(!rateLimit(user.id,'story',3,60000))return json(res,429,{error:'rate_limited'});
       const b=await readBody(req),instanceId=String(b.instanceId||''),dataUrl=String(b.dataUrl||'');
@@ -288,7 +339,17 @@ async function api(req,res,url){
 
     if(req.method==='GET'&&url.pathname==='/api/friends'){if(!BOT_USERNAME&&BOT_TOKEN)await resolveBotUsername();return json(res,200,friendsData(db,user,BOT_USERNAME))}
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
-    if(req.method==='POST'&&url.pathname==='/api/gift'){const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),b.recipientUsername??b.friendId);invalidateLeaderboard();return json(res,200,result)}
+    if(req.method==='POST'&&url.pathname==='/api/gift'){
+      const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),b.recipientUsername??b.friendId);
+      invalidateLeaderboard();
+      const sender=user.username?('@'+user.username):(user.first_name||'Игрок');
+      await notifyUser(result.recipientId,'USERNAME_RECEIVED','🎁 Тебе передали username',result.handle+'\nОт: '+sender,'collection');
+      const {recipientId,...publicResult}=result;
+      return json(res,200,publicResult)
+    }
+
+    if(req.method==='GET'&&url.pathname==='/api/notifications')return json(res,200,listNotifications(db,user.id,100));
+    if(req.method==='POST'&&url.pathname==='/api/notifications/read-all')return json(res,200,markAllNotificationsRead(db,user.id));
 
     if(req.method==='GET'&&url.pathname==='/api/wheel')return json(res,200,wheelStatus(db,user));
     if(req.method==='POST'&&url.pathname==='/api/wheel'){const b=await readBody(req),result=spinWheel(db,user,String(b.requestId||''));invalidateLeaderboard();return json(res,200,result)}
@@ -339,22 +400,35 @@ async function api(req,res,url){
     }
     const adminUser=url.pathname.match(/^\/api\/admin\/users\/(\d+)$/);
     if(req.method==='GET'&&adminUser){if(!isAdmin(user))return json(res,403,{error:'forbidden'});return json(res,200,adminUserDetail(db,Number(adminUser[1])))}
-    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block|reset|add-username)$/);
+    const adminActionRoute=url.pathname.match(/^\/api\/admin\/users\/(\d+)\/(balance|block|reset|add-username|message)$/);
     if(req.method==='POST'&&adminActionRoute){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});const targetId=Number(adminActionRoute[1]),action=adminActionRoute[2],b=await readBody(req);let result;
       if(action==='balance')result=adminSetBalance(db,user,targetId,b.delta);
       if(action==='block')result=adminSetBlocked(db,user,targetId,!!b.value);
       if(action==='reset')result=resetSingleUser(db,user,targetId);
       if(action==='add-username')result=adminAddUsername(db,user,targetId,b.handle,b.value);
+      if(action==='message'){
+        const message=String(b.text||'').trim();if(!message)throw new Error('bad_message');
+        const delivery=await notifyUser(targetId,'ADMIN_MESSAGE','Сообщение от USERNAME',message,'home');
+        result={ok:true,...delivery};
+      }
       invalidateLeaderboard();return json(res,200,result);
     }
     const adminUsername=url.pathname.match(/^\/api\/admin\/usernames\/([^/]+)\/(remove|transfer|value)$/);
     if(req.method==='POST'&&adminUsername){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req),id=adminUsername[1],action=adminUsername[2];let result;
       if(action==='remove')result=adminRemoveUsername(db,user,id);
-      if(action==='transfer')result=adminTransferUsername(db,user,id,Number(b.targetId));
+      if(action==='transfer'){result=adminTransferUsername(db,user,id,Number(b.targetId));await notifyUser(Number(b.targetId),'USERNAME_RECEIVED','🎁 Тебе передали username',result.handle+'\nПередано администрацией USERNAME','collection')}
       if(action==='value')result=adminSetUsernameValue(db,user,id,b.value);
       invalidateLeaderboard();return json(res,200,result);
+    }
+    if(req.method==='POST'&&url.pathname==='/api/admin/broadcast'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const b=await readBody(req),message=String(b.text||'').trim();if(!message)throw new Error('bad_message');
+      const result=await runBroadcast(message,{page:String(b.page||'home'),buttonLabel:String(b.buttonLabel||'🎮 Открыть игру')});
+      db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+        .run(crypto.randomUUID(),user.id,'broadcast','all',JSON.stringify(result),new Date().toISOString());
+      return json(res,200,result);
     }
     if(req.method==='POST'&&url.pathname==='/api/admin/reset-all'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});const b=await readBody(req);
@@ -367,7 +441,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
