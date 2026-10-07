@@ -8,7 +8,7 @@ import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
 import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
 import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
-import {ensureUser,publicUser,leaderboard,tasks,DAILY_TASK_POOL} from '../src/game.mjs';
+import {ensureUser,publicUser,leaderboard,tasks,DAILY_TASK_POOL,DAILY_TASK_COUNT,SPECIAL_TASKS} from '../src/game.mjs';
 import {listMarket,createListing,buyListing} from '../src/market.mjs';
 import {giftUsername} from '../src/social.mjs';
 import {levelFromXp,progressionFromXp,xpToReachLevel,MAX_LEVEL,TITLE_CONFIG,levelTitle} from '../src/progression.mjs';
@@ -109,8 +109,7 @@ test('v7.4 notifications are individually readable and promo UI is available',()
   assert.match(appSrc,/\/api\/notifications\/.*\/read/);
   assert.match(appSrc,/function promoView\(\)/);
   assert.match(appSrc,/data-promo-redeem/);
-  assert.match(appSrc,/checkmark-circle-02/);
-  assert.doesNotMatch(appSrc,/tick-01|✓/);
+  assert.doesNotMatch(appSrc,/checkmark-circle-02|tick-01|icon\('check'\)|✓/);
 });
 
 test('v7.4 username detail emphasizes price and the two primary actions',()=>{
@@ -120,6 +119,16 @@ test('v7.4 username detail emphasizes price and the two primary actions',()=>{
   assert.match(detail,/Продать/);
   assert.match(cssSrc,/\.username-detail-price\{/);
   assert.match(cssSrc,/\.username-detail-actions\{/);
+});
+
+test('tasks use badge states instead of checkmarks and expose channel verification UI',()=>{
+  const block=appSrc.match(/function tasksView\(\)\{[\s\S]*?\n\}/)?.[0]||'';
+  assert.match(block,/task-claimed-badge/);
+  assert.match(block,/data-task-channel-open/);
+  assert.match(block,/data-task-channel-verify/);
+  assert.doesNotMatch(block,/icon\('check'\)|✓/);
+  assert.match(cssSrc,/\.task-v10\{/);
+  assert.match(cssSrc,/\.task-channel-actions\{/);
 });
 
 test('gameplay animations are controlled by the in-app setting, not OS reduced-motion',()=>{
@@ -209,8 +218,10 @@ test('achievement UI is a compact two-column badge grid',()=>{
   assert.match(block,/\?\?\?\?/);
 });
 
-test('daily task pool has at least 30 templates and serves 5-7 per day',()=>{
-  assert.ok(DAILY_TASK_POOL.length>=30);
+test('daily task pool has 60+ templates and serves nine varied tasks per day',()=>{
+  assert.ok(DAILY_TASK_POOL.length>=60);
+  assert.equal(DAILY_TASK_COUNT,9);
+  assert.equal(SPECIAL_TASKS.find(x=>x.key==='subscribe_channel')?.reward,5000);
 });
 
 test('five skill games replace Lab in the visible client',()=>{
@@ -302,7 +313,7 @@ test('new user starts with configured gameplay economy',()=>{
 
 test('tasks endpoint returns six daily templates',()=>{
   const rows=tasks(db,seller);
-  assert.equal(rows.length,6);
+  assert.equal(rows.length,9);
   assert.ok(rows.every(x=>x.target>0&&x.reward>0));
 });
 
