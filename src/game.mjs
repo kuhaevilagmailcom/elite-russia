@@ -351,8 +351,9 @@ function dailyTaskDefs(user){
   return picked;
 }
 function taskState(db,user,t){
-  const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,todayKey(),t.source)?.value||0;
-  const claimed=!!db.prepare('SELECT 1 FROM task_claims WHERE user_id=? AND claim_date=? AND task_key=?').get(user.id,todayKey(),t.key);
+  const scope=t.special?'special':todayKey();
+  const p=db.prepare('SELECT value FROM task_progress WHERE user_id=? AND progress_date=? AND task_key=?').get(user.id,scope,t.source)?.value||0;
+  const claimed=!!db.prepare('SELECT 1 FROM task_claims WHERE user_id=? AND claim_date=? AND task_key=?').get(user.id,scope,t.key);
   return {...t,current:Math.min(t.target,p),claimed};
 }
 export function tasks(db,user,{includeSpecial=false}={}){
@@ -362,7 +363,7 @@ export function tasks(db,user,{includeSpecial=false}={}){
 export function claimTask(db,user,key,{allowSpecial=false}={}){
   const t=tasks(db,user,{includeSpecial:allowSpecial}).find(x=>x.key===key);if(!t)throw new Error('task_not_found');if(t.current<t.target)throw new Error('task_not_done');if(t.claimed)throw new Error('already_claimed');
   db.transaction(()=>{
-    db.prepare('INSERT INTO task_claims(user_id,claim_date,task_key) VALUES(?,?,?)').run(user.id,todayKey(),key);
+    db.prepare('INSERT INTO task_claims(user_id,claim_date,task_key) VALUES(?,?,?)').run(user.id,t.special?'special':todayKey(),key);
     txBalance(db,user.id,'task_reward',t.reward,{key});
     grantXp(db,user.id,25,'task',{key});bumpSeasonScore(db,user.id,25);
   })();
