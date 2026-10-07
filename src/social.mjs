@@ -60,7 +60,7 @@ export function giftUsername(db,user,instanceId,recipientRef){
     db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(instanceId);compactShowcase(db,user.id);
     db.prepare('INSERT INTO username_transfers(id,instance_id,from_user_id,to_user_id,type,created_at) VALUES(?,?,?,?,?,?)').run(uid(),instanceId,user.id,recipient.id,'gift',nowIso());
     bumpTask(db,user.id,'gift',1);grantXp(db,user.id,12,'gift',{instanceId,toUserId:recipient.id,fee});bumpSeasonScore(db,user.id,10);
-    return {handle:'@'+inst.handle,recipient:recipient.first_name||recipient.username||'Игрок',recipientUsername:recipient.username?('@'+recipient.username):'',fee,feeRate:Number(GAME.transferFee||.05)};
+    return {handle:'@'+inst.handle,recipientId:recipient.id,recipient:recipient.first_name||recipient.username||'Игрок',recipientUsername:recipient.username?('@'+recipient.username):'',fee,feeRate:Number(GAME.transferFee||.05)};
   })();
   return {ok:true,...result};
 }
