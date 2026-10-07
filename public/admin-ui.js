@@ -61,7 +61,7 @@ function broadcastSection(){
       '<label><span>Куда ведёт кнопка</span><select id="adminBroadcastPage"><option value="home">Главная</option><option value="games">Игры</option><option value="collection">Коллекция</option><option value="wheel">Колесо</option><option value="upgrader">Апгрейдер</option><option value="shop">Магазин</option></select></label></div>'+
       '<button class="primary admin-main-action" data-admin-broadcast>'+icon('notifications')+'<span>Запустить рассылку</span></button>'+
     '</div>'+
-    (result?'<div class="admin-delivery-result"><span>'+icon('check')+'</span><div><b>Последняя рассылка завершена</b><small>Отправлено: '+Number(result.sent||0)+' · Ошибок: '+Number(result.failed||0)+' · Всего: '+Number(result.total||0)+'</small></div></div>':'')+
+    (result?'<div class="admin-delivery-result"><span>'+icon('notifications')+'</span><div><b>Последняя рассылка завершена</b><small>Отправлено: '+Number(result.sent||0)+' · Ошибок: '+Number(result.failed||0)+' · Всего: '+Number(result.total||0)+'</small></div></div>':'')+
   '</section>';
 }
 function usernamesSection(){
