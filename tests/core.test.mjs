@@ -275,7 +275,17 @@ test('editor and build games validate answers on the server',()=>{
   const edit=source.includes('_')?source.replace(/_/g,''):source.replace(/\d+$/,'');
   const er=answerMiniGame(db,u,editor.id,edit);
   assert.equal(er.done,true);
-  const build=startMiniGame(db,u,'build'),answer=build.question.parts.join('');
+  const build=startMiniGame(db,u,'build'),parts=build.question.parts;
+  const findValid=(prefix,remaining)=>{
+    if(!remaining.length)return isGameUsername(prefix)?prefix:null;
+    for(let i=0;i<remaining.length;i++){
+      const found=findValid(prefix+remaining[i],remaining.slice(0,i).concat(remaining.slice(i+1)));
+      if(found)return found;
+    }
+    return null;
+  };
+  const answer=findValid('',parts);
+  assert.ok(answer,'build puzzle must have at least one valid username arrangement');
   const br=answerMiniGame(db,u,build.id,answer);
   assert.equal(br.done,true);
 });
