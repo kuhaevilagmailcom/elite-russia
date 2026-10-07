@@ -25,7 +25,7 @@ const dbSrc=fs.readFileSync(new URL('../src/database.mjs',import.meta.url),'utf8
 const paymentSrc=fs.readFileSync(new URL('../src/payments.mjs',import.meta.url),'utf8');
 
 test('v7 uses one stylesheet and cache-busts it with the current release',()=>{
-  assert.match(indexSrc,new RegExp('styles\\.css\\?v='+GAME.version.replace(/\\./g,'\\\\.')));
+  assert.match(indexSrc,new RegExp('styles\\.css\\?v='+GAME.version.split('.').join('\\.')));
   assert.doesNotMatch(indexSrc,/ux4-core\.css/);
   assert.equal(fs.existsSync(new URL('../public/ux4-core.css',import.meta.url)),false);
 });
