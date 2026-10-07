@@ -322,7 +322,7 @@ async function api(req,res,url){
       const subscribed=['creator','administrator','member'].includes(String(member?.status||''))||(member?.status==='restricted'&&member?.is_member!==false);
       if(!subscribed)throw new Error('channel_subscription_required');
       db.prepare('INSERT INTO task_progress(user_id,progress_date,task_key,value) VALUES(?,?,?,1) ON CONFLICT(user_id,progress_date,task_key) DO UPDATE SET value=MAX(value,1)')
-        .run(user.id,new Date(Date.now()+Number(GAME.dayTimezoneOffsetMinutes||0)*60000).toISOString().slice(0,10),'channel_sub');
+        .run(user.id,'special','channel_sub');
       const items=tasks(db,user,{includeSpecial:true}).map(t=>t.special?{...t,channelUrl:TASK_CHANNEL_URL}:t);
       return json(res,200,{ok:true,items,total:items.length,completed:items.filter(x=>x.claimed).length,ready:items.filter(x=>!x.claimed&&x.current>=x.target).length});
     }
