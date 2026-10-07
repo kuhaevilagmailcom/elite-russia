@@ -30,7 +30,8 @@ const BOT_TOKEN=process.env.BOT_TOKEN||'';
 let BOT_USERNAME=(process.env.BOT_USERNAME||'').replace(/^@/,'');
 const WEBAPP_URL=process.env.WEBAPP_URL||process.env.APP_URL||process.env.PUBLIC_URL||`http://localhost:${PORT}`;
 const MINIAPP_LINK=process.env.MINIAPP_LINK||'https://t.me/usernamegamebot/usernamegame';
-const TASK_CHANNEL_CHAT=String(process.env.TASK_CHANNEL_CHAT||process.env.TASK_CHANNEL_USERNAME||'').trim();
+const TASK_CHANNEL_RAW=String(process.env.TASK_CHANNEL_CHAT||process.env.TASK_CHANNEL_USERNAME||'').trim();
+const TASK_CHANNEL_CHAT=/^-100\d+$/.test(TASK_CHANNEL_RAW)||TASK_CHANNEL_RAW.startsWith('@')?TASK_CHANNEL_RAW:(/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(TASK_CHANNEL_RAW)?'@'+TASK_CHANNEL_RAW:TASK_CHANNEL_RAW);
 const TASK_CHANNEL_URL=String(process.env.TASK_CHANNEL_URL||'').trim()||(()=>{
   const name=TASK_CHANNEL_CHAT.replace(/^@/,'');
   return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(name)?'https://t.me/'+name:'';
@@ -493,7 +494,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
