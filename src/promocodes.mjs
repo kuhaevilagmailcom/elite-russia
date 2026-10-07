@@ -1,4 +1,4 @@
-import {nowIso,txBalance} from './economy.mjs';
+import {nowIso} from './economy.mjs';
 import {grantGems} from './payments.mjs';
 
 function normalizeCode(value){
@@ -7,9 +7,9 @@ function normalizeCode(value){
   return code;
 }
 function normalizeReward(type,amount){
-  const rewardType=String(type||'').toLowerCase();
-  if(!['gems','money'].includes(rewardType))throw new Error('bad_promo_reward');
-  const rewardAmount=Math.max(1,Math.min(rewardType==='gems'?100000:10000000,Math.round(Number(amount)||0)));
+  const rewardType=String(type||'gems').toLowerCase();
+  if(rewardType!=='gems')throw new Error('bad_promo_reward');
+  const rewardAmount=Math.max(1,Math.min(100000,Math.round(Number(amount)||0)));
   if(!rewardAmount)throw new Error('bad_promo_reward');
   return {rewardType,rewardAmount};
 }
@@ -27,13 +27,10 @@ export function redeemPromo(db,user,value){
     const changed=db.prepare(`UPDATE promo_codes SET uses=uses+1 WHERE code=? AND active=1
       AND (max_uses=0 OR uses<max_uses)`).run(code).changes;
     if(!changed)throw new Error('promo_limit');
-    let wallet=null,balance=null;
-    if(promo.reward_type==='gems')wallet=grantGems(db,user.id,promo.reward_amount);
-    else if(promo.reward_type==='money')balance=txBalance(db,user.id,'promo_reward',promo.reward_amount,{code});
-    else throw new Error('bad_promo_reward');
+    const wallet=grantGems(db,user.id,promo.reward_amount);
     db.prepare('INSERT INTO promo_redemptions(code,user_id,reward_type,reward_amount,redeemed_at) VALUES(?,?,?,?,?)')
       .run(code,user.id,promo.reward_type,promo.reward_amount,nowIso());
-    return {ok:true,code,rewardType:promo.reward_type,rewardAmount:Number(promo.reward_amount),wallet,balance};
+    return {ok:true,code,rewardType:'gems',rewardAmount:Number(promo.reward_amount),wallet};
   })();
 }
 export function adminPromoList(db){
