@@ -872,7 +872,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.dataset.selectCosmetic){
    const [type,key]=String(el.dataset.selectCosmetic).split(':');await api('/api/cosmetics/select',{method:'POST',body:JSON.stringify({type,key})});
-   if(state.shop){state.shop.selected=state.shop.selected||{};state.shop.selected.theme_key=key}
+   if(state.shop){state.shop.selected=state.shop.selected||{};state.shop.selected[type==='frame'?'frame_key':'theme_key']=key}
    await refreshUser();sound('tap');haptic('light');render();return
  }
  if(el.dataset.buyTheme){
