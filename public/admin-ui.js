@@ -6,12 +6,14 @@ state.adminUsernameStatus=state.adminUsernameStatus||'active';
 state.adminUsernamePage=state.adminUsernamePage||1;
 state.adminUsernames=state.adminUsernames||null;
 state.adminPromos=state.adminPromos||null;
+state.adminPayments=state.adminPayments||null;
 state.adminBroadcastResult=state.adminBroadcastResult||null;
 
 async function refreshAdmin(){
   state.admin=await api('/api/admin/overview?q='+encodeURIComponent(state.adminQuery||'')+'&page='+(state.adminPage||1)+'&size=20');
   if(state.adminSection==='usernames')await refreshAdminUsernames();
   if(state.adminSection==='promocodes')await refreshAdminPromos();
+  if(state.adminSection==='payments')await refreshAdminPayments();
 }
 async function refreshAdminUsernames(){
   state.adminUsernames=await api('/api/admin/usernames?q='+encodeURIComponent(state.adminUsernameQuery||'')+'&status='+encodeURIComponent(state.adminUsernameStatus||'active')+'&page='+(state.adminUsernamePage||1)+'&size=30');
@@ -19,6 +21,7 @@ async function refreshAdminUsernames(){
 async function refreshAdminPromos(){
   state.adminPromos=await api('/api/admin/promocodes');
 }
+async function refreshAdminPayments(){state.adminPayments=await api('/api/admin/payments');}
 function adminResetSheet(){
   if(!state.adminResetStage)return '';
   if(state.adminResetStage===1)return '<div class="sheet-root"><button class="sheet-backdrop" data-admin-reset-close></button><aside class="filter-sheet danger-sheet"><div class="sheet-title"><b>Сброс всех игроков</b><button data-admin-reset-close>'+icon('x')+'</button></div><p>Игровой прогресс всех пользователей будет сброшен. Перед операцией сервер создаст резервную копию.</p><label>Введите <b>RESET USERNAME</b><input id="adminResetPhrase" autocomplete="off" placeholder="RESET USERNAME"></label><button class="danger" data-admin-reset-arm disabled>Продолжить</button></aside></div>';
@@ -30,6 +33,7 @@ function adminTabs(){
     ['broadcast','notifications','Рассылка'],
     ['usernames','collection','Usernames'],
     ['promocodes','promo','Промокоды'],
+    ['payments','shop','Платежи'],
     ['stats','rank','Статистика']
   ];
   return '<nav class="admin-tabs">'+tabs.map(([key,ico,label])=>'<button data-admin-section="'+key+'" class="'+(state.adminSection===key?'active':'')+'"><span>'+icon(ico)+'</span><b>'+label+'</b></button>').join('')+'</nav>';
@@ -96,6 +100,20 @@ function promocodesSection(){
     '</article>').join(''):'<div class="empty">Промокодов пока нет.</div>')+'</div>'+
   '</section>';
 }
+function paymentsSection(){
+  const items=state.adminPayments?.items||[];
+  return '<section class="admin-section">'+
+    '<div class="admin-section-head"><div><small>TELEGRAM STARS</small><b>Платежи и возвраты</b><span>Последние 100 покупок. Возвраты выполняются через Telegram.</span></div><strong>'+items.length+'</strong></div>'+
+    '<div class="admin-promo-list">'+(items.length?items.map(p=>
+      '<article class="admin-promo-card"><div><b>'+esc(p.product)+'</b><span>'+Number(p.stars||0)+' ⭐</span></div>'+
+      '<small>UID '+Number(p.userId)+' · '+esc(p.firstName||p.username||'Игрок')+' · '+esc(p.createdAt||'')+'</small>'+
+      '<small>Транзакция: '+esc(p.chargeId)+'</small>'+
+      (p.refundedAt?'<span class="admin-status">Возвращено'+(Number(p.shortfallGems)>0?' · дефицит '+Number(p.shortfallGems)+' 💎':'')+'</span>':
+        '<button class="danger-soft" data-admin-refund="'+esc(p.chargeId)+'">Вернуть Stars</button>')+
+      '</article>').join(''):'<div class="empty">Покупок пока нет.</div>')+'</div>'+
+    '<p class="admin-payment-info">Поддержка: /paysupport текст. Ответ: /supportreply ID текст.</p>'+
+  '</section>';
+}
 function statsSection(){
   const s=state.admin?.stats||{};
   const cards=[
@@ -146,13 +164,14 @@ function userDetailView(d){
 }
 function adminView(){
   if(state.adminDetail)return '<div class="page-body admin-page">'+userDetailView(state.adminDetail)+'</div>';
-  const body=state.adminSection==='broadcast'?broadcastSection():state.adminSection==='usernames'?usernamesSection():state.adminSection==='promocodes'?promocodesSection():state.adminSection==='stats'?statsSection():usersSection();
+  const body=state.adminSection==='broadcast'?broadcastSection():state.adminSection==='usernames'?usernamesSection():state.adminSection==='promocodes'?promocodesSection():state.adminSection==='payments'?paymentsSection():state.adminSection==='stats'?statsSection():usersSection();
   return '<div class="page-body admin-page">'+adminResetSheet()+adminTabs()+body+'</div>';
 }
 async function refreshCurrentAdminList(){
   if(state.adminDetail){state.adminDetail=await api('/api/admin/users/'+state.adminDetail.user.id);return}
   if(state.adminSection==='usernames')await refreshAdminUsernames();
   else if(state.adminSection==='promocodes')await refreshAdminPromos();
+  else if(state.adminSection==='payments')await refreshAdminPayments();
   else await refreshAdmin();
 }
 document.addEventListener('click',async e=>{
@@ -162,6 +181,7 @@ document.addEventListener('click',async e=>{
       state.adminSection=el.dataset.adminSection;state.adminDetail=null;
       if(state.adminSection==='usernames')await refreshAdminUsernames();
       if(state.adminSection==='promocodes')await refreshAdminPromos();
+      if(state.adminSection==='payments')await refreshAdminPayments();
       render();return
     }
     if(el.hasAttribute('data-admin-search')){state.adminQuery=document.querySelector('#adminQuery')?.value||'';state.adminPage=1;await refreshAdmin();render();return}
@@ -202,6 +222,15 @@ document.addEventListener('click',async e=>{
     if(el.dataset.adminPromoActive){
       await api('/api/admin/promocodes/'+encodeURIComponent(el.dataset.adminPromoActive)+'/active',{method:'POST',body:JSON.stringify({active:el.dataset.active==='1'})});
       await refreshAdminPromos();toast(el.dataset.active==='1'?'Промокод включён':'Промокод выключен');render();return
+    }
+    if(el.dataset.adminRefund){
+      const charge=String(el.dataset.adminRefund);
+      if(!confirm('Вернуть Stars за эту покупку? Действие нельзя отменить.'))return;
+      el.disabled=true;
+      const result=await api('/api/admin/payments/'+encodeURIComponent(charge)+'/refund',{method:'POST',body:'{}'});
+      await refreshAdminPayments();
+      toast(result.shortfallGems?'Возврат оформлен. Проверь дефицит кристаллов.':'Stars возвращены');
+      render();return
     }
     if(el.hasAttribute('data-admin-broadcast')){
       const text=String(document.querySelector('#adminBroadcastText')?.value||'').trim();if(!text){toast('Введите текст рассылки');return}
