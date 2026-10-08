@@ -108,7 +108,7 @@ function paymentsSection(){
       '<article class="admin-promo-card"><div><b>'+esc(p.product)+'</b><span>'+Number(p.stars||0)+' ⭐</span></div>'+
       '<small>UID '+Number(p.userId)+' · '+esc(p.firstName||p.username||'Игрок')+' · '+esc(p.createdAt||'')+'</small>'+
       '<small>Транзакция: '+esc(p.chargeId)+'</small>'+
-      (p.refundedAt?'<span class="admin-status">Возвращено'+(Number(p.shortfallGems)>0?' · дефицит '+Number(p.shortfallGems)+' 💎':'')+'</span>':
+      (p.refundedAt?'<span class="admin-status">Возвращено'+(Number(p.shortfallGems)>0?' · дефицит '+Number(p.shortfallGems)+' 💎':'')+'</span>':p.refundStartedAt?'<span class="admin-status blocked">Возврат требует сверки с Telegram</span>':
         '<button class="danger-soft" data-admin-refund="'+esc(p.chargeId)+'">Вернуть Stars</button>')+
       '</article>').join(''):'<div class="empty">Покупок пока нет.</div>')+'</div>'+
     '<p class="admin-payment-info">Поддержка: /paysupport текст. Ответ: /supportreply ID текст.</p>'+
