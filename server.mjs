@@ -454,7 +454,7 @@ async function api(req,res,url){
     if(url.pathname==='/api/admin/payments'&&req.method==='GET'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
       const items=db.prepare(`SELECT p.telegram_charge_id chargeId,p.total_amount stars,p.product,p.created_at createdAt,
-        p.refunded_at refundedAt,p.refund_recovered_gems recoveredGems,p.refund_shortfall_gems shortfallGems,
+        p.refunded_at refundedAt,p.refund_started_at refundStartedAt,p.refund_recovered_gems recoveredGems,p.refund_shortfall_gems shortfallGems,
         u.id userId,u.username,u.first_name firstName FROM payments p JOIN users u ON u.id=p.user_id
         ORDER BY p.created_at DESC LIMIT 100`).all();
       return json(res,200,{items});
@@ -466,8 +466,12 @@ async function api(req,res,url){
       const payment=db.prepare('SELECT p.*,u.telegram_id FROM payments p JOIN users u ON u.id=p.user_id WHERE p.telegram_charge_id=?').get(chargeId);
       if(!payment)return json(res,404,{error:'payment_not_found'});
       if(payment.refunded_at)return json(res,200,{ok:true,alreadyRefunded:true});
+      if(payment.refund_started_at)return json(res,409,{error:'refund_pending_review'});
       if(!BOT_TOKEN)return json(res,503,{error:'payment_provider_unavailable'});
-      // Provider refunds happen first; the local record is updated only on success.
+      // Mark before calling an external provider to prevent duplicate retries after an ambiguous network failure.
+      const acquired=db.prepare('UPDATE payments SET refund_started_at=? WHERE telegram_charge_id=? AND refunded_at IS NULL AND refund_started_at IS NULL')
+        .run(new Date().toISOString(),chargeId).changes;
+      if(acquired!==1)return json(res,409,{error:'refund_pending_review'});
       await telegramApi('refundStarPayment',{user_id:Number(payment.telegram_id),telegram_payment_charge_id:payment.telegram_charge_id});
       const product=SHOP_PRODUCTS[payment.product],nominal=Number(product?.gems||0);
       const result=db.transaction(()=>{
@@ -553,7 +557,7 @@ async function api(req,res,url){
     const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409,
       daily_already_claimed:409,lab_cooldown:429,lab_duplicate:409,lab_too_similar:409,lab_invalid_username:400,
       game_session_not_found:404,game_session_expired:409,game_finished:409,game_cooldown:429,bad_game:400,
-      payment_not_found:404,payment_provider_unavailable:503}[e.message]||500;
+      payment_not_found:404,payment_provider_unavailable:503,refund_pending_review:409}[e.message]||500;
     return json(res,code,{error:code===500?'server_error':knownError||'server_error'});
   }
 }
