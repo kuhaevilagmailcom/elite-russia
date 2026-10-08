@@ -85,6 +85,7 @@ function awardLevelReward(db,userId,level){
 }
 
 export function grantXp(db,userId,amount,reason='game',metadata={}){
+  return db.transaction(()=>{
   const add=Math.max(0,Math.min(10000,Math.round(Number(amount)||0))),before=db.prepare('SELECT xp,level FROM users WHERE id=?').get(userId);
   if(!before)throw new Error('user_not_found');
   const beforeLevel=levelFromXp(before.xp);
@@ -95,6 +96,7 @@ export function grantXp(db,userId,amount,reason='game',metadata={}){
   const rewards=[];
   for(let l=beforeLevel+1;l<=after.level;l++){const r=awardLevelReward(db,userId,l);if(r)rewards.push(r)}
   return {...after,added:add,rewards};
+  })();
 }
 
 export function levelRewards(){
