@@ -389,7 +389,20 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/friends'){if(!BOT_USERNAME&&BOT_TOKEN)await resolveBotUsername();return json(res,200,friendsData(db,user,BOT_USERNAME))}
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
     if(req.method==='POST'&&url.pathname==='/api/gift'){
-      const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),b.recipientUsername??b.friendId);
+      const b=await readBody(req),instanceId=String(b.instanceId||''),recipient=b.recipientUsername??b.friendId;
+      if(!db.prepare("SELECT 1 FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id))throw new Error('not_owned');
+      const recipientRaw=String(recipient??'').trim();
+      if(recipientRaw&&!/^\d+$/.test(recipientRaw)){
+        const name=recipientRaw.replace(/^@/,'').toLowerCase();
+        const target=db.prepare('SELECT telegram_id FROM users WHERE LOWER(username)=? ORDER BY last_seen DESC LIMIT 1').get(name);
+        if(!target)throw new Error('user_not_found');
+        if(!BOT_TOKEN)throw new Error('recipient_verification_unavailable');
+        let chat;
+        try{chat=await telegramApi('getChat',{chat_id:Number(target.telegram_id)})}
+        catch{throw new Error('recipient_verification_unavailable')}
+        if(String(chat?.username||'').toLowerCase()!==name)throw new Error('recipient_username_unverified');
+      }
+      const result=giftUsername(db,user,instanceId,recipient);
       invalidateLeaderboard();
       const sender=user.username?('@'+user.username):(user.first_name||'Игрок');
       await notifyUser(result.recipientId,'USERNAME_RECEIVED','🎁 Тебе передали username',result.handle+'\nОт: '+sender,'collection');
@@ -557,7 +570,7 @@ async function api(req,res,url){
     const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409,
       daily_already_claimed:409,lab_cooldown:429,lab_duplicate:409,lab_too_similar:409,lab_invalid_username:400,
       game_session_not_found:404,game_session_expired:409,game_finished:409,game_cooldown:429,bad_game:400,
-      payment_not_found:404,payment_provider_unavailable:503,refund_pending_review:409}[e.message]||500;
+      payment_not_found:404,payment_provider_unavailable:503,refund_pending_review:409,recipient_verification_unavailable:503,recipient_username_unverified:409}[e.message]||500;
     return json(res,code,{error:code===500?'server_error':knownError||'server_error'});
   }
 }
