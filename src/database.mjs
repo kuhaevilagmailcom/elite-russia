@@ -154,6 +154,7 @@ export function createDatabase(dataDir){
   `);
   const paymentCols=new Set(db.prepare('PRAGMA table_info(payments)').all().map(x=>x.name));
   if(!paymentCols.has('refunded_at'))db.exec('ALTER TABLE payments ADD COLUMN refunded_at TEXT');
+  if(!paymentCols.has('refund_started_at'))db.exec('ALTER TABLE payments ADD COLUMN refund_started_at TEXT');
   if(!paymentCols.has('refund_recovered_gems'))db.exec('ALTER TABLE payments ADD COLUMN refund_recovered_gems INTEGER NOT NULL DEFAULT 0');
   if(!paymentCols.has('refund_shortfall_gems'))db.exec('ALTER TABLE payments ADD COLUMN refund_shortfall_gems INTEGER NOT NULL DEFAULT 0');
   const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
