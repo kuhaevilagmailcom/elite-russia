@@ -567,19 +567,24 @@ function profileView(p=state.profile?.profile){
  const own=String(p.id)===String(state.user?.id),best=p.best,badges=p.achievements||[],luck=p.luckStats||{};
  const achievementNames={first_drop:'Первый улов',collector10:'Полка',collector50:'Коллекционер',clean10:'Чистая десятка',purple:'Фиолетовый',gold:'Золотой билет',gold3:'Золотой запас',deal1:'Первая сделка',deal10:'На рынке',sales25:'Продавец',gift5:'Щедрый',game1:'Разминка',game25:'Игрок',streak5:'Серия',capital1m:'Миллион',level50:'Мастер',level100:'Ветеран',level200:'Легендарный'};
  const luckStatus={legendary:'Невероятно везёт',lucky:'Очень везёт',good:'Везёт',neutral:'Нейтрально',unlucky:'Не везёт',cursed:'Жёстко не везёт'}[luck.status]||'Нейтрально';
+ const seasonBadges=(p.cosmetics||[]).filter(x=>x.type==='badge'&&/^season_\d+_top100$/.test(x.key));
+ const seasonBadgeHtml=seasonBadges.length?'<div class="profile-season-badges">'+seasonBadges.map(x=>'<span>Топ-100 · сезон '+esc(x.key.split('_')[1])+'</span>').join('')+'</div>':'';
  const achievements='<section class="profile-section-v7"><small>ДОСТИЖЕНИЯ</small><div class="profile-achievements-v7">'+(badges.length?badges.map(x=>'<span>'+icon('achievements')+'<b>'+esc(achievementNames[x.achievement_key]||'Награда')+'</b></span>').join(''):'<div class="profile-empty-v7">Пока нет</div>')+'</div></section>';
  const bestBlock='<section class="profile-section-v7"><small>ЛУЧШИЙ ЮЗЕРНЕЙМ</small>'+(best?'<div class="profile-best'+valueClass(best)+'"><b>'+esc(best.handle)+'</b><strong>'+fmt(best.value)+'</strong></div>':'<div class="profile-empty-v7">—</div>')+'</section>';
  const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Юзернеймы',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
   '<section class="profile-luck-v8"><div class="luck-score-ring" style="--luck:'+Math.max(0,Math.min(100,Number(luck.score||0)))+'%"><b>'+Number(luck.score||0)+'%</b><span>Удача</span></div><div class="luck-copy"><small>УДАЧА И НЕВЕЗЕНИЕ</small><b>'+luckStatus+'</b><div><span>Защита от невезения</span><strong>'+Number(luck.protection||0)+'%</strong></div><div><span>Серия неудач</span><strong>'+Number(luck.badStreak||0)+'</strong></div></div></section>':'';
  return '<div class="profile-v7 '+(own?'own-profile':'public-profile')+'">'+
-  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+xpBar(p)+'<div class="profile-inline-stats"><b>'+(p.rank?'#'+Number(p.rank):'—')+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
+  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+seasonBadgeHtml+xpBar(p)+'<div class="profile-inline-stats"><b>'+(p.rank?'#'+Number(p.rank):'—')+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
   bestBlock+achievements+ownStats+'</div>';
 }
 function shopView(){
- const p=state.shop||{wallet:{gems:0},gemPacks:[],themes:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.key)),selected=String(p.selected?.theme_key||'');
+ const p=state.shop||{wallet:{gems:0},gemPacks:[],themes:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.key)),selected=String(p.selected?.theme_key||''),frames=(p.owned||[]).filter(x=>x.type==='frame');
  return '<div class="shop-page-v7"><section class="shop-wallet"><span>💎</span><b>'+new Intl.NumberFormat('ru-RU').format(Number(p.wallet?.gems||0))+'</b></section>'+
   '<div class="section-label">Кристаллы</div><div class="gem-pack-grid">'+(p.gemPacks||[]).map(x=>'<article><div><b>'+esc(x.title)+'</b><span>'+x.stars+' звёзд</span></div><button class="primary" data-buy-product="'+x.key+'" '+(!p.starsEnabled?'disabled':'')+'>Купить</button></article>').join('')+'</div>'+
   '<div class="section-label">Темы</div><div class="theme-shop-grid">'+(p.themes||[]).map(x=>{const has=owned.has(x.key),active=selected===x.key;return '<article data-theme-preview="'+esc(x.key)+'"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+(has?'<button class="secondary" data-select-cosmetic="theme:'+x.key+'" '+(active?'disabled':'')+'>'+(active?'Выбрано':'Применить')+'</button>':'<button data-buy-theme="'+x.key+'">'+x.gems+' 💎</button>')+'</article>'}).join('')+'</div>'+
+  (frames.length?'<div class="section-label">Рамки профиля</div><div class="theme-shop-grid">'+frames.map(x=>
+    '<article><b>Рамка сезона '+esc(x.key.match(/season_(\d+)/)?.[1]||'')+'</b>'+
+    '<button class="secondary" data-select-cosmetic="frame:'+esc(x.key)+'" '+(p.selected?.frame_key===x.key?'disabled':'')+'>'+(p.selected?.frame_key===x.key?'Выбрано':'Применить')+'</button></article>').join('')+'</div>':'')+
   '<p class="shop-note">💎 — только оформление. На дроп, колесо и апгрейд они не влияют.</p></div>';
 }
 function fmtPlain(n){return new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))}
