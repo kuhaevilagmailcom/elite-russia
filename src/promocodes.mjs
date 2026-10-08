@@ -41,7 +41,9 @@ export function adminPromoList(db){
 export function adminCreatePromo(db,admin,{code,rewardType,rewardAmount,maxUses=0,expiresAt=null}={}){
   const normalized=normalizeCode(code),reward=normalizeReward(rewardType,rewardAmount);
   const uses=Math.max(0,Math.min(1000000,Math.round(Number(maxUses)||0)));
-  const expires=expiresAt?new Date(expiresAt).toISOString():null;
+  const expiresMs=expiresAt?Date.parse(String(expiresAt)):null;
+  if(expiresAt&&!Number.isFinite(expiresMs))throw new Error('bad_promo_expiry');
+  const expires=expiresMs===null?null:new Date(expiresMs).toISOString();
   if(expires&&Date.parse(expires)<=Date.now())throw new Error('bad_promo_expiry');
   if(db.prepare('SELECT 1 FROM promo_codes WHERE code=?').get(normalized))throw new Error('promo_exists');
   db.prepare('INSERT INTO promo_codes(code,reward_type,reward_amount,max_uses,uses,active,expires_at,created_by,created_at) VALUES(?,?,?,?,0,1,?,?,?)')
