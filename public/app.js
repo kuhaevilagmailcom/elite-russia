@@ -1018,6 +1018,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-const adminModuleReady=import('/admin-ui.js?v=7.5.0').then(()=>true).catch(err=>{console.error('Admin interface failed to load:',err);return false});
+const adminModuleReady=import('/admin-ui.js?v=7.5.1').then(()=>true).catch(err=>{console.error('Admin interface failed to load:',err);return false});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
