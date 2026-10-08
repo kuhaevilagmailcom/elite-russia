@@ -614,3 +614,10 @@ html.is-desktop .promo-page{width:100%;max-width:660px;margin:0 auto;padding-lef
 html.is-desktop .tasks-v10{width:100%;max-width:760px;margin:0 auto;padding-left:22px;padding-right:22px}
 
 @media (prefers-reduced-motion:reduce){.rolling,.land,.wheel-v10-stage,.wheel-v10-stage *{animation:none!important;transition:none!important}}
+
+.settings-disclaimer{font-size:12px;line-height:1.5;color:var(--muted);padding:8px 14px 18px;text-align:center}
+.profile-season-badges{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+.profile-season-badges span{display:inline-flex;padding:5px 9px;border-radius:8px;background:var(--accent-soft);color:var(--accent-text);font-size:12px;font-weight:700}
+:root[data-accent-theme^="season_"]{--accent:#7867AE;--accent-soft:#F0ECFA;--accent-text:#615191}
+:root[data-theme="dark"][data-accent-theme^="season_"]{--accent-soft:#2F283F;--accent-text:#C4B5FD}
+:root[data-profile-frame^="season_"] .own-profile .profile-main-v7{outline:2px solid var(--accent);outline-offset:-2px;border-radius:18px}
