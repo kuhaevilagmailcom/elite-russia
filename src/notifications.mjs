@@ -24,6 +24,10 @@ export function createNotification(db,userId,type,title,body='',page=''){
   };
   db.prepare('INSERT INTO notifications(id,user_id,type,title,body,page,read_at,created_at) VALUES(?,?,?,?,?,?,NULL,?)')
     .run(row.id,row.userId,row.type,row.title,row.body,row.page,row.createdAt);
+  // Retain at most 300 recent notifications per user, including unread ones.
+  db.prepare(`DELETE FROM notifications WHERE user_id=? AND id IN
+    (SELECT id FROM notifications WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT -1 OFFSET 300)`)
+    .run(row.userId,row.userId);
   return row;
 }
 
