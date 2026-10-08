@@ -152,6 +152,10 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_promo_active ON promo_codes(active,expires_at);
   CREATE INDEX IF NOT EXISTS idx_promo_redemptions_user ON promo_redemptions(user_id,redeemed_at DESC);
   `);
+  const paymentCols=new Set(db.prepare('PRAGMA table_info(payments)').all().map(x=>x.name));
+  if(!paymentCols.has('refunded_at'))db.exec('ALTER TABLE payments ADD COLUMN refunded_at TEXT');
+  if(!paymentCols.has('refund_recovered_gems'))db.exec('ALTER TABLE payments ADD COLUMN refund_recovered_gems INTEGER NOT NULL DEFAULT 0');
+  if(!paymentCols.has('refund_shortfall_gems'))db.exec('ALTER TABLE payments ADD COLUMN refund_shortfall_gems INTEGER NOT NULL DEFAULT 0');
   const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
   if(!userCols.has('luck_points'))db.exec("ALTER TABLE users ADD COLUMN luck_points INTEGER NOT NULL DEFAULT 0");
   if(!userCols.has('bad_drop_streak'))db.exec("ALTER TABLE users ADD COLUMN bad_drop_streak INTEGER NOT NULL DEFAULT 0");
