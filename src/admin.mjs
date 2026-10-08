@@ -72,16 +72,18 @@ export function adminGrantGems(db,admin,targetId,amount){
   const target=db.prepare('SELECT id FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
   const add=Math.max(-100000,Math.min(100000,Math.round(Number(amount)||0)));
   if(!add)throw new Error('bad_gems');
-  const current=walletData(db,target.id);
-  if(add<0&&current.gems<Math.abs(add))throw new Error('insufficient_gems');
-  let wallet;
-  if(add>0)wallet=grantGems(db,target.id,add);
-  else{
-    db.prepare('UPDATE currency_wallets SET gems=gems+?,updated_at=? WHERE user_id=?').run(add,nowIso(),target.id);
-    wallet=walletData(db,target.id);
-  }
-  audit(db,admin.id,'gems',target.id,{delta:add,gems:wallet.gems});
-  return {ok:true,wallet};
+  return db.transaction(()=>{
+    const current=walletData(db,target.id);
+    if(add<0&&current.gems<Math.abs(add))throw new Error('insufficient_gems');
+    let wallet;
+    if(add>0)wallet=grantGems(db,target.id,add);
+    else{
+      db.prepare('UPDATE currency_wallets SET gems=gems+?,updated_at=? WHERE user_id=?').run(add,nowIso(),target.id);
+      wallet=walletData(db,target.id);
+    }
+    audit(db,admin.id,'gems',target.id,{delta:add,gems:wallet.gems});
+    return {ok:true,wallet};
+  })();
 }
 export function adminUpdateUserProgress(db,admin,targetId,{xp,freeDrops}={}){
   const target=db.prepare('SELECT * FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
