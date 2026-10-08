@@ -453,7 +453,10 @@ async function api(req,res,url){
       const owned=db.prepare("SELECT type,key FROM user_cosmetics WHERE user_id=? AND type='theme' ORDER BY key").all(user.id);
       const selected=db.prepare('SELECT theme_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
       const catalog=shopCatalog();
-      return json(res,200,{wallet:walletData(db,user.id),gemPacks:catalog.gemPacks,themes:catalog.themes,owned,selected,starsEnabled:!!BOT_TOKEN})
+      const seasonalThemes=owned.filter(x=>x.type==='theme'&&/^season_\d+_top10$/.test(x.key)).map(x=>({
+        key:x.key,title:'Тема сезона '+x.key.split('_')[1],description:'Награда за место в топ-10',gems:0,type:'theme'
+      }));
+      return json(res,200,{wallet:walletData(db,user.id),gemPacks:catalog.gemPacks,themes:[...catalog.themes,...seasonalThemes],owned,selected,starsEnabled:!!BOT_TOKEN})
     }
     if(req.method==='POST'&&url.pathname==='/api/shop/invoice'){
       if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});
@@ -467,11 +470,13 @@ async function api(req,res,url){
     }
     if(req.method==='POST'&&url.pathname==='/api/cosmetics/select'){
       const b=await readBody(req),type=String(b.type||''),key=String(b.key||'');
-      if(type!=='theme')throw new Error('bad_cosmetic');
-      if(!db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key=?").get(user.id,key))throw new Error('cosmetic_locked');
+      if(type!=='theme'&&type!=='frame')throw new Error('bad_cosmetic');
+      if(!db.prepare('SELECT 1 FROM user_cosmetics WHERE user_id=? AND type=? AND key=?').get(user.id,type,key))throw new Error('cosmetic_locked');
       const now=new Date().toISOString();
-      db.prepare('INSERT INTO user_cosmetic_settings(user_id,theme_key,frame_key,card_key,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme_key=excluded.theme_key,updated_at=excluded.updated_at')
-        .run(user.id,key,null,null,now);
+      const selectedField=type==='theme'?'theme_key':'frame_key';
+      db.prepare(`INSERT INTO user_cosmetic_settings(user_id,theme_key,frame_key,card_key,updated_at) VALUES(?,?,?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET ${selectedField}=excluded.${selectedField},updated_at=excluded.updated_at`)
+        .run(user.id,type==='theme'?key:null,type==='frame'?key:null,null,now);
       return json(res,200,{ok:true,type,key})
     }
     if(req.method==='GET'&&url.pathname==='/api/levels'){
