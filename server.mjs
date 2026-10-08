@@ -96,7 +96,19 @@ backupDatabase().catch(()=>{});
 
 function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://use.hugeicons.com; img-src 'self' data:; connect-src 'self'; font-src 'self' https://use.hugeicons.com data:; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(JSON.stringify(payload))}
-function readBody(req){return new Promise((resolve,reject)=>{let s='';req.on('data',c=>{s+=c;if(s.length>3e6){reject(new Error('body_too_large'));req.destroy()}});req.on('end',()=>{try{resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});req.on('error',reject)})}
+function readBody(req){
+  return new Promise((resolve,reject)=>{
+    let s='',bytes=0,oversize=false;
+    req.on('data',c=>{
+      if(oversize)return;
+      bytes+=c.length;
+      if(bytes>3e6){oversize=true;reject(new Error('body_too_large'));return}
+      s+=c.toString('utf8');
+    });
+    req.on('end',()=>{if(oversize)return;try{resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});
+    req.on('error',reject);
+  });
+}
 function validateInitData(initData){
   if(!initData||!BOT_TOKEN)return null;
   const p=new URLSearchParams(initData),hash=p.get('hash');if(!hash)return null;p.delete('hash');
@@ -254,7 +266,7 @@ function acquirePollLease(){
     ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at
     WHERE runtime_locks.owner=excluded.owner OR runtime_locks.expires_at<=?`).run(INSTANCE_ID,expires,currentIso).changes===1;
 }
-function refreshPollLease(){db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID)}
+function refreshPollLease(){return db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID).changes===1}
 async function resolveBotUsername(){
   if(!BOT_TOKEN)return;
   try{
@@ -289,12 +301,17 @@ async function startTelegramPolling(){
   await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
   await notifyAdminsBotRestarted();
   await configureTelegramBot();
-  let offset=0,lastLease=0;console.log('Telegram bot polling started');
+  let offset=Math.max(0,Number(db.prepare("SELECT value FROM game_config WHERE key='telegram_update_offset'").get()?.value||0)),lastLease=0;
+  console.log('Telegram bot polling started');
   while(telegramPolling){
     try{
-      if(Date.now()-lastLease>20000){refreshPollLease();lastLease=Date.now()}
+      if(Date.now()-lastLease>20000){if(!refreshPollLease()){console.error('Lost polling lease');telegramPolling=false;break}lastLease=Date.now()}
       const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});
-      for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}
+      for(const u of ups||[]){
+        await handleTelegramUpdate(u);
+        offset=Math.max(offset,Number(u.update_id||0)+1);
+        db.prepare("INSERT INTO game_config(key,value) VALUES('telegram_update_offset',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(offset));
+      }
     }catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}
   }
 }
