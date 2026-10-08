@@ -572,7 +572,7 @@ function profileView(p=state.profile?.profile){
  const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Юзернеймы',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
   '<section class="profile-luck-v8"><div class="luck-score-ring" style="--luck:'+Math.max(0,Math.min(100,Number(luck.score||0)))+'%"><b>'+Number(luck.score||0)+'%</b><span>Удача</span></div><div class="luck-copy"><small>УДАЧА И НЕВЕЗЕНИЕ</small><b>'+luckStatus+'</b><div><span>Защита от невезения</span><strong>'+Number(luck.protection||0)+'%</strong></div><div><span>Серия неудач</span><strong>'+Number(luck.badStreak||0)+'</strong></div></div></section>':'';
  return '<div class="profile-v7 '+(own?'own-profile':'public-profile')+'">'+
-  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+xpBar(p)+'<div class="profile-inline-stats"><b>#'+Number(p.rank||0)+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
+  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+xpBar(p)+'<div class="profile-inline-stats"><b>'+(p.rank?'#'+Number(p.rank):'—')+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
   bestBlock+achievements+ownStats+'</div>';
 }
 function shopView(){
@@ -598,7 +598,7 @@ function settingsView(){
   [['light','Светлая','sun-03'],['dark','Тёмная','moon-02'],['system','Системная','settings-01']].map(([v,t,ic])=>'<button data-setting-theme="'+v+'" class="'+(s.theme===v?'active':'')+'">'+iconRaw(ic)+'<span>'+t+'</span></button>').join('')+
  '</div></section><section class="settings-card"><div class="settings-title"><b>Язык</b><span>'+(s.language==='en'?'English':'Русский')+'</span></div><div class="language-segment">'+
   '<button data-setting-language="ru" class="'+(s.language!=='en'?'active':'')+'">Русский</button><button data-setting-language="en" class="'+(s.language==='en'?'active':'')+'">English</button>'+
- '</div></section><section class="settings-card settings-list">'+toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','motion')+'</section></div>';
+ '</div></section><section class="settings-card settings-list">'+toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','motion')+'</section><p class="settings-disclaimer">Все ₽ в игре — виртуальные очки. Их нельзя вывести или обменять на настоящие деньги.</p></div>';
 }
 function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function levelsView(){
