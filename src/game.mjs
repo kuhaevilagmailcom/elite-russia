@@ -126,11 +126,12 @@ export function publicUser(db,user){
   const assets=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(user.id);
   const owned=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id).c;
   const active=activeCollectionCount(db,user.id),capital=Number(user.balance||0)+Number(assets.value||0);
-  const rank=db.prepare(`SELECT COUNT(*)+1 rank FROM (
+  const rankCutoff=new Date(Date.now()-7*86400000).toISOString();
+  const rank=String(user.last_seen||'')<rankCutoff?null:db.prepare(`SELECT COUNT(*)+1 rank FROM (
     SELECT u.id,u.balance+COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) capital
     FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
     WHERE u.blocked=0 AND u.last_seen>=? GROUP BY u.id HAVING capital>?
-  )`).get(new Date(Date.now()-7*86400000).toISOString(),capital).rank;
+  )`).get(rankCutoff,capital).rank;
   const prog=progressionFromXp(user.xp);
   return {
     id:user.id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
