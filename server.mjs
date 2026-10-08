@@ -43,9 +43,12 @@ const DEV_ADMIN=process.env.DEV_ADMIN==='1';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
 const INSTANCE_ID=crypto.randomUUID();
 if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
-const DEFAULT_ADMIN_IDS=['8464597898','1141626866'];
-const ADMIN_IDS=new Set([...DEFAULT_ADMIN_IDS,...String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean)]);
+const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(x=>/^\d{5,20}$/.test(x)));
+if(!ADMIN_IDS.size)console.warn('Configure ADMIN_IDS before using the admin panel');
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
+const BACKUP_DIR=process.env.BACKUP_DIR||path.join(DATA_DIR,'backups');
+const PAY_SUPPORT_CONTACT=String(process.env.PAY_SUPPORT_CONTACT||'').trim().slice(0,200);
+let lastBackupSuccess=null,lastBackupFailure=null;
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
@@ -73,22 +76,23 @@ function cleanupStoryFiles(){
   try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(st.mtimeMs<cutoff)fs.unlinkSync(p)}}catch(e){console.error('Story cleanup:',e.message)}
 }
 async function backupDatabase(label=''){
-  const dir=path.join(DATA_DIR,'backups');fs.mkdirSync(dir,{recursive:true});
+  const dir=BACKUP_DIR;fs.mkdirSync(dir,{recursive:true});
   const day=new Date().toISOString().slice(0,10),safe=String(label||'username-'+day).replace(/[^a-z0-9._-]/gi,'-'),target=path.join(dir,safe+'.sqlite');
   try{
     if(!fs.existsSync(target))await db.backup(target);
     const files=fs.readdirSync(dir).filter(x=>/\.sqlite$/.test(x)).sort((a,b)=>fs.statSync(path.join(dir,b)).mtimeMs-fs.statSync(path.join(dir,a)).mtimeMs);
     for(const old of files.slice(12))fs.unlinkSync(path.join(dir,old));
+    lastBackupSuccess=new Date().toISOString();lastBackupFailure=null;
     return target;
-  }catch(e){console.error('Backup:',e.message);throw e}
+  }catch(e){lastBackupFailure=String(e.message||e);console.error('Backup:',lastBackupFailure);throw e}
 }
 function maintenance(){
   cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);cleanupMiniGameSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
 }
 maintenance();
 setInterval(maintenance,10*60*1000).unref?.();
-setInterval(()=>backupDatabase(),24*60*60*1000).unref?.();
-backupDatabase();
+setInterval(()=>{backupDatabase().catch(()=>{});},24*60*60*1000).unref?.();
+backupDatabase().catch(()=>{});
 
 function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://use.hugeicons.com; img-src 'self' data:; connect-src 'self'; font-src 'self' https://use.hugeicons.com data:; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(JSON.stringify(payload))}
@@ -181,7 +185,7 @@ async function runBroadcast(message,{page='home',buttonLabel='🎮 Открыт�
       if(url)payload.reply_markup={inline_keyboard:[[{text:String(buttonLabel||'🎮 Открыть игру').slice(0,64),url}]]};
       await telegramApi('sendMessage',payload);return true;
     }));
-    for(const r of results){if(r.status==='fulfilled')sent++;else failed++}
+    for(const r of results){if(r.status==='fulfilled'&&r.value===true)sent++;else failed++}
     if(offset+20<users.length)await new Promise(r=>setTimeout(r,750));
   }
   return {ok:true,total:users.length,sent,failed};
@@ -226,10 +230,10 @@ async function handleTelegramUpdate(u){
 }
 let telegramPolling=false;
 function acquirePollLease(){
-  const now=Date.now(),expires=new Date(now+70000).toISOString(),current=db.prepare('SELECT * FROM runtime_locks WHERE name=?').get('telegram_polling');
-  if(current&&current.owner!==INSTANCE_ID&&new Date(current.expires_at).getTime()>now)return false;
-  db.prepare('INSERT INTO runtime_locks(name,owner,expires_at) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at').run('telegram_polling',INSTANCE_ID,expires);
-  return true;
+  const now=Date.now(),expires=new Date(now+70000).toISOString(),currentIso=new Date(now).toISOString();
+  return db.prepare(`INSERT INTO runtime_locks(name,owner,expires_at) VALUES('telegram_polling',?,?)
+    ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at
+    WHERE runtime_locks.owner=excluded.owner OR runtime_locks.expires_at<=?`).run(INSTANCE_ID,expires,currentIso).changes===1;
 }
 function refreshPollLease(){db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID)}
 async function resolveBotUsername(){
@@ -494,8 +498,12 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
-    return json(res,code,{error:e.message||'server_error'});
+    const knownError=typeof e?.message==='string'?e.message:'';
+    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409,
+      daily_already_claimed:409,lab_cooldown:429,lab_duplicate:409,lab_too_similar:409,lab_invalid_username:400,
+      game_session_not_found:404,game_session_expired:409,game_finished:409,game_cooldown:429,bad_game:400,
+      payment_not_found:404,payment_provider_unavailable:503}[e.message]||500;
+    return json(res,code,{error:code===500?'server_error':knownError||'server_error'});
   }
 }
 function serveStoryImage(req,res,url){
@@ -507,12 +515,14 @@ function serveStoryImage(req,res,url){
   });
 }
 function serveStatic(req,res,url){
-  let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');
-  const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}
+  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405,{'Allow':'GET, HEAD'});return res.end()}
+  const rel=url.pathname==='/'?'index.html':url.pathname.slice(1);
+  const root=path.resolve(__dirname,'public'),file=path.resolve(root,rel),relative=path.relative(root,file);
+  if(relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative)){res.writeHead(403);return res.end()}
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':'no-store, max-age=0','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})
 }
 const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz'){
-  try{const dbOk=Number(db.prepare('SELECT 1 ok').get()?.ok)===1;return json(res,dbOk?200:503,{ok:dbOk,service:'username',version:GAME.version,db:dbOk,botConfigured:!!BOT_TOKEN,telegramPolling})}
+  try{const dbOk=Number(db.prepare('SELECT 1 ok').get()?.ok)===1;return json(res,dbOk?200:503,{ok:dbOk,service:'username',version:GAME.version,db:dbOk,botConfigured:!!BOT_TOKEN,telegramPolling,backupOk:!!lastBackupSuccess&&!lastBackupFailure,backupLastSuccess:lastBackupSuccess})}
   catch{return json(res,503,{ok:false,service:'username',version:GAME.version,db:false,botConfigured:!!BOT_TOKEN,telegramPolling})}
 }if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
