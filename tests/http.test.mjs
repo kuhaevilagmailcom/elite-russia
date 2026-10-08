@@ -27,7 +27,7 @@ async function json(pathname,opts={}){
 test.before(async()=>{
   child=spawn(process.execPath,['server.mjs'],{
     cwd:process.cwd(),
-    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'',BOT_TOKEN:'',BOT_USERNAME:'test_username_bot',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
+    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'31001',BOT_TOKEN:'',BOT_USERNAME:'test_username_bot',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
     stdio:['ignore','pipe','pipe']
   });
   await waitForServer();
@@ -43,7 +43,7 @@ test('HTTP auth rejects request without Telegram/dev identity',async()=>{
 });
 
 test('HTTP home and drop work through the real server',async()=>{
-  const home=await json('/api/home',{headers:headers()});assert.equal(home.r.status,200);assert.equal(home.body.user.telegramId,'30001');
+  const home=await json('/api/home',{headers:headers()});assert.equal(home.r.status,200);assert.equal(Object.hasOwn(home.body.user,'telegramId'),false);
   const drop=await json('/api/drop',{method:'POST',headers:headers(),body:JSON.stringify({requestId:'http-drop-1',tier:'basic'})});
   assert.equal(drop.r.status,200);assert.ok(drop.body.instance.id);assert.ok(drop.body.instance.handle.startsWith('@'));
   const replay=await json('/api/drop',{method:'POST',headers:headers(),body:JSON.stringify({requestId:'http-drop-1',tier:'basic'})});
@@ -134,7 +134,7 @@ test('HTTP upgrader preview and spin work without touch APIs or Telegram-only ev
   const spin=await json('/api/upgrader',{method:'POST',headers:headers(uid),body:JSON.stringify({ids:[id],sessionId:preview.body.sessionId})});assert.equal(spin.r.status,200);assert.equal(typeof spin.body.success,'boolean');
 });
 
-test('fixed admin IDs are authorized and ordinary users are denied',async()=>{
+test('configured admin IDs are authorized and ordinary users are denied',async()=>{
   await json('/api/home',{headers:headers('8464597898')});
   const ok=await json('/api/admin/overview',{headers:headers('8464597898')});assert.equal(ok.r.status,200);
   const denied=await json('/api/admin/overview',{headers:headers('30200')});assert.equal(denied.r.status,403);assert.equal(denied.body.error,'forbidden');
