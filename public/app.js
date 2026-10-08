@@ -718,7 +718,7 @@ async function fetchPage(page){
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='shop')state.shop=await api('/api/shop');
  if(page==='promo')state.promo=await api('/api/promocode');
- if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;await adminModuleReady;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
+ if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!await adminModuleReady||!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
  const seq=++routeSeq,initial=!window.__USERNAME_READY||!state.user;
@@ -735,7 +735,7 @@ async function load(page,{force=false}={}){
   else toast(ERR[e.message]||'Не удалось загрузить раздел');
  }finally{if(seq===routeSeq)routeLoading(false)}
 }
-function openMarketModal(id,handle,value){const fee=Number(state.market?.fee??.05),root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
+function openMarketModal(id,handle,value){const fee=Number(state.market?.fee??.05),root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия '+Math.round(fee*100)+'% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function openSystemSellModal(id,handle,value){
  const root=document.createElement('div');root.className='modal-root';
  root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Продать '+esc(handle)+'?</b><button data-modal-close>'+icon('close')+'</button></div><div class="system-sell-copy">Система сразу начислит <b>'+fmt(value)+'</b>. Username исчезнет из коллекции. Отменить продажу после подтверждения нельзя.</div><button class="primary" data-confirm-system-sell="'+id+'">Продать за '+fmt(value)+'</button></div>';
@@ -1013,6 +1013,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-const adminModuleReady=import('/admin-ui.js?v=7.5.0').catch(err=>{console.error('Admin interface failed to load:',err);throw new Error('network')});
+const adminModuleReady=import('/admin-ui.js?v=7.5.0').then(()=>true).catch(err=>{console.error('Admin interface failed to load:',err);return false});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
