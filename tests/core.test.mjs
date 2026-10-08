@@ -131,10 +131,10 @@ test('tasks use badge states instead of checkmarks and expose channel verificati
   assert.match(cssSrc,/\.task-channel-actions\{/);
 });
 
-test('gameplay animations are controlled by the in-app setting, not OS reduced-motion',()=>{
+test('gameplay animations respect both in-app and OS reduced-motion settings',()=>{
   const motion=appSrc.match(/function motionEnabled\(\)\{[^}]+\}/)?.[0]||'';
   assert.match(motion,/state\.settings\.animations/);
-  assert.doesNotMatch(motion,/prefers-reduced-motion/);
+  assert.match(motion,/prefers-reduced-motion/);
   assert.doesNotMatch(cssSrc,/@media\s*\(prefers-reduced-motion:reduce\)\{\*\{/);
   assert.match(cssSrc,/\.no-animations \*\{/);
   const drop=appSrc.match(/async function animateDrop\(result\)\{[\s\S]*?\n\}/)?.[0]||'';
@@ -388,7 +388,7 @@ test('market purchase transfers one username once',()=>{
   assert.ok(listMarket(db,{q:'market'}).items.every(x=>x.id!==listing.id));
 });
 
-test('gift picker backend only transfers to a friend',()=>{
+test('gift picker backend can transfer to a friend and prevents duplicate transfer',()=>{
   db.prepare('INSERT OR IGNORE INTO friends(user_id,friend_id,created_at) VALUES(?,?,?)').run(seller.id,friend.id,new Date().toISOString());
   const id=owned(seller,'giftv7','COMMON',1200);
   const r=giftUsername(db,seller,id,friend.id);
