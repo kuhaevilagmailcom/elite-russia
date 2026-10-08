@@ -2,6 +2,7 @@ export const BOT_COMMANDS=Object.freeze([
   {command:'start',description:'Открыть главное меню'},
   {command:'play',description:'Начать играть'},
   {command:'help',description:'Как играть'},
+  {command:'paysupport',description:'Поддержка покупок за Stars'},
   {command:'admin',description:'Админ-панель'},
   {command:'broadcast',description:'Рассылка (только админ)'}
 ]);
@@ -33,7 +34,7 @@ export function helpMessage(){
     '3. Торгуй с игроками и собирай редкие короткие имена.\n'+
     '4. Используй апгрейдер, если готов рискнуть предметом ради более дорогого.\n'+
     '5. Увеличивай капитал и занимай место в рейтинге.\n\n'+
-    'Команды: /start — главное меню, /play — открыть игру, /help — эта подсказка.';
+    'Команды: /start — главное меню, /play — открыть игру, /help — эта подсказка, /paysupport — вопросы об оплате.';
 }
 
 export function gameKeyboard(url,label='🎮 Начать играть'){
