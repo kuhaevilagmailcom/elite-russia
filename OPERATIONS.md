@@ -1,4 +1,4 @@
-# USERNAME 7.5.0 — deployment and operations
+# USERNAME 7.5.1 — deployment and operations
 
 ## Required environment
 
