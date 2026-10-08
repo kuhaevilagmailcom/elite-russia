@@ -207,6 +207,25 @@ async function handleTelegramUpdate(u){
   }
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
+  const support=text.match(/^\/paysupport(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+  if(support){
+    if(!rateLimit(m.from?.id||m.chat.id,'payment_support',5,3600000))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Слишком много обращений. Попробуй позже.'});
+    const issue=String(support[1]||'').trim().slice(0,1800);
+    if(!issue)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Опиши проблему после команды: /paysupport текст обращения'+(PAY_SUPPORT_CONTACT?'\nКонтакт: '+PAY_SUPPORT_CONTACT:'')});
+    if(!ADMIN_IDS.size)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Поддержка сейчас недоступна. Попробуй позже.'+(PAY_SUPPORT_CONTACT?'\nКонтакт: '+PAY_SUPPORT_CONTACT:'')});
+    let delivered=0;
+    const message='<b>Обращение по Telegram Stars</b>\nЧат: <code>'+String(m.chat.id)+'</code>\n\n'+escapeTelegramHtml(issue);
+    for(const id of ADMIN_IDS){try{await telegramApi('sendMessage',{chat_id:id,text:message,parse_mode:'HTML'});delivered++}catch(e){console.error('Stars support forwarding:',e.message)}}
+    return telegramApi('sendMessage',{chat_id:m.chat.id,text:delivered?'Обращение принято. Ответ придёт сюда.':'Не удалось передать обращение. Попробуй позже.'});
+  }
+  const supportReply=text.match(/^\/supportreply(?:@\w+)?\s+(\d{5,20})\s+([\s\S]+)$/i);
+  if(supportReply){
+    if(!ADMIN_IDS.has(String(m.from?.id)))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
+    const answer=String(supportReply[2]||'').trim().slice(0,1800);
+    if(!answer)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Ответ пуст.'});
+    try{await telegramApi('sendMessage',{chat_id:supportReply[1],text:'Ответ поддержки USERNAME:\n\n'+answer});return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Ответ отправлен.'})}
+    catch(e){return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Не удалось отправить ответ: '+String(e.message).slice(0,100)})}
+  }
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
   if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
@@ -432,6 +451,38 @@ async function api(req,res,url){
       return json(res,200,reconcileAchievements(db,{...fresh,level:progressionFromXp(fresh.xp).level}));
     }
 
+    if(url.pathname==='/api/admin/payments'&&req.method==='GET'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const items=db.prepare(`SELECT p.telegram_charge_id chargeId,p.total_amount stars,p.product,p.created_at createdAt,
+        p.refunded_at refundedAt,p.refund_recovered_gems recoveredGems,p.refund_shortfall_gems shortfallGems,
+        u.id userId,u.username,u.first_name firstName FROM payments p JOIN users u ON u.id=p.user_id
+        ORDER BY p.created_at DESC LIMIT 100`).all();
+      return json(res,200,{items});
+    }
+    const refundRoute=url.pathname.match(/^\/api\/admin\/payments\/([^/]+)\/refund$/);
+    if(req.method==='POST'&&refundRoute){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const chargeId=decodeURIComponent(refundRoute[1]);
+      const payment=db.prepare('SELECT p.*,u.telegram_id FROM payments p JOIN users u ON u.id=p.user_id WHERE p.telegram_charge_id=?').get(chargeId);
+      if(!payment)return json(res,404,{error:'payment_not_found'});
+      if(payment.refunded_at)return json(res,200,{ok:true,alreadyRefunded:true});
+      if(!BOT_TOKEN)return json(res,503,{error:'payment_provider_unavailable'});
+      // Provider refunds happen first; the local record is updated only on success.
+      await telegramApi('refundStarPayment',{user_id:Number(payment.telegram_id),telegram_payment_charge_id:payment.telegram_charge_id});
+      const product=SHOP_PRODUCTS[payment.product],nominal=Number(product?.gems||0);
+      const result=db.transaction(()=>{
+        if(db.prepare('SELECT refunded_at FROM payments WHERE telegram_charge_id=?').get(chargeId)?.refunded_at)return {ok:true,alreadyRefunded:true};
+        const available=Number(db.prepare('SELECT gems FROM currency_wallets WHERE user_id=?').get(payment.user_id)?.gems||0);
+        const recovered=Math.min(available,nominal),shortfall=nominal-recovered,ts=new Date().toISOString();
+        if(recovered)db.prepare('UPDATE currency_wallets SET gems=gems-?,updated_at=? WHERE user_id=?').run(recovered,ts,payment.user_id);
+        db.prepare('UPDATE payments SET refunded_at=?,refund_recovered_gems=?,refund_shortfall_gems=? WHERE telegram_charge_id=?').run(ts,recovered,shortfall,chargeId);
+        db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),user.id,'refund_stars',String(payment.user_id),JSON.stringify({chargeId,recovered,shortfall}),ts);
+        return {ok:true,recoveredGems:recovered,shortfallGems:shortfall};
+      })();
+      await notifyUser(payment.user_id,'SYSTEM','Возврат Telegram Stars','Возврат оформлен. Если есть вопросы, напиши /paysupport','shop');
+      return json(res,200,result);
+    }
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
       return json(res,200,adminOverview(db,{q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||20)}));
