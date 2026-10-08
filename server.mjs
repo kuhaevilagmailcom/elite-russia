@@ -43,9 +43,12 @@ const DEV_ADMIN=process.env.DEV_ADMIN==='1';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
 const INSTANCE_ID=crypto.randomUUID();
 if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
-const DEFAULT_ADMIN_IDS=['8464597898','1141626866'];
-const ADMIN_IDS=new Set([...DEFAULT_ADMIN_IDS,...String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean)]);
+const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(x=>/^\d{5,20}$/.test(x)));
+if(!ADMIN_IDS.size)console.warn('Configure ADMIN_IDS before using the admin panel');
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
+const BACKUP_DIR=process.env.BACKUP_DIR||path.join(DATA_DIR,'backups');
+const PAY_SUPPORT_CONTACT=String(process.env.PAY_SUPPORT_CONTACT||'').trim().slice(0,200);
+let lastBackupSuccess=null,lastBackupFailure=null;
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
@@ -73,26 +76,39 @@ function cleanupStoryFiles(){
   try{for(const name of fs.readdirSync(STORY_DIR)){const p=path.join(STORY_DIR,name),st=fs.statSync(p);if(st.mtimeMs<cutoff)fs.unlinkSync(p)}}catch(e){console.error('Story cleanup:',e.message)}
 }
 async function backupDatabase(label=''){
-  const dir=path.join(DATA_DIR,'backups');fs.mkdirSync(dir,{recursive:true});
+  const dir=BACKUP_DIR;fs.mkdirSync(dir,{recursive:true});
   const day=new Date().toISOString().slice(0,10),safe=String(label||'username-'+day).replace(/[^a-z0-9._-]/gi,'-'),target=path.join(dir,safe+'.sqlite');
   try{
     if(!fs.existsSync(target))await db.backup(target);
     const files=fs.readdirSync(dir).filter(x=>/\.sqlite$/.test(x)).sort((a,b)=>fs.statSync(path.join(dir,b)).mtimeMs-fs.statSync(path.join(dir,a)).mtimeMs);
     for(const old of files.slice(12))fs.unlinkSync(path.join(dir,old));
+    lastBackupSuccess=new Date().toISOString();lastBackupFailure=null;
     return target;
-  }catch(e){console.error('Backup:',e.message);throw e}
+  }catch(e){lastBackupFailure=String(e.message||e);console.error('Backup:',lastBackupFailure);throw e}
 }
 function maintenance(){
   cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);cleanupMiniGameSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
 }
 maintenance();
 setInterval(maintenance,10*60*1000).unref?.();
-setInterval(()=>backupDatabase(),24*60*60*1000).unref?.();
-backupDatabase();
+setInterval(()=>{backupDatabase().catch(()=>{});},24*60*60*1000).unref?.();
+backupDatabase().catch(()=>{});
 
 function securityHeaders(){return {'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':"default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline' https://use.hugeicons.com; img-src 'self' data:; connect-src 'self'; font-src 'self' https://use.hugeicons.com data:; frame-ancestors https://web.telegram.org https://*.telegram.org"}}
 function json(res,status,payload){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...securityHeaders()});res.end(JSON.stringify(payload))}
-function readBody(req){return new Promise((resolve,reject)=>{let s='';req.on('data',c=>{s+=c;if(s.length>3e6){reject(new Error('body_too_large'));req.destroy()}});req.on('end',()=>{try{resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});req.on('error',reject)})}
+function readBody(req){
+  return new Promise((resolve,reject)=>{
+    const chunks=[];let bytes=0,oversize=false;
+    req.on('data',c=>{
+      if(oversize)return;
+      bytes+=c.length;
+      if(bytes>3e6){oversize=true;reject(new Error('body_too_large'));return}
+      chunks.push(c);
+    });
+    req.on('end',()=>{if(oversize)return;try{const s=Buffer.concat(chunks).toString('utf8');resolve(s?JSON.parse(s):{})}catch{reject(new Error('bad_json'))}});
+    req.on('error',reject);
+  });
+}
 function validateInitData(initData){
   if(!initData||!BOT_TOKEN)return null;
   const p=new URLSearchParams(initData),hash=p.get('hash');if(!hash)return null;p.delete('hash');
@@ -181,7 +197,7 @@ async function runBroadcast(message,{page='home',buttonLabel='🎮 Открыт�
       if(url)payload.reply_markup={inline_keyboard:[[{text:String(buttonLabel||'🎮 Открыть игру').slice(0,64),url}]]};
       await telegramApi('sendMessage',payload);return true;
     }));
-    for(const r of results){if(r.status==='fulfilled')sent++;else failed++}
+    for(const r of results){if(r.status==='fulfilled'&&r.value===true)sent++;else failed++}
     if(offset+20<users.length)await new Promise(r=>setTimeout(r,750));
   }
   return {ok:true,total:users.length,sent,failed};
@@ -203,6 +219,25 @@ async function handleTelegramUpdate(u){
   }
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
+  const support=text.match(/^\/paysupport(?:@\w+)?(?:\s+([\s\S]+))?$/i);
+  if(support){
+    if(!rateLimit(m.from?.id||m.chat.id,'payment_support',5,3600000))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Слишком много обращений. Попробуй позже.'});
+    const issue=String(support[1]||'').trim().slice(0,1800);
+    if(!issue)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Опиши проблему после команды: /paysupport текст обращения'+(PAY_SUPPORT_CONTACT?'\nКонтакт: '+PAY_SUPPORT_CONTACT:'')});
+    if(!ADMIN_IDS.size)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Поддержка сейчас недоступна. Попробуй позже.'+(PAY_SUPPORT_CONTACT?'\nКонтакт: '+PAY_SUPPORT_CONTACT:'')});
+    let delivered=0;
+    const message='<b>Обращение по Telegram Stars</b>\nЧат: <code>'+String(m.chat.id)+'</code>\n\n'+escapeTelegramHtml(issue);
+    for(const id of ADMIN_IDS){try{await telegramApi('sendMessage',{chat_id:id,text:message,parse_mode:'HTML'});delivered++}catch(e){console.error('Stars support forwarding:',e.message)}}
+    return telegramApi('sendMessage',{chat_id:m.chat.id,text:delivered?'Обращение принято. Ответ придёт сюда.':'Не удалось передать обращение. Попробуй позже.'});
+  }
+  const supportReply=text.match(/^\/supportreply(?:@\w+)?\s+(\d{5,20})\s+([\s\S]+)$/i);
+  if(supportReply){
+    if(!ADMIN_IDS.has(String(m.from?.id)))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
+    const answer=String(supportReply[2]||'').trim().slice(0,1800);
+    if(!answer)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Ответ пуст.'});
+    try{await telegramApi('sendMessage',{chat_id:supportReply[1],text:'Ответ поддержки USERNAME:\n\n'+answer});return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Ответ отправлен.'})}
+    catch(e){return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Не удалось отправить ответ: '+String(e.message).slice(0,100)})}
+  }
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
   if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
@@ -226,12 +261,12 @@ async function handleTelegramUpdate(u){
 }
 let telegramPolling=false;
 function acquirePollLease(){
-  const now=Date.now(),expires=new Date(now+70000).toISOString(),current=db.prepare('SELECT * FROM runtime_locks WHERE name=?').get('telegram_polling');
-  if(current&&current.owner!==INSTANCE_ID&&new Date(current.expires_at).getTime()>now)return false;
-  db.prepare('INSERT INTO runtime_locks(name,owner,expires_at) VALUES(?,?,?) ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at').run('telegram_polling',INSTANCE_ID,expires);
-  return true;
+  const now=Date.now(),expires=new Date(now+70000).toISOString(),currentIso=new Date(now).toISOString();
+  return db.prepare(`INSERT INTO runtime_locks(name,owner,expires_at) VALUES('telegram_polling',?,?)
+    ON CONFLICT(name) DO UPDATE SET owner=excluded.owner,expires_at=excluded.expires_at
+    WHERE runtime_locks.owner=excluded.owner OR runtime_locks.expires_at<=?`).run(INSTANCE_ID,expires,currentIso).changes===1;
 }
-function refreshPollLease(){db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID)}
+function refreshPollLease(){return db.prepare('UPDATE runtime_locks SET expires_at=? WHERE name=? AND owner=?').run(new Date(Date.now()+70000).toISOString(),'telegram_polling',INSTANCE_ID).changes===1}
 async function resolveBotUsername(){
   if(!BOT_TOKEN)return;
   try{
@@ -261,19 +296,26 @@ async function notifyAdminsBotRestarted(){
   }
 }
 async function startTelegramPolling(){
-  if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');return}
+  if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');setTimeout(()=>startTelegramPolling().catch(e=>console.error('Telegram polling restart:',e.message)),25000).unref?.();return}
   telegramPolling=true;await resolveBotUsername();
   await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
   await notifyAdminsBotRestarted();
   await configureTelegramBot();
-  let offset=0,lastLease=0;console.log('Telegram bot polling started');
+  const telegramOffsetKey='telegram_update_offset_'+crypto.createHash('sha256').update(BOT_TOKEN).digest('hex').slice(0,16);
+  let offset=Math.max(0,Number(db.prepare('SELECT value FROM game_config WHERE key=?').get(telegramOffsetKey)?.value||0)),lastLease=0;
+  console.log('Telegram bot polling started');
   while(telegramPolling){
     try{
-      if(Date.now()-lastLease>20000){refreshPollLease();lastLease=Date.now()}
+      if(Date.now()-lastLease>20000){if(!refreshPollLease()){console.error('Lost polling lease');telegramPolling=false;break}lastLease=Date.now()}
       const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});
-      for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}
+      for(const u of ups||[]){
+        await handleTelegramUpdate(u);
+        offset=Math.max(offset,Number(u.update_id||0)+1);
+        db.prepare('INSERT INTO game_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(telegramOffsetKey,String(offset));
+      }
     }catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}
   }
+  setTimeout(()=>startTelegramPolling().catch(e=>console.error('Telegram polling restart:',e.message)),25000).unref?.();
 }
 function giftOptions(user){
   const items=db.prepare("SELECT id,handle,rarity,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id).map(x=>({...x,handle:'@'+x.handle}));
@@ -366,7 +408,20 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/friends'){if(!BOT_USERNAME&&BOT_TOKEN)await resolveBotUsername();return json(res,200,friendsData(db,user,BOT_USERNAME))}
     if(req.method==='GET'&&url.pathname==='/api/gift/options')return json(res,200,giftOptions(user));
     if(req.method==='POST'&&url.pathname==='/api/gift'){
-      const b=await readBody(req),result=giftUsername(db,user,String(b.instanceId||''),b.recipientUsername??b.friendId);
+      const b=await readBody(req),instanceId=String(b.instanceId||''),recipient=b.recipientUsername??b.friendId;
+      if(!db.prepare("SELECT 1 FROM username_instances WHERE id=? AND owner_id=? AND status='owned'").get(instanceId,user.id))throw new Error('not_owned');
+      const recipientRaw=String(recipient??'').trim();
+      if(recipientRaw&&!/^\d+$/.test(recipientRaw)){
+        const name=recipientRaw.replace(/^@/,'').toLowerCase();
+        const target=db.prepare('SELECT telegram_id FROM users WHERE LOWER(username)=? ORDER BY last_seen DESC LIMIT 1').get(name);
+        if(!target)throw new Error('user_not_found');
+        if(!BOT_TOKEN)throw new Error('recipient_verification_unavailable');
+        let chat;
+        try{chat=await telegramApi('getChat',{chat_id:Number(target.telegram_id)})}
+        catch{throw new Error('recipient_verification_unavailable')}
+        if(String(chat?.username||'').toLowerCase()!==name)throw new Error('recipient_username_unverified');
+      }
+      const result=giftUsername(db,user,instanceId,recipient);
       invalidateLeaderboard();
       const sender=user.username?('@'+user.username):(user.first_name||'Игрок');
       await notifyUser(result.recipientId,'USERNAME_RECEIVED','🎁 Тебе передали username',result.handle+'\nОт: '+sender,'collection');
@@ -395,10 +450,13 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
     if(req.method==='GET'&&(url.pathname==='/api/shop'||url.pathname==='/api/premium')){
-      const owned=db.prepare("SELECT type,key FROM user_cosmetics WHERE user_id=? AND type='theme' ORDER BY key").all(user.id);
-      const selected=db.prepare('SELECT theme_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
+      const owned=db.prepare("SELECT type,key FROM user_cosmetics WHERE user_id=? AND type IN ('theme','frame') ORDER BY type,key").all(user.id);
+      const selected=db.prepare('SELECT theme_key,frame_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
       const catalog=shopCatalog();
-      return json(res,200,{wallet:walletData(db,user.id),gemPacks:catalog.gemPacks,themes:catalog.themes,owned,selected,starsEnabled:!!BOT_TOKEN})
+      const seasonalThemes=owned.filter(x=>x.type==='theme'&&/^season_\d+_top10$/.test(x.key)).map(x=>({
+        key:x.key,title:'Тема сезона '+x.key.split('_')[1],description:'Награда за место в топ-10',gems:0,type:'theme'
+      }));
+      return json(res,200,{wallet:walletData(db,user.id),gemPacks:catalog.gemPacks,themes:[...catalog.themes,...seasonalThemes],owned,selected,starsEnabled:!!BOT_TOKEN})
     }
     if(req.method==='POST'&&url.pathname==='/api/shop/invoice'){
       if(!BOT_TOKEN)return json(res,503,{error:'premium_unavailable'});
@@ -412,11 +470,13 @@ async function api(req,res,url){
     }
     if(req.method==='POST'&&url.pathname==='/api/cosmetics/select'){
       const b=await readBody(req),type=String(b.type||''),key=String(b.key||'');
-      if(type!=='theme')throw new Error('bad_cosmetic');
-      if(!db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key=?").get(user.id,key))throw new Error('cosmetic_locked');
+      if(type!=='theme'&&type!=='frame')throw new Error('bad_cosmetic');
+      if(!db.prepare('SELECT 1 FROM user_cosmetics WHERE user_id=? AND type=? AND key=?').get(user.id,type,key))throw new Error('cosmetic_locked');
       const now=new Date().toISOString();
-      db.prepare('INSERT INTO user_cosmetic_settings(user_id,theme_key,frame_key,card_key,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET theme_key=excluded.theme_key,updated_at=excluded.updated_at')
-        .run(user.id,key,null,null,now);
+      const selectedField=type==='theme'?'theme_key':'frame_key';
+      db.prepare(`INSERT INTO user_cosmetic_settings(user_id,theme_key,frame_key,card_key,updated_at) VALUES(?,?,?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET ${selectedField}=excluded.${selectedField},updated_at=excluded.updated_at`)
+        .run(user.id,type==='theme'?key:null,type==='frame'?key:null,null,now);
       return json(res,200,{ok:true,type,key})
     }
     if(req.method==='GET'&&url.pathname==='/api/levels'){
@@ -428,6 +488,42 @@ async function api(req,res,url){
       return json(res,200,reconcileAchievements(db,{...fresh,level:progressionFromXp(fresh.xp).level}));
     }
 
+    if(url.pathname==='/api/admin/payments'&&req.method==='GET'){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const items=db.prepare(`SELECT p.telegram_charge_id chargeId,p.total_amount stars,p.product,p.created_at createdAt,
+        p.refunded_at refundedAt,p.refund_started_at refundStartedAt,p.refund_recovered_gems recoveredGems,p.refund_shortfall_gems shortfallGems,
+        u.id userId,u.username,u.first_name firstName FROM payments p JOIN users u ON u.id=p.user_id
+        ORDER BY p.created_at DESC LIMIT 100`).all();
+      return json(res,200,{items});
+    }
+    const refundRoute=url.pathname.match(/^\/api\/admin\/payments\/([^/]+)\/refund$/);
+    if(req.method==='POST'&&refundRoute){
+      if(!isAdmin(user))return json(res,403,{error:'forbidden'});
+      const chargeId=decodeURIComponent(refundRoute[1]);
+      const payment=db.prepare('SELECT p.*,u.telegram_id FROM payments p JOIN users u ON u.id=p.user_id WHERE p.telegram_charge_id=?').get(chargeId);
+      if(!payment)return json(res,404,{error:'payment_not_found'});
+      if(payment.refunded_at)return json(res,200,{ok:true,alreadyRefunded:true});
+      if(payment.refund_started_at)return json(res,409,{error:'refund_pending_review'});
+      if(!BOT_TOKEN)return json(res,503,{error:'payment_provider_unavailable'});
+      // Mark before calling an external provider to prevent duplicate retries after an ambiguous network failure.
+      const acquired=db.prepare('UPDATE payments SET refund_started_at=? WHERE telegram_charge_id=? AND refunded_at IS NULL AND refund_started_at IS NULL')
+        .run(new Date().toISOString(),chargeId).changes;
+      if(acquired!==1)return json(res,409,{error:'refund_pending_review'});
+      await telegramApi('refundStarPayment',{user_id:Number(payment.telegram_id),telegram_payment_charge_id:payment.telegram_charge_id});
+      const product=SHOP_PRODUCTS[payment.product],nominal=Number(product?.gems||0);
+      const result=db.transaction(()=>{
+        if(db.prepare('SELECT refunded_at FROM payments WHERE telegram_charge_id=?').get(chargeId)?.refunded_at)return {ok:true,alreadyRefunded:true};
+        const available=Number(db.prepare('SELECT gems FROM currency_wallets WHERE user_id=?').get(payment.user_id)?.gems||0);
+        const recovered=Math.min(available,nominal),shortfall=nominal-recovered,ts=new Date().toISOString();
+        if(recovered)db.prepare('UPDATE currency_wallets SET gems=gems-?,updated_at=? WHERE user_id=?').run(recovered,ts,payment.user_id);
+        db.prepare('UPDATE payments SET refunded_at=?,refund_recovered_gems=?,refund_shortfall_gems=? WHERE telegram_charge_id=?').run(ts,recovered,shortfall,chargeId);
+        db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),user.id,'refund_stars',String(payment.user_id),JSON.stringify({chargeId,recovered,shortfall}),ts);
+        return {ok:true,recoveredGems:recovered,shortfallGems:shortfall};
+      })();
+      await notifyUser(payment.user_id,'SYSTEM','Возврат Telegram Stars','Возврат оформлен. Если есть вопросы, напиши /paysupport','shop');
+      return json(res,200,result);
+    }
     if(url.pathname==='/api/admin/overview'&&req.method==='GET'){
       if(!isAdmin(user))return json(res,403,{error:'forbidden'});
       return json(res,200,adminOverview(db,{q:url.searchParams.get('q')||'',page:Number(url.searchParams.get('page')||1),size:Number(url.searchParams.get('size')||20)}));
@@ -494,8 +590,12 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
-    return json(res,code,{error:e.message||'server_error'});
+    const knownError=typeof e?.message==='string'?e.message:'';
+    const code={insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409,
+      daily_already_claimed:409,lab_cooldown:429,lab_duplicate:409,lab_too_similar:409,lab_invalid_username:400,
+      game_session_not_found:404,game_session_expired:409,game_finished:409,game_cooldown:429,bad_game:400,
+      payment_not_found:404,payment_provider_unavailable:503,refund_pending_review:409,recipient_verification_unavailable:503,recipient_username_unverified:409}[e.message]||500;
+    return json(res,code,{error:code===500?'server_error':knownError||'server_error'});
   }
 }
 function serveStoryImage(req,res,url){
@@ -507,12 +607,14 @@ function serveStoryImage(req,res,url){
   });
 }
 function serveStatic(req,res,url){
-  let rel=url.pathname==='/'?'index.html':url.pathname.slice(1);rel=path.normalize(rel).replace(/^\.\.(\/|\\|$)/,'');
-  const root=path.join(__dirname,'public'),file=path.join(root,rel);if(!file.startsWith(root)){res.writeHead(403);return res.end()}
+  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405,{'Allow':'GET, HEAD'});return res.end()}
+  const rel=url.pathname==='/'?'index.html':url.pathname.slice(1);
+  const root=path.resolve(__dirname,'public'),file=path.resolve(root,rel),relative=path.relative(root,file);
+  if(relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative)){res.writeHead(403);return res.end()}
   fs.stat(file,(err,st)=>{if(err||!st.isFile()){res.writeHead(404);return res.end('Not found')}const ext=path.extname(file),types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2'};res.writeHead(200,{'Content-Type':types[ext]||'application/octet-stream','Cache-Control':'no-store, max-age=0','Pragma':'no-cache','Expires':'0',...securityHeaders()});fs.createReadStream(file).pipe(res)})
 }
 const server=http.createServer((req,res)=>{const url=new URL(req.url,WEBAPP_URL);if(url.pathname==='/healthz'){
-  try{const dbOk=Number(db.prepare('SELECT 1 ok').get()?.ok)===1;return json(res,dbOk?200:503,{ok:dbOk,service:'username',version:GAME.version,db:dbOk,botConfigured:!!BOT_TOKEN,telegramPolling})}
+  try{const dbOk=Number(db.prepare('SELECT 1 ok').get()?.ok)===1;return json(res,dbOk?200:503,{ok:dbOk,service:'username',version:GAME.version,db:dbOk,botConfigured:!!BOT_TOKEN,telegramPolling,backupOk:!!lastBackupSuccess&&!lastBackupFailure,backupLastSuccess:lastBackupSuccess})}
   catch{return json(res,503,{ok:false,service:'username',version:GAME.version,db:false,botConfigured:!!BOT_TOKEN,telegramPolling})}
 }if(url.pathname.startsWith('/story/'))return serveStoryImage(req,res,url);if(url.pathname.startsWith('/api/'))return api(req,res,url);return serveStatic(req,res,url)});
 const isMain=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);

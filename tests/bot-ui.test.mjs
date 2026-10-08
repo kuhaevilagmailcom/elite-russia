@@ -6,7 +6,7 @@ import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,startMessage,helpMess
 const serverSrc=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 
 test('bot exposes player and admin commands',()=>{
-  assert.deepEqual(BOT_COMMANDS.map(x=>x.command),['start','play','help','admin','broadcast']);
+  assert.deepEqual(BOT_COMMANDS.map(x=>x.command),['start','play','help','paysupport','admin','broadcast']);
   assert.ok(BOT_COMMANDS.every(x=>x.description.length>0));
 });
 

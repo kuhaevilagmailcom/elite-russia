@@ -16,7 +16,7 @@ export function ensureUser(db,tg){
       .run(id,tg.username||'',tg.first_name||'Игрок',GAME.startBalance,GAME.freeDrops,ts,ts);
     u=db.prepare('SELECT * FROM users WHERE telegram_id=?').get(id);
   }else{
-    const nextUsername=tg.username||u.username,nextName=tg.first_name||u.first_name,lastSeen=Date.parse(u.last_seen||'')||0;
+    const nextUsername=String(tg.username||''),nextName=tg.first_name||u.first_name,lastSeen=Date.parse(u.last_seen||'')||0;
     if(nextUsername!==u.username||nextName!==u.first_name||Date.now()-lastSeen>=60000){
       db.prepare('UPDATE users SET username=?,first_name=?,last_seen=? WHERE id=?').run(nextUsername,nextName,ts,u.id);
       u=db.prepare('SELECT * FROM users WHERE id=?').get(u.id);
@@ -126,14 +126,15 @@ export function publicUser(db,user){
   const assets=db.prepare("SELECT COUNT(*) count,COALESCE(SUM(value),0) value,COALESCE(MAX(value),0) best FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").get(user.id);
   const owned=db.prepare("SELECT COUNT(*) c FROM username_instances WHERE owner_id=? AND status='owned'").get(user.id).c;
   const active=activeCollectionCount(db,user.id),capital=Number(user.balance||0)+Number(assets.value||0);
-  const rank=db.prepare(`SELECT COUNT(*)+1 rank FROM (
+  const rankCutoff=new Date(Date.now()-7*86400000).toISOString();
+  const rank=String(user.last_seen||'')<rankCutoff?null:db.prepare(`SELECT COUNT(*)+1 rank FROM (
     SELECT u.id,u.balance+COALESCE(SUM(CASE WHEN i.status IN ('pending','owned','market') THEN i.value ELSE 0 END),0) capital
     FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
-    WHERE u.blocked=0 GROUP BY u.id HAVING capital>?
-  )`).get(capital).rank;
+    WHERE u.blocked=0 AND u.last_seen>=? GROUP BY u.id HAVING capital>?
+  )`).get(rankCutoff,capital).rank;
   const prog=progressionFromXp(user.xp);
   return {
-    id:user.id,telegramId:user.telegram_id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
+    id:user.id,username:user.username,firstName:user.first_name,balance:user.balance,freeDrops:user.free_drops,
     level:prog.level,xp:prog.xp,title:prog.title,levelXp:prog.levelXp,nextLevelXp:prog.nextLevelXp,levelProgress:prog.progress,xpRemaining:prog.remaining,
     luck:Number(user.luck_points||0),badDropStreak:Number(user.bad_drop_streak||0),totalEarned:Number(user.total_earned||0),bestDropValue:Number(user.best_drop_value||0),
     premium:isPremium(user),collectionCount:owned,activeCollectionCount:active,collectionValue:assets.value,bestValue:assets.best,capital,rank,
@@ -237,11 +238,11 @@ export function leaderboard(db){
        WHERE x.owner_id=u.id AND x.status IN ('pending','owned','market')
        ORDER BY x.value DESC,x.obtained_at ASC LIMIT 1) best_handle
     FROM users u LEFT JOIN username_instances i ON i.owner_id=u.id
-    WHERE u.blocked=0
+    WHERE u.blocked=0 AND u.last_seen>=?
     GROUP BY u.id
     ORDER BY capital DESC,u.id ASC
     LIMIT 100
-  `).all();
+  `).all(new Date(Date.now()-7*86400000).toISOString());
   return rows.map((r,i)=>({...r,position:i+1,best_handle:r.best_handle?'@'+r.best_handle:null}));
 }
 export const DAILY_TASK_COUNT=9;

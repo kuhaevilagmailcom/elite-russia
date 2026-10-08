@@ -51,6 +51,7 @@ export function achievementsData(db,user){
 }
 export function reconcileAchievements(db,user){
   ensureSchema(db);
+  return db.transaction(()=>{
   const rows=rowsFor(db,user),unlock=db.prepare('INSERT OR IGNORE INTO achievement_unlocks(user_id,achievement_key,xp_reward,unlocked_at) VALUES(?,?,?,?)');
   for(const a of rows){
     if(!a.done)continue;
@@ -58,4 +59,5 @@ export function reconcileAchievements(db,user){
     if(changes)grantXp(db,user.id,a.xp,'achievement',{key:a.key});
   }
   return achievementsData(db,{...user,...db.prepare('SELECT * FROM users WHERE id=?').get(user.id)});
+  })();
 }

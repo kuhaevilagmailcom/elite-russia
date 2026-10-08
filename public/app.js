@@ -22,7 +22,7 @@ const ERR={
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
   wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
-  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',network:'Нет соединения с сервером'
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',recipient_username_unverified:'Этот Telegram username больше не принадлежит указанному пользователю',recipient_verification_unavailable:'Не удалось безопасно проверить получателя. Попробуй позже',refund_pending_review:'Возврат уже запрошен. Требуется сверка с Telegram',payment_not_found:'Платёж не найден',payment_provider_unavailable:'Telegram Stars временно недоступны',server_error:'Ошибка сервера. Попробуй позже',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
 function syncViewportNow(){
@@ -204,7 +204,7 @@ function sound(kind='tap'){
  };
  for(const [hz,opts] of (map[kind]||map.tap))tone(hz,opts);
 }
-function motionEnabled(){return !!state.settings.animations}
+function motionEnabled(){return !!state.settings.animations&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches}
 function toast(t){toastEl.textContent=translateLiteral(t);toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
 async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
 function startParam(){
@@ -567,19 +567,24 @@ function profileView(p=state.profile?.profile){
  const own=String(p.id)===String(state.user?.id),best=p.best,badges=p.achievements||[],luck=p.luckStats||{};
  const achievementNames={first_drop:'Первый улов',collector10:'Полка',collector50:'Коллекционер',clean10:'Чистая десятка',purple:'Фиолетовый',gold:'Золотой билет',gold3:'Золотой запас',deal1:'Первая сделка',deal10:'На рынке',sales25:'Продавец',gift5:'Щедрый',game1:'Разминка',game25:'Игрок',streak5:'Серия',capital1m:'Миллион',level50:'Мастер',level100:'Ветеран',level200:'Легендарный'};
  const luckStatus={legendary:'Невероятно везёт',lucky:'Очень везёт',good:'Везёт',neutral:'Нейтрально',unlucky:'Не везёт',cursed:'Жёстко не везёт'}[luck.status]||'Нейтрально';
+ const seasonBadges=(p.cosmetics||[]).filter(x=>x.type==='badge'&&/^season_\d+_top100$/.test(x.key));
+ const seasonBadgeHtml=seasonBadges.length?'<div class="profile-season-badges">'+seasonBadges.map(x=>'<span>Топ-100 · сезон '+esc(x.key.split('_')[1])+'</span>').join('')+'</div>':'';
  const achievements='<section class="profile-section-v7"><small>ДОСТИЖЕНИЯ</small><div class="profile-achievements-v7">'+(badges.length?badges.map(x=>'<span>'+icon('achievements')+'<b>'+esc(achievementNames[x.achievement_key]||'Награда')+'</b></span>').join(''):'<div class="profile-empty-v7">Пока нет</div>')+'</div></section>';
  const bestBlock='<section class="profile-section-v7"><small>ЛУЧШИЙ ЮЗЕРНЕЙМ</small>'+(best?'<div class="profile-best'+valueClass(best)+'"><b>'+esc(best.handle)+'</b><strong>'+fmt(best.value)+'</strong></div>':'<div class="profile-empty-v7">—</div>')+'</section>';
  const ownStats=own?'<section class="profile-section-v7"><small>СТАТИСТИКА</small><div class="profile-stats-v7">'+metric('Юзернеймы',p.collectionCount)+metric('Сделки',p.marketDeals||0)+metric('Друзья',p.friendsCount||0)+metric('Удача',(Number(luck.score||0))+'%')+'</div></section>'+
   '<section class="profile-luck-v8"><div class="luck-score-ring" style="--luck:'+Math.max(0,Math.min(100,Number(luck.score||0)))+'%"><b>'+Number(luck.score||0)+'%</b><span>Удача</span></div><div class="luck-copy"><small>УДАЧА И НЕВЕЗЕНИЕ</small><b>'+luckStatus+'</b><div><span>Защита от невезения</span><strong>'+Number(luck.protection||0)+'%</strong></div><div><span>Серия неудач</span><strong>'+Number(luck.badStreak||0)+'</strong></div></div></section>':'';
  return '<div class="profile-v7 '+(own?'own-profile':'public-profile')+'">'+
-  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+xpBar(p)+'<div class="profile-inline-stats"><b>#'+Number(p.rank||0)+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
+  '<section class="profile-main-v7"><div class="avatar">'+esc((p.firstName||'U')[0].toUpperCase())+'</div><h1>'+esc(p.firstName||'Игрок')+'</h1><span>'+(p.username?'@'+esc(p.username):'')+'</span>'+seasonBadgeHtml+xpBar(p)+'<div class="profile-inline-stats"><b>'+(p.rank?'#'+Number(p.rank):'—')+'</b><strong>'+fmt(p.capital||0)+'</strong></div></section>'+
   bestBlock+achievements+ownStats+'</div>';
 }
 function shopView(){
- const p=state.shop||{wallet:{gems:0},gemPacks:[],themes:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.key)),selected=String(p.selected?.theme_key||'');
+ const p=state.shop||{wallet:{gems:0},gemPacks:[],themes:[],owned:[],selected:{}},owned=new Set((p.owned||[]).map(x=>x.key)),selected=String(p.selected?.theme_key||''),frames=(p.owned||[]).filter(x=>x.type==='frame');
  return '<div class="shop-page-v7"><section class="shop-wallet"><span>💎</span><b>'+new Intl.NumberFormat('ru-RU').format(Number(p.wallet?.gems||0))+'</b></section>'+
   '<div class="section-label">Кристаллы</div><div class="gem-pack-grid">'+(p.gemPacks||[]).map(x=>'<article><div><b>'+esc(x.title)+'</b><span>'+x.stars+' звёзд</span></div><button class="primary" data-buy-product="'+x.key+'" '+(!p.starsEnabled?'disabled':'')+'>Купить</button></article>').join('')+'</div>'+
   '<div class="section-label">Темы</div><div class="theme-shop-grid">'+(p.themes||[]).map(x=>{const has=owned.has(x.key),active=selected===x.key;return '<article data-theme-preview="'+esc(x.key)+'"><div><b>'+esc(x.title)+'</b><span>'+esc(x.description)+'</span></div>'+(has?'<button class="secondary" data-select-cosmetic="theme:'+x.key+'" '+(active?'disabled':'')+'>'+(active?'Выбрано':'Применить')+'</button>':'<button data-buy-theme="'+x.key+'">'+x.gems+' 💎</button>')+'</article>'}).join('')+'</div>'+
+  (frames.length?'<div class="section-label">Рамки профиля</div><div class="theme-shop-grid">'+frames.map(x=>
+    '<article><b>Рамка сезона '+esc(x.key.match(/season_(\d+)/)?.[1]||'')+'</b>'+
+    '<button class="secondary" data-select-cosmetic="frame:'+esc(x.key)+'" '+(p.selected?.frame_key===x.key?'disabled':'')+'>'+(p.selected?.frame_key===x.key?'Выбрано':'Применить')+'</button></article>').join('')+'</div>':'')+
   '<p class="shop-note">💎 — только оформление. На дроп, колесо и апгрейд они не влияют.</p></div>';
 }
 function fmtPlain(n){return new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))}
@@ -598,7 +603,7 @@ function settingsView(){
   [['light','Светлая','sun-03'],['dark','Тёмная','moon-02'],['system','Системная','settings-01']].map(([v,t,ic])=>'<button data-setting-theme="'+v+'" class="'+(s.theme===v?'active':'')+'">'+iconRaw(ic)+'<span>'+t+'</span></button>').join('')+
  '</div></section><section class="settings-card"><div class="settings-title"><b>Язык</b><span>'+(s.language==='en'?'English':'Русский')+'</span></div><div class="language-segment">'+
   '<button data-setting-language="ru" class="'+(s.language!=='en'?'active':'')+'">Русский</button><button data-setting-language="en" class="'+(s.language==='en'?'active':'')+'">English</button>'+
- '</div></section><section class="settings-card settings-list">'+toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','motion')+'</section></div>';
+ '</div></section><section class="settings-card settings-list">'+toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','motion')+'</section><p class="settings-disclaimer">Все ₽ в игре — виртуальные очки. Их нельзя вывести или обменять на настоящие деньги.</p></div>';
 }
 function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function levelsView(){
@@ -718,7 +723,7 @@ async function fetchPage(page){
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='shop')state.shop=await api('/api/shop');
  if(page==='promo')state.promo=await api('/api/promocode');
- if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
+ if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!await adminModuleReady||!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
  const seq=++routeSeq,initial=!window.__USERNAME_READY||!state.user;
@@ -735,7 +740,7 @@ async function load(page,{force=false}={}){
   else toast(ERR[e.message]||'Не удалось загрузить раздел');
  }finally{if(seq===routeSeq)routeLoading(false)}
 }
-function openMarketModal(id,handle,value){const fee=.05,root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия 5% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
+function openMarketModal(id,handle,value){const fee=Number(state.market?.fee??.05),root=document.createElement('div');root.className='modal-root';root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Выставить '+esc(handle)+'</b><button data-modal-close>'+icon('close')+'</button></div><label>Цена<input id="listingPrice" inputmode="numeric" value="'+Math.max(100,Math.round(value*1.15))+'"></label><div class="modal-calc" id="modalCalc"></div><button class="primary" data-create-listing="'+id+'">Выставить</button></div>';document.body.appendChild(root);hydrateIcons();const input=root.querySelector('#listingPrice'),calc=root.querySelector('#modalCalc');const update=()=>{const p=Math.max(0,Number(input.value)||0);calc.textContent='Комиссия '+Math.round(fee*100)+'% · получите '+fmt(p*(1-fee))};input.addEventListener('input',update);update()}
 function openSystemSellModal(id,handle,value){
  const root=document.createElement('div');root.className='modal-root';
  root.innerHTML='<div class="modal-back" data-modal-close></div><div class="modal"><div class="modal-head"><b>Продать '+esc(handle)+'?</b><button data-modal-close>'+icon('close')+'</button></div><div class="system-sell-copy">Система сразу начислит <b>'+fmt(value)+'</b>. Username исчезнет из коллекции. Отменить продажу после подтверждения нельзя.</div><button class="primary" data-confirm-system-sell="'+id+'">Продать за '+fmt(value)+'</button></div>';
@@ -867,7 +872,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.dataset.selectCosmetic){
    const [type,key]=String(el.dataset.selectCosmetic).split(':');await api('/api/cosmetics/select',{method:'POST',body:JSON.stringify({type,key})});
-   if(state.shop){state.shop.selected=state.shop.selected||{};state.shop.selected.theme_key=key}
+   if(state.shop){state.shop.selected=state.shop.selected||{};state.shop.selected[type==='frame'?'frame_key':'theme_key']=key}
    await refreshUser();sound('tap');haptic('light');render();return
  }
  if(el.dataset.buyTheme){
@@ -1013,6 +1018,6 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.5.0').catch(()=>{});
+const adminModuleReady=import('/admin-ui.js?v=7.5.1').then(()=>true).catch(err=>{console.error('Admin interface failed to load:',err);return false});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
