@@ -450,8 +450,8 @@ async function api(req,res,url){
     if(req.method==='GET'&&url.pathname==='/api/seasons')return json(res,200,{season:seasonData(db,user)});
 
     if(req.method==='GET'&&(url.pathname==='/api/shop'||url.pathname==='/api/premium')){
-      const owned=db.prepare("SELECT type,key FROM user_cosmetics WHERE user_id=? AND type='theme' ORDER BY key").all(user.id);
-      const selected=db.prepare('SELECT theme_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
+      const owned=db.prepare("SELECT type,key FROM user_cosmetics WHERE user_id=? AND type IN ('theme','frame') ORDER BY type,key").all(user.id);
+      const selected=db.prepare('SELECT theme_key,frame_key FROM user_cosmetic_settings WHERE user_id=?').get(user.id)||{};
       const catalog=shopCatalog();
       const seasonalThemes=owned.filter(x=>x.type==='theme'&&/^season_\d+_top10$/.test(x.key)).map(x=>({
         key:x.key,title:'Тема сезона '+x.key.split('_')[1],description:'Награда за место в топ-10',gems:0,type:'theme'
