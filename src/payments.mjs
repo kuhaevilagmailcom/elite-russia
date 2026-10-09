@@ -73,11 +73,11 @@ export function applyPremiumPayment(){return {applied:false,reason:'product_remo
 export function buyTheme(db,user,themeKey){
   ensureWallet(db);
   const theme=THEME_PRODUCTS[String(themeKey||'')];if(!theme)throw new Error('bad_product');
-  const existing=db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key=?").get(user.id,theme.key);
-  if(existing)return {ok:true,alreadyOwned:true,wallet:walletData(db,user.id),theme};
   return db.transaction(()=>{
+    const existing=db.prepare("SELECT 1 FROM user_cosmetics WHERE user_id=? AND type='theme' AND key=?").get(user.id,theme.key);
+    if(existing)return {ok:true,alreadyOwned:true,wallet:walletData(db,user.id),theme};
     const wallet=spendGems(db,user.id,theme.gems),ts=new Date().toISOString();
-    db.prepare("INSERT OR IGNORE INTO user_cosmetics(user_id,type,key,source,created_at) VALUES(?,'theme',?,'gems',?)").run(user.id,theme.key,ts);
+    db.prepare("INSERT INTO user_cosmetics(user_id,type,key,source,created_at) VALUES(?,'theme',?,'gems',?)").run(user.id,theme.key,ts);
     return {ok:true,alreadyOwned:false,wallet,theme};
-  })();
+  }).immediate();
 }

@@ -192,23 +192,27 @@ export function createDrop(db,user,requestId,tierKey='basic'){
   return {instance:shapeInstance(db.prepare('SELECT * FROM username_instances WHERE id=?').get(made.instanceId)),user:publicUser(db,fresh),replayed:false,tier:made.effectiveTier,cost:made.cost};
 }
 export function resolveDrop(db,user,instanceId,action){
-  const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='pending'").get(instanceId,user.id);if(!inst)throw new Error('pending_not_found');
-  db.transaction(()=>{
+  const resolve=db.transaction(()=>{
+    // Acquire the SQLite write lock before reading the pending row. This closes
+    // the cross-process TOCTOU window between lookup and settlement.
+    const inst=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='pending'").get(instanceId,user.id);if(!inst)throw new Error('pending_not_found');
     if(action==='keep'){
-      db.prepare("UPDATE username_instances SET status='owned' WHERE id=?").run(inst.id);
+      const changed=db.prepare("UPDATE username_instances SET status='owned' WHERE id=? AND owner_id=? AND status='pending'").run(inst.id,user.id).changes;if(!changed)throw new Error('pending_not_found');
       db.prepare('INSERT OR IGNORE INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(inst.id,user.id,nowIso());
       db.prepare("UPDATE drop_history SET action='kept' WHERE instance_id=?").run(inst.id);
       grantXp(db,user.id,5,'keep_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'keep',1);bumpSeasonScore(db,user.id,8);
     }else if(action==='sell'){
       const payout=systemSellValue(inst.value);
-      db.prepare("UPDATE username_instances SET status='sold' WHERE id=?").run(inst.id);
+      const changed=db.prepare("UPDATE username_instances SET status='sold' WHERE id=? AND owner_id=? AND status='pending'").run(inst.id,user.id).changes;if(!changed)throw new Error('pending_not_found');
       db.prepare("UPDATE drop_history SET action='sold' WHERE instance_id=?").run(inst.id);
       txBalance(db,user.id,'system_sale',payout,{instanceId:inst.id,handle:inst.handle,estimatedValue:inst.value});
       grantXp(db,user.id,5,'sell_username',{instanceId:inst.id,value:inst.value});
       bumpTask(db,user.id,'sell',1);bumpSeasonScore(db,user.id,5);
     }else throw new Error('bad_action');
-  })();
+    return inst;
+  }).immediate();
+  const inst=resolve;
   return {instance:shapeInstance(db.prepare('SELECT * FROM username_instances WHERE id=?').get(inst.id)),user:publicUser(db,db.prepare('SELECT * FROM users WHERE id=?').get(user.id))};
 }
 export function collection(db,user,{sort='new',digits='all',page=1}={}){
@@ -386,6 +390,8 @@ function luckProfile(db,u){
 export function profile(db,userId){
   const u=db.prepare('SELECT * FROM users WHERE id=?').get(userId);if(!u)return null;
   const p=publicUser(db,u);
+  // Public profiles must not expose the private Telegram identity binding.
+  const {telegramId: _telegramId,...publicProfile}=p;
   const best=shapeInstance(db.prepare("SELECT * FROM username_instances WHERE owner_id=? AND status IN ('owned','market') ORDER BY value DESC LIMIT 1").get(userId));
   const friends=db.prepare('SELECT COUNT(*) c FROM friends WHERE user_id=?').get(userId).c;
   const gifts=db.prepare('SELECT COUNT(*) c FROM username_transfers WHERE from_user_id=?').get(userId).c;
@@ -393,7 +399,7 @@ export function profile(db,userId){
   const bestSeason=db.prepare('SELECT MIN(position) p FROM season_history WHERE user_id=? AND position IS NOT NULL').get(userId).p;
   const cosmetics=db.prepare('SELECT type,key,source,created_at FROM user_cosmetics WHERE user_id=? ORDER BY created_at DESC').all(userId),activeCosmeticState=activeCosmetics(db,userId);
   const achievements=db.prepare('SELECT achievement_key,xp_reward,unlocked_at FROM achievement_unlocks WHERE user_id=? ORDER BY unlocked_at DESC LIMIT 3').all(userId);
-  return {...p,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,achievements,luckStats:luckProfile(db,u)};
+  return {...publicProfile,best,friendsCount:friends,giftsCount:gifts,marketDeals:deals,bestSeason:bestSeason||null,cosmetics,activeCosmetics:activeCosmeticState,achievements,luckStats:luckProfile(db,u)};
 }
 export function sellOwnedUsername(db,user,instanceId){
   const result=db.transaction(()=>{

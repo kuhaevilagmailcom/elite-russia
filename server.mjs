@@ -43,8 +43,8 @@ const DEV_ADMIN=process.env.DEV_ADMIN==='1';
 const TRUST_PROXY=process.env.TRUST_PROXY==='1';
 const INSTANCE_ID=crypto.randomUUID();
 if(NODE_ENV==='production'&&ALLOW_DEV_AUTH)throw new Error('ALLOW_DEV_AUTH must be disabled in production');
-const DEFAULT_ADMIN_IDS=['8464597898','1141626866'];
-const ADMIN_IDS=new Set([...DEFAULT_ADMIN_IDS,...String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean)]);
+// Admin authority is deployment-owned. Never ship live administrator identities in source.
+const ADMIN_IDS=new Set(String(process.env.ADMIN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
 const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
 const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
@@ -108,6 +108,10 @@ function validateInitData(initData){
     return user;
   }catch{return null}
 }
+export function isLoopbackAddress(address){
+  const value=String(address||'').toLowerCase().replace(/^\[|\]$/g,'');
+  return value==='127.0.0.1'||value==='::1'||value==='::ffff:127.0.0.1';
+}
 function auth(req){
   const raw=String(req.headers['x-telegram-init-data']||''),tg=validateInitData(raw);
   if(tg){
@@ -116,8 +120,9 @@ function auth(req){
   }
   if(ALLOW_DEV_AUTH){
     const rawDev=req.headers['x-dev-user'];if(!rawDev)return null;
-    const host=String(req.headers.host||'').split(':')[0].toLowerCase();
-    if(!['localhost','127.0.0.1','::1'].includes(host))return null;
+    // Host is client-controlled and can be spoofed. Dev auth is safe only when
+    // the actual TCP peer is loopback; production rejects this mode at startup.
+    if(!isLoopbackAddress(req.socket?.remoteAddress))return null;
     const id=String(rawDev),u=ensureUser(db,{id:Number(id),username:'dev'+id,first_name:'Dev'});
     const devStart=String(req.headers['x-start-param']||'');registerReferral(db,u,devStart);if(devStart)invalidateLeaderboard();return u;
   }
@@ -463,6 +468,8 @@ async function api(req,res,url){
       if(action==='message'){
         const message=String(b.text||'').trim();if(!message)throw new Error('bad_message');
         const delivery=await notifyUser(targetId,'ADMIN_MESSAGE','Сообщение от USERNAME',message,'home');
+        db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),user.id,'message',String(targetId),JSON.stringify({messageLength:message.length,delivery}),new Date().toISOString());
         result={ok:true,...delivery};
       }
       invalidateLeaderboard();return json(res,200,result);
