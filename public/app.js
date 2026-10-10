@@ -229,27 +229,16 @@ async function api(url,opts={}){
  if(key)inflightGet.set(key,run);
  try{return await run}finally{if(key&&inflightGet.get(key)===run)inflightGet.delete(key)}
 }
-const ICON_PATH=Object.freeze({
- home:'<path d="M5 8.5 12 4l7 4.5v8L12 20l-7-3.5z"/><path d="m5 8.5 7 4 7-4M12 12.5V20"/>',
- menu:'<path d="M5 7h14M5 12h14M5 17h14"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',back:'<path d="m15 5-7 7 7 7"/>',chevron:'<path d="m9 5 7 7-7 7"/>',down:'<path d="m6 9 6 6 6-6"/>',plus:'<path d="M12 5v14M5 12h14"/>',
- market:'<path d="M4 10h16v10H4zM3 10l2-6h14l2 6"/><path d="M8 14h3v6M3 10c1 2 3 2 4 0 1 2 3 2 5 0 1 2 3 2 5 0 1 2 3 2 4 0"/>',
- rank:'<path d="M5 20v-6h4v6M10 20V9h4v11M15 20V4h4v16"/>',tasks:'<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
- wheel:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v6M19 12h-5M12 20v-6M5 12h5"/>',
- friends:'<path d="M8.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 20v-2a5.5 5.5 0 0 1 11 0v2M16 6a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5"/>',
- gift:'<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M3 9h18M12 9v11M12 9H8.5A2.5 2.5 0 1 1 11 6.5zM12 9h3.5A2.5 2.5 0 1 0 13 6.5z"/>',
- upgrade:'<path d="m7 14 5-5 5 5M7 9l5-5 5 5M12 9v11"/>',season:'<circle cx="12" cy="9" r="5"/><path d="m9 13-2 7 5-3 5 3-2-7"/>',
- collection:'<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h8"/>',profile:'<circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
- shop:'<path d="M6 8h12l-1 12H7zM9 9V7a3 3 0 0 1 6 0v2"/>',filter:'<path d="M4 6h16M7 12h10M10 18h4"/>',search:'<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
- games:'<path d="M8 9h8a5 5 0 0 1 4.8 6.4l-.6 2A2.2 2.2 0 0 1 16.5 19L14 17h-4l-2.5 2a2.2 2.2 0 0 1-3.7-1.6l-.6-2A5 5 0 0 1 8 9Z"/><path d="M8 12v4M6 14h4M16 13h.01M18 15h.01"/>',
- levels:'<circle cx="12" cy="9" r="5"/><path d="m9 13-2 7 5-3 5 3-2-7"/>',achievements:'<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5v2a4 4 0 0 0 4 4M16 6h3v2a4 4 0 0 1-4 4M12 13v4M8 20h8M9 17h6"/>',
- notifications:'<path d="M6 17h12l-1.5-2.5V10a4.5 4.5 0 0 0-9 0v4.5zM10 20h4"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
- sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',theme:'<path d="M19 15.5A8 8 0 0 1 8.5 5 8 8 0 1 0 19 15.5Z"/>',sound:'<path d="M5 10v4h3l4 4V6L8 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',motion:'<path d="m9 7 8 5-8 5z"/>',
- admin:'<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>',story:'<path d="M4 12v7h16v-7M12 15V4M8 8l4-4 4 4"/>',promo:'<path d="M4 8a2 2 0 0 0 0 4v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a2 2 0 0 0 0-4V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z"/><path d="M9 8h.01M15 14h.01M9 15l6-7"/>',
- edit:'<path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10zM14 7l3 3"/>',puzzle:'<path d="M4 4h6v3a2 2 0 1 0 4 0V4h6v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4v-6h3a2 2 0 1 0 0-4H4z"/>',
- fire:'<path d="M12 21c-4 0-7-2.6-7-6.5 0-3 1.7-5.2 4.5-7.5 0 2 1 3.2 2 4 1-3 2.7-5.2 4.5-7 0 3 3 5 3 9.5C19 18 16 21 12 21Z"/>',money:'<path d="M4 7h16v11H4zM7 10h.01M17 15h.01"/><circle cx="12" cy="12.5" r="2.5"/>',diamond:'<path d="m12 20-9-10 4-6h10l4 6zM3 10h18M8 4l4 16 4-16"/>',crown:'<path d="m4 7 4 4 4-7 4 7 4-4-2 11H6z"/>'
+const ICON_NAME=Object.freeze({
+ home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
+ market:'store-01',rank:'ranking',tasks:'layers-01',wheel:'target-01',
+ friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
+ collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
+ search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
+ theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ down:'arrow-down-01',plus:'add-01',promo:'coupon-01',x:'cancel-01'
 });
-const RAW_ICON_KEY=Object.freeze({'sun-03':'sun','moon-02':'theme','settings-01':'settings','medal-01':'achievements','package':'home','layers-01':'collection','sparkles':'achievements','diamond-02':'diamond','award-01':'season','store-01':'market','chart-up':'rank','gift':'gift','game':'games','fire':'fire','money-bag-02':'money','crown':'crown','search-visual':'search','edit-02':'edit','puzzle':'puzzle','gamepad':'games'});
-function icon(k){const body=ICON_PATH[k]||ICON_PATH.menu;return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+body+'</svg>'}
+function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function marketFilterIcon(){return icon('filter')}
 function FilterButton(scope){
  const attr=scope==='collection'?'data-collection-filter-open':'data-market-filter-open';
@@ -611,7 +600,7 @@ function settingsView(){
   '<button data-setting-language="ru" class="'+(s.language!=='en'?'active':'')+'">Русский</button><button data-setting-language="en" class="'+(s.language==='en'?'active':'')+'">English</button>'+
  '</div></section><section class="settings-card settings-list">'+toggle('vibration','Вибрация','settings')+toggle('sound','Звук','sound')+toggle('animations','Анимации','motion')+'</section></div>';
 }
-function iconRaw(name){return icon(RAW_ICON_KEY[name]||name)}
+function iconRaw(name){return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
 function levelsView(){
  const l=state.levels||{},p=l.progression||state.user||{},rewards=(l.rewards||[]).filter(r=>Number(r.level)>Number(p.level||1)).slice(0,7);
  return '<div class="levels-v7"><section class="levels-main-v7"><h1>УР. '+Number(p.level||1)+'</h1><b>'+esc(p.title||state.user?.title||'Новичок')+'</b>'+xpBar(p)+'<span>До следующего: '+Number(p.remaining||0)+' XP</span></section>'+
