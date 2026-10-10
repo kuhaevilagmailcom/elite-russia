@@ -38,9 +38,9 @@ test('no image setup still leaves an accessible players chat button',()=>{
 test('start uses persistent file_id and sends photo with caption, fallbacks to text',()=>{
   assert.match(server,/SELECT value FROM game_config WHERE key=\?/);
   assert.match(server,/telegram_start_photo_file_id/);
-  assert.match(server,/telegramApi\('sendPhoto',\{chat_id:chatId,photo,caption,parse_mode:'HTML',reply_markup:keyboard\}\)/);
+  assert.match(server,/telegramApi\('sendPhoto',\{chat_id:chatId,photo,caption,parse_mode:'HTML',reply_markup:keyboard\},12000\)/);
   assert.match(server,/telegramApi\('sendMessage',\{[\s\S]*?chat_id:chatId,text:caption/);
   assert.match(server,/if\(!ADMIN_IDS\.has\(String\(m\.from\?\.id\)\)\)/);
   assert.match(server,/m\.reply_to_message\?\.photo/);
-  assert.match(server,/if\(start\)return sendStartMessage\(/);
+  assert.match(server,/if\(start\)\{[\s\S]*enqueueStart\(db,\{updateId:u\.update_id/);
 });

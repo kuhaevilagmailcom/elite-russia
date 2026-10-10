@@ -43,5 +43,10 @@ test('admins receive a restart message immediately after the active bot process 
   assert.match(serverSrc,/async function notifyAdminsBotRestarted/);
   assert.match(serverSrc,/Бот перезапущен/);
   assert.match(serverSrc,/Версия:/);
-  assert.match(serverSrc,/await notifyAdminsBotRestarted\(\);\s*await configureTelegramBot\(\)/);
+  assert.match(serverSrc,/void notifyAdminsBotRestarted\(\)/);
+  assert.match(serverSrc,/void configureTelegramBot\(\)/);
+  assert.match(serverSrc,/enqueueStart\(db,\{updateId:u\.update_id/);
+  assert.match(serverSrc,/deliverStartBatch\(db,row=>sendStartMessage/);
+  assert.match(serverSrc,/telegram_update_offset/);
+  assert.doesNotMatch(serverSrc,/if\(t-last<GAME\.dropRateLimitMs\)/);
 });

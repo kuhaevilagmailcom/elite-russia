@@ -50,6 +50,26 @@ test('HTTP home and drop work through the real server',async()=>{
   assert.equal(replay.r.status,200);assert.equal(replay.body.instance.id,drop.body.instance.id);
 });
 
+test('100K drop can be retried immediately after an unsuccessful first attempt',async()=>{
+  const player='39990',init=await json('/api/home',{headers:headers(player)});
+  assert.equal(init.r.status,200);
+  const fail=await json('/api/drop',{method:'POST',headers:headers(player),
+    body:JSON.stringify({requestId:'max-failed-initially',tier:'max'})});
+  assert.equal(fail.r.status,409);
+  assert.equal(fail.body.error,'insufficient_funds');
+  const conn=new Database(path.join(tmp,'username.sqlite'));
+  try{conn.prepare('UPDATE users SET balance=250000 WHERE telegram_id=?').run(player)}
+  finally{conn.close()}
+  const good=await json('/api/drop',{method:'POST',headers:headers(player),
+    body:JSON.stringify({requestId:'max-retry-immediately',tier:'max'})});
+  assert.equal(good.r.status,200,JSON.stringify(good.body));
+  assert.equal(good.body.cost,100000);
+  const replay=await json('/api/drop',{method:'POST',headers:headers(player),
+    body:JSON.stringify({requestId:'max-retry-immediately',tier:'max'})});
+  assert.equal(replay.r.status,200);
+  assert.equal(replay.body.instance.id,good.body.instance.id);
+});
+
 test('HTTP story endpoint returns a public same-origin media path and JPEG without auth',async()=>{
   const home=await json('/api/home',{headers:headers()});const id=home.body.pending?.id;assert.ok(id);
   const bytes=Buffer.alloc(1200,1);bytes[0]=0xff;bytes[1]=0xd8;
