@@ -46,8 +46,7 @@ button,.ico{-webkit-tap-highlight-color:transparent}
 .top-actions{display:flex;align-items:center;gap:8px}.top-actions>span{font-weight:750;font-size:14px}
 .top-actions button,.top-back,.menu-head-icon{width:36px;height:36px;border-radius:11px;background:transparent;display:grid;place-items:center}
 .top-actions button:hover,.top-back:hover,.menu-head-icon:hover{background:var(--surface-subtle)}
-.ico{width:20px;height:20px;display:block;flex:none;overflow:visible}
-.menu-tile-icon,.settings-row-icon,.home-quick-icon,.task-v10-icon,.notification-icon,.achievement-badge-icon,.admin-head-icon{display:grid;place-items:center}
+.ico{font-size:20px;line-height:1;display:inline-grid;place-items:center}
 
 button.primary,.primary{min-height:46px;border-radius:13px;background:var(--accent);color:#fff;font-weight:750;padding:0 16px}
 button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--surface-subtle);color:var(--text);font-weight:700;padding:0 16px}
