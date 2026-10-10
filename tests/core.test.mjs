@@ -52,13 +52,13 @@ test('menu has exactly the four v7 product groups and no Lab or Plus',()=>{
   assert.doesNotMatch(block,/Lab|Plus|USERNAME\+/);
 });
 
-test('UI icons use one local aligned SVG system without an external icon font',()=>{
-  const block=appSrc.match(/const ICON_PATH=Object\.freeze\(\{[\s\S]*?\}\);/)?.[0]||'';
-  for(const icon of ['home:','games:','shop:','upgrade:','achievements:','motion:','filter:'])assert.match(block,new RegExp(icon));
-  assert.match(appSrc,/viewBox="0 0 24 24"/);
-  assert.match(appSrc,/stroke-width="1\.8"/);
-  assert.doesNotMatch(appSrc,/hgi-stroke|hugeicon/);
-  assert.doesNotMatch(indexSrc,/use\.hugeicons\.com/);
+test('UI keeps the stable Hugeicons family without mismatched SVG replacements',()=>{
+  const block=appSrc.match(/const ICON_NAME=Object\.freeze\(\{[\s\S]*?\}\);/)?.[0]||'';
+  for(const item of ['home:','games:','shop:','upgrade:','achievements:','motion:','filter:'])
+    assert.match(block,new RegExp(item));
+  assert.match(appSrc,/hgi-stroke hgi-/);
+  assert.doesNotMatch(appSrc,/const ICON_PATH=Object\.freeze/);
+  assert.match(indexSrc,/https:\/\/use\.hugeicons\.com\/font\/icons\.css/);
 });
 
 test('market and collection share one reusable FilterButton component',()=>{
