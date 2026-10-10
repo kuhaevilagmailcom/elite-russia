@@ -14,16 +14,23 @@ export function escapeTelegramHtml(value){
 }
 
 export function startMessage(firstName=''){
-  const name=escapeTelegramHtml(String(firstName||'').trim());
-  return (name?`Привет, <b>${name}</b>! 👋\n\n`:'')+
-    '<b>USERNAME</b> — игра про самые редкие имена Telegram.\n\n'+
-    '🎲 Выбивай уникальные usernames\n'+
-    '💎 Собирай дорогую коллекцию\n'+
-    '📈 Покупай и продавай на рынке\n'+
-    '⚡ Рискуй в апгрейдере\n'+
-    '🏆 Поднимайся в общем рейтинге\n\n'+
-    '<i>Каждый username существует в игре только в одном экземпляре.</i>\n\n'+
-    'Нажимай кнопку — и забирай свой первый дроп.';
+  const name=escapeTelegramHtml(String(firstName||'игрок').trim().slice(0,64)||'игрок');
+  return 'Привет, <b>'+name+'</b>! 👋\n\n'+
+    '<b>USERNAME</b> — крути юзернеймы и собирай самые дорогие.\n\n'+
+    '<blockquote>💎 <b>Редкие юзернеймы</b> — пополняй коллекцию\n'+
+    '🏆 <b>Рейтинг игроков</b> — поднимайся в топ\n'+
+    '⚡ <b>Апгрейд</b> — улучшай свои находки\n'+
+    '🛒 <b>Маркет юзернеймов</b> — покупай и продавай</blockquote>\n\n'+
+    'Какой USERNAME выпадет тебе? Жми <b>«Играть»</b> 👇';
+}
+
+export const PLAYERS_CHAT_URL='https://t.me/usernamegamechat';
+
+export function startKeyboard(url){
+  return {inline_keyboard:[
+    ...(url?[[{text:'🎮 Играть',url}]]:[]),
+    [{text:'💬 Чат игроков',url:PLAYERS_CHAT_URL}]
+  ]};
 }
 
 export function helpMessage(){
