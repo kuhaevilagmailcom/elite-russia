@@ -13,7 +13,7 @@ import {upgradeInfo,previewUpgrade,performUpgrade,cleanupUpgradeSessions} from '
 import {seasonData,ensureSeasonLifecycle} from './src/seasons.mjs';
 import {SHOP_PRODUCTS,shopCatalog,validProductCheckout,applyProductPayment,walletData,buyTheme} from './src/payments.mjs';
 import {adminOverview,adminUserDetail,adminSetBalance,adminGrantGems,adminUpdateUserProgress,adminUsernames,adminSetBlocked,adminRemoveUsername,adminTransferUsername,adminAddUsername,adminSetUsernameValue,resetSingleUser,resetAllUsers} from './src/admin.mjs';
-import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard} from './src/bot-ui.mjs';
+import {BOT_COMMANDS,BOT_DESCRIPTION,BOT_SHORT_DESCRIPTION,escapeTelegramHtml,startMessage,helpMessage,gameKeyboard,startKeyboard} from './src/bot-ui.mjs';
 import {labStatus,submitLab} from './src/lab.mjs';
 import {dailyStatus,claimDaily} from './src/daily.mjs';
 import {publicUser} from './src/game.mjs';
@@ -147,8 +147,27 @@ async function sendBotMenuMessage(chatId,text,url,label){
   if(keyboard)payload.reply_markup=keyboard;
   return telegramApi('sendMessage',payload);
 }
+function storedStartPhotoFileId(){
+  // Telegram photo file_id belongs to THIS bot and is captured from an admin upload.
+  // Store it in the existing persistent SQLite game_config table, not in RAM.
+  const configured=db.prepare("SELECT value FROM game_config WHERE key=?").get('telegram_start_photo_file_id')?.value;
+  return String(configured||process.env.START_PHOTO_FILE_ID||'').trim();
+}
 async function sendStartMessage(chatId,firstName='',ref=''){
-  return sendBotMenuMessage(chatId,startMessage(firstName),publicMiniAppLink(ref),'🎮 Начать играть');
+  const caption=startMessage(firstName),keyboard=startKeyboard(publicMiniAppLink(ref));
+  const photo=storedStartPhotoFileId();
+  if(photo){
+    try{
+      return await telegramApi('sendPhoto',{chat_id:chatId,photo,caption,parse_mode:'HTML',reply_markup:keyboard});
+    }catch(e){
+      // A removed or inaccessible file_id must not stop /start from working.
+      console.error('Telegram start photo delivery:',e.message);
+    }
+  }
+  return telegramApi('sendMessage',{
+    chat_id:chatId,text:caption,parse_mode:'HTML',
+    disable_web_page_preview:true,reply_markup:keyboard
+  });
 }
 async function sendHelpMessage(chatId){
   return sendBotMenuMessage(chatId,helpMessage(),publicMiniAppLink(),'🎮 Начать играть');
@@ -203,6 +222,25 @@ async function handleTelegramUpdate(u){
   }
   const text=String(m.text||'').trim(),start=text.match(/^\/start(?:@\w+)?(?:\s+([^\s]+))?$/i);
   if(!m.chat?.id)return;
+  // One-time setup: send the desired banner to this bot with caption
+  // /setstartphoto, or reply /setstartphoto to an existing photo.
+  // Telegram supplies the real bot-specific file_id in message.photo.
+  const setPhoto=/^\/setstartphoto(?:@\w+)?$/i.test(text)||
+    /^\/setstartphoto(?:@\w+)?$/i.test(String(m.caption||'').trim());
+  if(setPhoto){
+    if(!ADMIN_IDS.has(String(m.from?.id))){
+      return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
+    }
+    const photos=m.photo?.length?m.photo:m.reply_to_message?.photo;
+    const fileId=String(photos?.[photos.length-1]?.file_id||'');
+    if(!fileId){
+      return telegramApi('sendMessage',{chat_id:m.chat.id,
+        text:'Отправь нужный баннер фотографией с подписью /setstartphoto или ответь /setstartphoto на фотографию.'});
+    }
+    db.prepare("INSERT INTO game_config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run('telegram_start_photo_file_id',fileId);
+    return sendStartMessage(m.chat.id,m.from?.first_name||'');
+  }
   if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
   if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
