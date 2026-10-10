@@ -90,21 +90,45 @@ function pickTemplate(db,tierKey='basic',rng=randomUnit,player=null){
     const availableSpecials=specials.filter(x=>!handleUnavailable(db,x.handle)&&Number(x.base_value||0)>=protectionFloor);if(availableSpecials.length)return availableSpecials[Math.floor(rng()*availableSpecials.length)];
   }
   const starterBand=starter?starterValueBand(starterMode):null;
-  for(let i=0;i<(starter?650:80);i++){
-    const handle=buildGeneratedHandle(profile,rng);if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
-    let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
-    if(starter&&t?.special)continue;
-    const base=t?Number(t.base_value):scoreHandle(handle),rarity=rarityFromValue(base);
-    if(starter&&(base<starterBand[0]||base>starterBand[1]))continue;
-    if(!starter&&protectionFloor&&base<protectionFloor)continue;
-    if(!t){
-      const supply=1,assessment=analyzeUsername(handle);
-      db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at) VALUES(?,?,?,?,0,?,0,1,?,?,?,?)')
-        .run(handle,rarity,base,supply,'generated',assessment.score,visualTier(base,assessment.score),JSON.stringify(assessment.breakdown||{}),nowIso());
-      t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
+  // A protection floor may be impossible to reach with the selected rarity.
+  // For example, max-tier COMMON handles are typically worth far less than
+  // 50-90K, so the old 80-attempt loop returned no_username_available for
+  // players who had legitimately earned anti-bad-luck protection.
+  // Try the originally rolled profile first; only broaden the pool when its
+  // candidates cannot satisfy the *existing* protection promise.
+  const tryGenerated=(candidateProfile,attempts)=>{
+    for(let i=0;i<attempts;i++){
+      const handle=buildGeneratedHandle(candidateProfile,rng);
+      if(!isValidHandle(handle)||handleUnavailable(db,handle))continue;
+      let t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
+      if(t?.special)continue; // curated 1/1 usernames use separate, weighted prize paths
+      const base=t?Number(t.base_value):scoreHandle(handle);
+      if(starter&&(base<starterBand[0]||base>starterBand[1]))continue;
+      if(!starter&&protectionFloor&&base<protectionFloor)continue;
+      if(!t){
+        const assessment=analyzeUsername(handle),rarity=rarityFromValue(base);
+        db.prepare('INSERT OR IGNORE INTO username_templates(handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at) VALUES(?,?,?,?,0,?,0,1,?,?,?,?)')
+          .run(handle,rarity,base,1,'generated',assessment.score,visualTier(base,assessment.score),JSON.stringify(assessment.breakdown||{}),nowIso());
+        t=db.prepare('SELECT * FROM username_templates WHERE handle=?').get(handle);
+      }
+      if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle))return t;
     }
-    if(starter&&t?.special)continue;
-    if(t&&t.active&&t.current_supply<1&&!handleUnavailable(db,t.handle))return t;
+    return null;
+  };
+  const initial=tryGenerated(profile,starter?650:120);
+  if(initial)return initial;
+
+  // Re-sample within a qualifying generated-price band rather than failing
+  // the paid spin. Rare curated 1/1 prizes are never issued via this fallback.
+  if(!starter&&protectionFloor){
+    const recovery=protectionFloor>=500000
+      ?['LEGEND']
+      :protectionFloor>=100000?['EPIC','LEGEND']:['RARE','EPIC','LEGEND'];
+    for(const next of recovery){
+      if(next===profile)continue;
+      const candidate=tryGenerated(next,160);
+      if(candidate)return candidate;
+    }
   }
   throw new Error('no_username_available');
 }

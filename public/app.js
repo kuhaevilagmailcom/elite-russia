@@ -17,7 +17,7 @@ function untilText(iso){
 }
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ERR={
-  unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',
+  unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',no_username_available:'Не удалось подобрать username. Повтори попытку — деньги не списаны.',
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
@@ -219,7 +219,7 @@ async function api(url,opts={}){
   const headers={'Content-Type':'application/json',...(opts.headers||{})},d=await initData();
   if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';
   const sp=startParam();if(sp)headers['X-Start-Param']=sp;
-  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),9000);
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),method==='POST'&&url==='/api/drop'?15000:9000);
   try{
    const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal}),j=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(j.error||'network');return j
@@ -911,7 +911,16 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    state.busy=true;el.disabled=true;
    const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));
    try{
-     const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});
+     const payload={method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})};
+     let r;
+     try{r=await api('/api/drop',payload)}
+     catch(err){
+       // Retry ONLY generation exhaustion, using the SAME requestId.
+       // If the first request somehow committed, createDrop returns its result
+       // without charging again. Network errors are reconciled below instead.
+       if(err.message!=='no_username_available')throw err;
+       r=await api('/api/drop',payload);
+     }
      applyUserLocal(r.user);
      await animateDrop(r.instance);
    }catch(e){
