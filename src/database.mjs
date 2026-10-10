@@ -29,6 +29,19 @@ export function createDatabase(dataDir){
     premium_until TEXT, created_at TEXT NOT NULL, last_seen TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS game_config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS bot_start_outbox(
+    update_id INTEGER PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    first_name TEXT NOT NULL DEFAULT '',
+    ref TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    sent_at INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_bot_start_outbox_due ON bot_start_outbox(status,next_attempt_at,update_id);
   CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,start_at TEXT NOT NULL,end_at TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
   CREATE TABLE IF NOT EXISTS username_templates(
     id INTEGER PRIMARY KEY AUTOINCREMENT, handle TEXT UNIQUE NOT NULL, rarity TEXT NOT NULL, base_value INTEGER NOT NULL,
