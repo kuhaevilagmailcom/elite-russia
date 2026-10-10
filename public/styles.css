@@ -447,7 +447,36 @@ html.is-desktop .upgrade-wheel-card{min-height:320px}
 html.is-desktop .upgrade-roulette-clean{width:min(46vh,340px)}
 html.is-desktop .collection-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 html.is-desktop .games-grid-v7{grid-template-columns:repeat(3,minmax(0,1fr))}
-html.is-desktop .menu-sheet{width:min(390px,38vw)}
+/* Telegram Desktop often embeds Mini Apps in a 360-420px-wide window.
+   Do not tie the menu width to 38vw: that produced a ~150px sheet and
+   unreadable four-column menu tiles in the native desktop WebApp. */
+html.is-desktop .menu-sheet{
+  left:12px;right:auto;
+  width:min(360px,calc(100% - 24px));
+  max-width:calc(100% - 24px);
+  max-height:calc(100% - var(--safe-t) - var(--safe-b) - 20px);
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+html.is-desktop .menu-section{padding:7px 0}
+html.is-desktop .menu-section>div{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+}
+html.is-desktop .menu-section-tile{
+  height:48px;padding:0 10px;
+  flex-direction:row;align-items:center;justify-content:flex-start;
+  gap:8px;text-align:left;
+}
+html.is-desktop .menu-tile-icon{
+  display:grid;place-items:center;flex:0 0 22px;
+  width:22px;height:22px;
+}
+html.is-desktop .menu-tile-label{
+  min-width:0;max-width:none;overflow:visible;
+  white-space:normal;overflow-wrap:break-word;text-overflow:clip;
+  font-size:12px;line-height:1.25;
+}
 html.is-desktop .menu-section-tile:hover,
 html.is-desktop .notification-item:hover,
 html.is-desktop .user-card:hover{transform:translateY(-1px)}
@@ -612,3 +641,45 @@ html.is-desktop .promo-page{width:100%;max-width:660px;margin:0 auto;padding-lef
 .notification-state>i{display:block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .game-feedback-v7 b{font-size:10px}
 html.is-desktop .tasks-v10{width:100%;max-width:760px;margin:0 auto;padding-left:22px;padding-right:22px}
+
+/* Telegram Desktop narrow popup: use mobile-sized content gutters and allow
+   the embedded window to shrink without a forced 560px minimum height. */
+@media (max-width:600px){
+  html.is-desktop #app{
+    min-height:0;padding:8px;
+    width:100%;
+  }
+  html.is-desktop .shell{
+    width:100%;height:calc(var(--app-h) - 16px);
+    min-height:0;border-radius:16px;
+  }
+  html.is-desktop .topbar{padding-left:12px;padding-right:12px}
+  html.is-desktop .home-v7,
+  html.is-desktop .page-body,
+  html.is-desktop .page-scroll,
+  html.is-desktop .settings-page,
+  html.is-desktop .levels-v7,
+  html.is-desktop .achievements-v7,
+  html.is-desktop .profile-v7,
+  html.is-desktop .shop-page-v7,
+  html.is-desktop .gift-page-v7,
+  html.is-desktop .games-hub-v7,
+  html.is-desktop .mini-game-v7,
+  html.is-desktop .detail-v7,
+  html.is-desktop .wheel-page,
+  html.is-desktop .upgrade-page,
+  html.is-desktop .friends-page,
+  html.is-desktop .notifications-page,
+  html.is-desktop .tasks-v10{
+    padding-left:13px;padding-right:13px;
+  }
+  html.is-desktop .collection-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html.is-desktop .games-grid-v7{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html.is-desktop .home-quick-action{gap:5px;padding:0 7px}
+  html.is-desktop .home-quick-v7{gap:6px}
+}
+@media (max-height:540px){
+  html.is-desktop .menu-sheet{top:calc(var(--safe-t) + 6px)}
+  html.is-desktop .menu-section{padding:4px 0}
+  html.is-desktop .menu-section-tile{height:42px}
+}
