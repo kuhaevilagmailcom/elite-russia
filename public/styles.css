@@ -612,3 +612,35 @@ html.is-desktop .promo-page{width:100%;max-width:660px;margin:0 auto;padding-lef
 .notification-state>i{display:block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
 .game-feedback-v7 b{font-size:10px}
 html.is-desktop .tasks-v10{width:100%;max-width:760px;margin:0 auto;padding-left:22px;padding-right:22px}
+
+
+/* Release UI stability: prevent clipped content on compact Telegram viewports.
+   Scoped to sizing/overflow only; keep the established USERNAME design intact. */
+#app,.shell{min-height:0}
+.shell,.screen,.page-body,.page-scroll,.home-v7,.home-drop-v7,.admin-page{min-width:0}
+.screen{max-height:100%;min-height:0}
+.screen-toolbar,.topbar,.menu-section,.menu-section>div{min-width:0}
+.menu-section-tile,.user-card,.market-card,.task-v10,.notification-item{min-width:0}
+.page-body,.page-scroll,.settings-page,.levels-v7,.achievements-v7,
+.profile-v7,.shop-page-v7,.gift-page-v7,.games-hub-v7,.mini-game-v7,
+.detail-v7,.wheel-page,.upgrade-page,.friends-page,.notifications-page,
+.promo-page,.tasks-v10,.admin-page{min-height:0;min-width:0;overscroll-behavior:contain}
+.modal,.drop-cost-sheet{max-height:calc(var(--app-h) - var(--safe-t) - var(--safe-b) - 20px);overflow-y:auto}
+html.is-desktop .shell{min-height:0}
+@media(max-height:520px){
+  .home-level-v7{padding:7px 9px}
+  .home-stake-top{margin-top:3px}
+  .home-drop-v7{height:114px}
+  .home-drop-v7 .handle-stage{padding:8px 5px}
+  .home-drop-v7 .handle-stage b{font-size:clamp(28px,8vw,44px)}
+  .home-quick-v7{bottom:5px}
+  .home-quick-action{height:48px;padding:0 6px;gap:5px}
+  .home-quick-icon{width:27px;height:27px}
+  .topbar{height:42px;min-height:42px}
+  .drop-cost-sheet{max-height:calc(var(--app-h) - var(--safe-t) - var(--safe-b) - 20px)}
+}
+@media(max-width:360px){
+  .task-v10-top{grid-template-columns:32px minmax(0,1fr) auto;gap:6px}
+  .task-v10-icon{width:32px;height:32px}
+  .task-channel-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+}
