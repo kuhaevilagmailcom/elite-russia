@@ -907,7 +907,30 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
- if(el.hasAttribute('data-drop-trigger')&&!state.busy){state.busy=true;el.disabled=true;const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});state.home.user=r.user;state.user=r.user;await animateDrop(r.instance);state.busy=false;return}
+ if(el.hasAttribute('data-drop-trigger')&&!state.busy){
+   state.busy=true;el.disabled=true;
+   const requestId=crypto.randomUUID?.()||('req-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+   try{
+     const r=await api('/api/drop',{method:'POST',body:JSON.stringify({requestId,tier:state.dropTier})});
+     applyUserLocal(r.user);
+     await animateDrop(r.instance);
+   }catch(e){
+     if(e.message==='network'){
+       // A timeout may happen after the server has committed the drop.
+       try{
+         state.home=await api('/api/home');
+         applyUserLocal(state.home.user);
+         render();
+         if(state.home.pending){toast('Дроп сохранён — открой свой username');return}
+       }catch{}
+     }
+     throw e;
+   }finally{
+     state.busy=false;
+     el.disabled=false;
+   }
+   return
+ }
  if(el.dataset.storyCopy){try{await navigator.clipboard.writeText(el.dataset.storyCopy);toast('Ссылка скопирована')}catch{toast('Не удалось скопировать')}return}
  if(el.dataset.shareStory){
    const item=state.home?.pending&&String(state.home.pending.id)===String(el.dataset.shareStory)?state.home.pending:null;
