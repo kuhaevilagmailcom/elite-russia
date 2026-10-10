@@ -14,7 +14,9 @@ test('start message is branded, useful and safely escapes Telegram HTML',()=>{
   const text=startMessage('<Alex & Co>');
   assert.match(text,/<b>USERNAME<\/b>/);
   assert.match(text,/&lt;Alex &amp; Co&gt;/);
-  assert.match(text,/Каждый username существует/);
+  assert.match(text,/Какой USERNAME выпадет тебе\?/);
+  assert.match(text,/<blockquote>/);
+  assert.match(text,/Маркет юзернеймов/);
   assert.doesNotMatch(text,/<Alex/);
 });
 
