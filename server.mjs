@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {GAME} from './src/config.mjs';
+import {enqueueStart,deliverStartBatch} from './src/bot-start-queue.mjs';
 import {createDatabase} from './src/database.mjs';
 import {ensureUser,homeData,createDrop,resolveDrop,collection,leaderboard,tasks,claimTask,profile,sellOwnedUsername} from './src/game.mjs';
 import {listMarket,createListing,cancelListing,buyListing} from './src/market.mjs';
@@ -50,7 +51,6 @@ const STORY_DIR=path.join(DATA_DIR,'story-shares');
 fs.mkdirSync(STORY_DIR,{recursive:true});
 const db=createDatabase(DATA_DIR);
 ensureMiniGameSchema(db);
-const lastDropAt=new Map();
 const leaderboardCache=new Map();
 function invalidateLeaderboard(){leaderboardCache.clear()}
 
@@ -84,6 +84,8 @@ async function backupDatabase(label=''){
 }
 function maintenance(){
   cleanupRateBuckets();cleanupStoryFiles();cleanupUpgradeSessions(db);cleanupMiniGameSessions(db);ensureSeasonLifecycle(db);invalidateLeaderboard();
+  db.prepare("DELETE FROM bot_start_outbox WHERE status IN ('sent','failed') AND created_at<?")
+    .run(Date.now()-14*86400000);
 }
 maintenance();
 setInterval(maintenance,10*60*1000).unref?.();
@@ -135,9 +137,9 @@ function externalOrigin(req){
   if(req.socket?.encrypted&&/^[a-z0-9.-]+(?::\d+)?$/i.test(host))return 'https://'+host;
   return '';
 }
-async function telegramApi(method,payload={}){
+async function telegramApi(method,payload={},timeoutMs=35000){
   if(!BOT_TOKEN)throw new Error('bot_token_missing');
-  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),35000);
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),timeoutMs);
   try{const r=await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});const j=await r.json().catch(()=>({ok:false}));if(!r.ok||!j.ok)throw new Error(j.description||'telegram_error');return j.result}finally{clearTimeout(timer)}
 }
 function publicWebAppUrl(ref=''){try{const u=new URL(WEBAPP_URL);if(u.protocol!=='https:')return '';if(ref)u.searchParams.set('ref',ref);return u.toString()}catch{return ''}}
@@ -158,7 +160,7 @@ async function sendStartMessage(chatId,firstName='',ref=''){
   const photo=storedStartPhotoFileId();
   if(photo){
     try{
-      return await telegramApi('sendPhoto',{chat_id:chatId,photo,caption,parse_mode:'HTML',reply_markup:keyboard});
+      return await telegramApi('sendPhoto',{chat_id:chatId,photo,caption,parse_mode:'HTML',reply_markup:keyboard},12000);
     }catch(e){
       // A removed or inaccessible file_id must not stop /start from working.
       console.error('Telegram start photo delivery:',e.message);
@@ -167,7 +169,7 @@ async function sendStartMessage(chatId,firstName='',ref=''){
   return telegramApi('sendMessage',{
     chat_id:chatId,text:caption,parse_mode:'HTML',
     disable_web_page_preview:true,reply_markup:keyboard
-  });
+  },12000);
 }
 async function sendHelpMessage(chatId){
   return sendBotMenuMessage(chatId,helpMessage(),publicMiniAppLink(),'🎮 Начать играть');
@@ -241,7 +243,12 @@ async function handleTelegramUpdate(u){
       .run('telegram_start_photo_file_id',fileId);
     return sendStartMessage(m.chat.id,m.from?.first_name||'');
   }
-  if(start)return sendStartMessage(m.chat.id,m.from?.first_name||'',start[1]||'');
+  if(start){
+    // Persist reply before getUpdates offset is advanced: no lost /start on restart.
+    enqueueStart(db,{updateId:u.update_id,chatId:m.chat.id,
+      firstName:m.from?.first_name||'',ref:start[1]||''});
+    return;
+  }
   if(/^\/play(?:@\w+)?$/i.test(text)||/^🎮?\s*(?:открыть|начать) игру$/i.test(text))return sendBotMenuMessage(m.chat.id,'<b>USERNAME</b> уже ждёт тебя. Нажимай кнопку и заходи в игру 👇',publicMiniAppLink(),'🎮 Начать играть');
   if(/^\/help(?:@\w+)?$/i.test(text))return sendHelpMessage(m.chat.id);
   if(/^\/admin(?:@\w+)?$/i.test(text)){
@@ -258,11 +265,19 @@ async function handleTelegramUpdate(u){
   if(broadcast){
     if(!ADMIN_IDS.has(String(m.from?.id)))return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Нет доступа.'});
     if(!String(broadcast[1]||'').trim())return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Использование: /broadcast текст сообщения'});
-    const result=await runBroadcast(broadcast[1],{page:'home'});
-    return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Рассылка завершена.\n\nОтправлено: '+result.sent+'\nОшибок: '+result.failed+'\nВсего: '+result.total});
+    // A large admin broadcast must never block all other bot commands.
+    if(broadcastRunning)return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Рассылка уже выполняется.'});
+    broadcastRunning=true;
+    void runBroadcast(broadcast[1],{page:'home'})
+      .then(result=>telegramApi('sendMessage',{chat_id:m.chat.id,
+        text:'Рассылка завершена.\n\nОтправлено: '+result.sent+'\nОшибок: '+result.failed+'\nВсего: '+result.total}))
+      .catch(e=>console.error('Telegram broadcast:',e.message))
+      .finally(()=>{broadcastRunning=false});
+    return telegramApi('sendMessage',{chat_id:m.chat.id,text:'Рассылка запущена. Отчёт придёт после завершения.'},12000);
   }
 }
 let telegramPolling=false;
+let broadcastRunning=false;
 function acquirePollLease(){
   const now=Date.now(),expires=new Date(now+70000).toISOString(),current=db.prepare('SELECT * FROM runtime_locks WHERE name=?').get('telegram_polling');
   if(current&&current.owner!==INSTANCE_ID&&new Date(current.expires_at).getTime()>now)return false;
@@ -299,20 +314,67 @@ async function notifyAdminsBotRestarted(){
   }
 }
 async function startTelegramPolling(){
-  if(telegramPolling||!BOT_TOKEN)return;if(!acquirePollLease()){console.log('Telegram polling lease held by another instance');return}
-  telegramPolling=true;await resolveBotUsername();
-  await telegramApi('deleteWebhook',{drop_pending_updates:false}).catch(()=>{});
-  await notifyAdminsBotRestarted();
-  await configureTelegramBot();
-  let offset=0,lastLease=0;console.log('Telegram bot polling started');
-  while(telegramPolling){
+  if(telegramPolling||!BOT_TOKEN)return;
+  telegramPolling=true;
+  // On deployment the previous instance can keep a valid lease for up to
+  // 70 seconds. Wait and retry instead of disabling polling until next deploy.
+  let waitingLogged=false;
+  while(telegramPolling&&!acquirePollLease()){
+    if(!waitingLogged){console.warn('Telegram polling lease held; waiting for takeover');waitingLogged=true}
+    await new Promise(resolve=>setTimeout(resolve,3000));
+  }
+  if(!telegramPolling)return;
+
+  // A slow getMe, notification, or bot profile setup must not block /start.
+  void resolveBotUsername().catch(e=>console.error('Telegram bot username:',e.message));
+  await telegramApi('deleteWebhook',{drop_pending_updates:false},10000)
+    .catch(e=>console.error('Telegram deleteWebhook:',e.message));
+  void notifyAdminsBotRestarted().catch(e=>console.error('Telegram restart notification:',e.message));
+  void configureTelegramBot().catch(e=>console.error('Telegram bot configuration:',e.message));
+
+  let deliveryRunning=false;
+  const flushStarts=async()=>{
+    if(deliveryRunning)return;
+    deliveryRunning=true;
     try{
-      if(Date.now()-lastLease>20000){refreshPollLease();lastLease=Date.now()}
-      const ups=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});
-      for(const u of ups||[]){offset=Math.max(offset,Number(u.update_id||0)+1);await handleTelegramUpdate(u)}
-    }catch(e){console.error('Telegram polling:',e.message);await new Promise(r=>setTimeout(r,2000))}
+      await deliverStartBatch(db,row=>sendStartMessage(row.chat_id,row.first_name,row.ref));
+    }catch(e){console.error('Telegram start delivery:',e.message)}
+    finally{deliveryRunning=false}
+  };
+  const deliveryTimer=setInterval(()=>{void flushStarts()},1000);
+  deliveryTimer.unref?.();
+  void flushStarts();
+
+  const savedOffset=Number(db.prepare("SELECT value FROM game_config WHERE key='telegram_update_offset'").get()?.value||0);
+  let offset=Number.isSafeInteger(savedOffset)&&savedOffset>=0?savedOffset:0;
+  let lastLease=0;
+  console.log('Telegram bot polling started, offset',offset);
+  try{
+    while(telegramPolling){
+      try{
+        if(Date.now()-lastLease>20000){refreshPollLease();lastLease=Date.now()}
+        const updates=await telegramApi('getUpdates',{offset,timeout:25,allowed_updates:['message','pre_checkout_query']});
+        for(const update of updates||[]){
+          // An update is acknowledged only after its processing (or durable
+          // queue insertion) completes, including persistence of the offset.
+          await handleTelegramUpdate(update);
+          const nextOffset=Math.max(offset,Number(update.update_id||0)+1);
+          db.prepare("INSERT INTO game_config(key,value) VALUES('telegram_update_offset',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .run(String(nextOffset));
+          offset=nextOffset;
+        }
+      }catch(e){
+        console.error('Telegram polling:',e.message);
+        await new Promise(resolve=>setTimeout(resolve,2000));
+      }
+    }
+  }finally{
+    clearInterval(deliveryTimer);
+    db.prepare("DELETE FROM runtime_locks WHERE name='telegram_polling' AND owner=?").run(INSTANCE_ID);
+    telegramPolling=false;
   }
 }
+
 function giftOptions(user){
   const items=db.prepare("SELECT id,handle,rarity,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id).map(x=>({...x,handle:'@'+x.handle}));
   const friends=db.prepare('SELECT u.id,u.username,u.first_name FROM friends f JOIN users u ON u.id=f.friend_id WHERE f.user_id=? ORDER BY u.first_name,u.username').all(user.id);
@@ -337,9 +399,12 @@ async function api(req,res,url){
       return json(res,200,{ok:true,mediaPath,mediaUrl});
     }
     if(req.method==='POST'&&url.pathname==='/api/drop'){
-      const b=await readBody(req),requestId=String(b.requestId||''),replay=db.prepare('SELECT 1 FROM drop_requests WHERE request_id=? AND user_id=?').get(requestId,user.id);
-      if(!replay){const t=Date.now(),last=lastDropAt.get(user.id)||0;if(t-last<GAME.dropRateLimitMs)return json(res,429,{error:'too_fast'});lastDropAt.set(user.id,t)}
-      const result=createDrop(db,user,requestId,String(b.tier||'basic'));invalidateLeaderboard();return json(res,200,result);
+      const b=await readBody(req),requestId=String(b.requestId||'');
+      // Global per-user rate limiting, unique request IDs and pending-drop
+      // constraints already protect the economy. A 900ms timer used to reject
+      // legitimate new tier selections and even failed first attempts.
+      const result=createDrop(db,user,requestId,String(b.tier||'basic'));
+      invalidateLeaderboard();return json(res,200,result);
     }
     const resolve=url.pathname.match(/^\/api\/drop\/([^/]+)\/resolve$/);if(req.method==='POST'&&resolve){const b=await readBody(req),result=resolveDrop(db,user,resolve[1],b.action);invalidateLeaderboard();return json(res,200,result)}
     if(req.method==='GET'&&url.pathname==='/api/collection')return json(res,200,collection(db,user,{sort:url.searchParams.get('sort')||'new',digits:url.searchParams.get('digits')||'all',page:Number(url.searchParams.get('page')||1)}));
