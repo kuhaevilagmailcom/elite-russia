@@ -130,8 +130,18 @@ const BASE_ROOTS=[
 export const ROOTS=buildMassLexicon(BASE_ROOTS);
 if(ROOTS.length<100000)throw new Error('username_lexicon_too_small:'+ROOTS.length);
 
-export const SUFFIXES=['','7','77','777','1','01','07','007','x','xx','pro','one','max','hq','live','lab','io','tv','club','zone','hub','net','go'];
-export const PREFIXES=['','the','real','mr','its','iam'];
+// Keep generation profiles aligned with the canonical valuation thresholds.
+// Previously profiles selected only by root length, so an EPIC/LEGEND/ULTRA
+// profile frequently produced a COMMON-valued handle. Build deterministic
+// rarity buckets once at startup and use rejection sampling after variants.
+const ROOTS_BY_RARITY=Object.fromEntries(['COMMON','RARE','EPIC','LEGEND','ULTRA'].map(r=>[r,[]]));
+for(const root of ROOTS){
+  const rarity=rarityFromValue(analyzeUsername(root).value);
+  ROOTS_BY_RARITY[rarity].push(root);
+}
+
+export const SUFFIXES=['','7','77','777','1','01','07','007','x','xx','pro','one','max','hq','live','lab','io','tv','club','zone','hub','net','go','dev','app','bot','team','world','daily','official','online'];
+export const PREFIXES=['','the','real','mr','its','iam','just','hey','my'];
 
 export const SPECIALS=[
   // Telegram-native three-letter handles: the scarcest usernames in the game.
@@ -285,6 +295,8 @@ function normalizeGenerated(handle){
 const ROOTS_BY_LENGTH=Array.from({length:33},()=>[]);
 for(const root of ROOTS)if(/^[a-z]+$/.test(root)&&root.length<ROOTS_BY_LENGTH.length)ROOTS_BY_LENGTH[root.length].push(root);
 function rootForProfile(profile,rng){
+  const targeted=ROOTS_BY_RARITY[profile];
+  if(targeted?.length)return choice(targeted,rng);
   const range={COMMON:[7,15],RARE:[6,14],EPIC:[5,10],LEGEND:[4,8],ULTRA:[4,6]}[profile]||[7,15];
   const lengths=[];for(let len=range[0];len<=range[1];len++)if(ROOTS_BY_LENGTH[len]?.length)lengths.push(len);
   if(!lengths.length)return choice(ROOTS,rng).slice(0,15);
@@ -317,11 +329,16 @@ function telegramStyleVariant(root,profile,rng){
   return r<.76?root:randomPronounceable(4,5,rng);
 }
 export function buildGeneratedHandle(profile='COMMON',rng=randomUnit){
-  const root=rootForProfile(profile,rng),roll=rng();let handle;
-  if(profile==='COMMON'&&roll<.12)handle=randomLetters(7,10,rng);
-  else if(profile==='RARE'&&roll<.10)handle=randomPronounceable(6,8,rng);
-  else handle=telegramStyleVariant(root,profile,rng);
-  return normalizeGenerated(handle);
+  let last='';
+  for(let attempt=0;attempt<40;attempt++){
+    const root=rootForProfile(profile,rng),roll=rng();let handle;
+    if(profile==='COMMON'&&roll<.12)handle=randomLetters(7,10,rng);
+    else if(profile==='RARE'&&roll<.10)handle=randomPronounceable(6,8,rng);
+    else handle=telegramStyleVariant(root,profile,rng);
+    last=normalizeGenerated(handle);
+    if(rarityFromValue(analyzeUsername(last).value)===profile)return last;
+  }
+  return last;
 }
 const WORD_SET=new Set(ROOTS.map(x=>String(x).toLowerCase()).filter(x=>/^[a-z]{3,15}$/.test(x)));
 export function wordQuality(handle){
@@ -354,7 +371,7 @@ export function assessHandle(handle,{stable=false,theme=''}={}){
   return {handle:a.handle,value:a.value,rarity:rarityFromValue(a.value),quality:a.breakdown?.word||0,length:a.handle.length,score:a.score,visual:a.visual,breakdown:a.breakdown};
 }
 export function generatedSupply(){return 1}
-export const EXACT_ROOT_VARIANT_UNIVERSE=3324779;
+export const EXACT_ROOT_VARIANT_UNIVERSE=4627140;
 export function candidateUniverseSize(){return EXACT_ROOT_VARIANT_UNIVERSE}
 const CURATED_REAL_ROOTS=new Set([
   ...REAL_ENGLISH_ROOTS,
