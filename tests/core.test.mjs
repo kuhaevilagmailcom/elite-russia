@@ -6,7 +6,7 @@ import path from 'node:path';
 
 import {createDatabase} from '../src/database.mjs';
 import {GAME,DROP_TIERS} from '../src/config.mjs';
-import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality} from '../src/generator.mjs';
+import {ROOTS,SPECIALS,buildGeneratedHandle,candidateUniverseSize,isValidHandle,scoreHandle,wordQuality,rarityFromValue} from '../src/generator.mjs';
 import {analyzeUsername,isGameUsername,visualTier} from '../src/valuation.mjs';
 import {ensureUser,publicUser,leaderboard,tasks,claimTask,DAILY_TASK_POOL,DAILY_TASK_COUNT,SPECIAL_TASKS} from '../src/game.mjs';
 import {listMarket,createListing,buyListing} from '../src/market.mjs';
@@ -52,11 +52,13 @@ test('menu has exactly the four v7 product groups and no Lab or Plus',()=>{
   assert.doesNotMatch(block,/Lab|Plus|USERNAME\+/);
 });
 
-test('UI icon map is Hugeicons-only and contains verified semantic icons',()=>{
+test('UI keeps the stable Hugeicons family without mismatched SVG replacements',()=>{
   const block=appSrc.match(/const ICON_NAME=Object\.freeze\(\{[\s\S]*?\}\);/)?.[0]||'';
-  for(const icon of ['package','gamepad','shopping-bag-01','square-arrow-up-double','medal-01','play','filter'])assert.match(block,new RegExp(icon.replace(/-/g,'\\-')));
-  assert.match(appSrc,/hgi-stroke/);
-  assert.doesNotMatch(block,/lucide|emoji|solid/i);
+  for(const item of ['home:','games:','shop:','upgrade:','achievements:','motion:','filter:'])
+    assert.match(block,new RegExp(item));
+  assert.match(appSrc,/hgi-stroke hgi-/);
+  assert.doesNotMatch(appSrc,/const ICON_PATH=Object\.freeze/);
+  assert.match(indexSrc,/https:\/\/use\.hugeicons\.com\/font\/icons\.css/);
 });
 
 test('market and collection share one reusable FilterButton component',()=>{
@@ -170,6 +172,14 @@ test('game usernames start at 4 characters and support digits and underscore',()
     if(/^[a-z]+$/.test(h))clean++;
   }
   assert.ok(digits>0&&underscores>0&&clean>0);
+});
+
+test('paid drop generation matches the canonical rarity profile',()=>{
+  for(const profile of ['COMMON','RARE','EPIC','LEGEND','ULTRA']){
+    let matched=0;
+    for(let i=0;i<250;i++)matched+=rarityFromValue(analyzeUsername(buildGeneratedHandle(profile)).value)===profile?1:0;
+    assert.ok(matched>=238,`${profile} matched ${matched}/250`);
+  }
 });
 
 test('canonical valuation rewards readable clean usernames over junk',()=>{

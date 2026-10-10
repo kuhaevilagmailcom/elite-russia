@@ -69,28 +69,32 @@ export function adminSetBalance(db,admin,targetId,delta){
   return {ok:true,balance:result};
 }
 export function adminGrantGems(db,admin,targetId,amount){
-  const target=db.prepare('SELECT id FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
   const add=Math.max(-100000,Math.min(100000,Math.round(Number(amount)||0)));
   if(!add)throw new Error('bad_gems');
-  const current=walletData(db,target.id);
-  if(add<0&&current.gems<Math.abs(add))throw new Error('insufficient_gems');
-  let wallet;
-  if(add>0)wallet=grantGems(db,target.id,add);
-  else{
-    db.prepare('UPDATE currency_wallets SET gems=gems+?,updated_at=? WHERE user_id=?').run(add,nowIso(),target.id);
-    wallet=walletData(db,target.id);
-  }
-  audit(db,admin.id,'gems',target.id,{delta:add,gems:wallet.gems});
-  return {ok:true,wallet};
+  return db.transaction(()=>{
+    const target=db.prepare('SELECT id FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
+    const current=walletData(db,target.id);
+    if(add<0&&current.gems<Math.abs(add))throw new Error('insufficient_gems');
+    let wallet;
+    if(add>0)wallet=grantGems(db,target.id,add);
+    else{
+      db.prepare('UPDATE currency_wallets SET gems=gems+?,updated_at=? WHERE user_id=?').run(add,nowIso(),target.id);
+      wallet=walletData(db,target.id);
+    }
+    audit(db,admin.id,'gems',target.id,{delta:add,gems:wallet.gems});
+    return {ok:true,wallet};
+  }).immediate();
 }
 export function adminUpdateUserProgress(db,admin,targetId,{xp,freeDrops}={}){
-  const target=db.prepare('SELECT * FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
-  const nextXp=Math.max(0,Math.min(1000000000,Math.round(Number(xp??target.xp)||0)));
-  const nextFree=Math.max(0,Math.min(100000,Math.round(Number(freeDrops??target.free_drops)||0)));
-  db.prepare('UPDATE users SET xp=?,free_drops=? WHERE id=?').run(nextXp,nextFree,target.id);
-  audit(db,admin.id,'user_progress',target.id,{xp:nextXp,freeDrops:nextFree});
-  const prog=progressionFromXp(nextXp);
-  return {ok:true,xp:nextXp,freeDrops:nextFree,level:prog.level,title:prog.title};
+  return db.transaction(()=>{
+    const target=db.prepare('SELECT * FROM users WHERE id=?').get(Number(targetId));if(!target)throw new Error('user_not_found');
+    const nextXp=Math.max(0,Math.min(1000000000,Math.round(Number(xp??target.xp)||0)));
+    const nextFree=Math.max(0,Math.min(100000,Math.round(Number(freeDrops??target.free_drops)||0)));
+    db.prepare('UPDATE users SET xp=?,free_drops=? WHERE id=?').run(nextXp,nextFree,target.id);
+    audit(db,admin.id,'user_progress',target.id,{xp:nextXp,freeDrops:nextFree});
+    const prog=progressionFromXp(nextXp);
+    return {ok:true,xp:nextXp,freeDrops:nextFree,level:prog.level,title:prog.title};
+  }).immediate();
 }
 export function adminUsernames(db,{q='',status='active',page=1,size=30}={}){
   const p=Math.max(1,Number(page)||1),limit=Math.max(10,Math.min(60,Number(size)||30)),off=(p-1)*limit,query=String(q||'').trim().toLowerCase(),filters=[],args=[];

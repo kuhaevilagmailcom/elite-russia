@@ -27,7 +27,7 @@ async function json(pathname,opts={}){
 test.before(async()=>{
   child=spawn(process.execPath,['server.mjs'],{
     cwd:process.cwd(),
-    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'',BOT_TOKEN:'',BOT_USERNAME:'test_username_bot',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
+    env:{...process.env,PORT:String(port),NODE_ENV:'test',ALLOW_DEV_AUTH:'1',DEV_ADMIN:'1',ADMIN_IDS:'10001',BOT_TOKEN:'',BOT_USERNAME:'test_username_bot',DATA_DIR:tmp,WEBAPP_URL:'https://username.example'},
     stdio:['ignore','pipe','pipe']
   });
   await waitForServer();
@@ -134,18 +134,18 @@ test('HTTP upgrader preview and spin work without touch APIs or Telegram-only ev
   const spin=await json('/api/upgrader',{method:'POST',headers:headers(uid),body:JSON.stringify({ids:[id],sessionId:preview.body.sessionId})});assert.equal(spin.r.status,200);assert.equal(typeof spin.body.success,'boolean');
 });
 
-test('fixed admin IDs are authorized and ordinary users are denied',async()=>{
-  await json('/api/home',{headers:headers('8464597898')});
-  const ok=await json('/api/admin/overview',{headers:headers('8464597898')});assert.equal(ok.r.status,200);
+test('configured admin IDs are authorized and ordinary users are denied',async()=>{
+  await json('/api/home',{headers:headers('10001')});
+  const ok=await json('/api/admin/overview',{headers:headers('10001')});assert.equal(ok.r.status,200);
   const denied=await json('/api/admin/overview',{headers:headers('30200')});assert.equal(denied.r.status,403);assert.equal(denied.body.error,'forbidden');
 });
 
 test('HTTP single-user reset restores gameplay defaults without deleting account',async()=>{
   const uid='30203';const home=await json('/api/home',{headers:headers(uid)});assert.equal(home.r.status,200);
-  const overview=await json('/api/admin/overview',{headers:headers('8464597898')});const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
-  await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({handle:'resetone',value:7000})});
-  await json('/api/admin/users/'+target.id+'/balance',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({delta:12000})});
-  const reset=await json('/api/admin/users/'+target.id+'/reset',{method:'POST',headers:headers('8464597898'),body:'{}'});assert.equal(reset.r.status,200);
+  const overview=await json('/api/admin/overview',{headers:headers('10001')});const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
+  await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('10001'),body:JSON.stringify({handle:'resetone',value:7000})});
+  await json('/api/admin/users/'+target.id+'/balance',{method:'POST',headers:headers('10001'),body:JSON.stringify({delta:12000})});
+  const reset=await json('/api/admin/users/'+target.id+'/reset',{method:'POST',headers:headers('10001'),body:'{}'});assert.equal(reset.r.status,200);
   const after=await json('/api/home',{headers:headers(uid)});assert.equal(after.r.status,200);assert.equal(after.body.user.balance,50000);assert.equal(after.body.user.freeDrops,1);assert.equal(after.body.user.collectionCount,0);
 });
 
@@ -196,16 +196,16 @@ test('HTTP gem invoice is unavailable without bot token',async()=>{
 
 test('HTTP full reset requires exact confirmation, makes backup, frees usernames and preserves financial/schema records',async()=>{
   const uid='30300';await json('/api/home',{headers:headers(uid)});
-  const overview=await json('/api/admin/overview',{headers:headers('8464597898')});const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
-  const added=await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({handle:'resetallx',value:12000})});assert.equal(added.r.status,200);
+  const overview=await json('/api/admin/overview',{headers:headers('10001')});const target=overview.body.users.find(x=>String(x.telegram_id)===uid);assert.ok(target);
+  const added=await json('/api/admin/users/'+target.id+'/add-username',{method:'POST',headers:headers('10001'),body:JSON.stringify({handle:'resetallx',value:12000})});assert.equal(added.r.status,200);
   const direct=new Database(path.join(tmp,'username.sqlite'));direct.pragma('busy_timeout = 3000');
   const migrationsBefore=direct.prepare('SELECT COUNT(*) c FROM schema_migrations').get().c;
   const premiumUntil=new Date(Date.now()+15*86400000).toISOString();
   direct.prepare('UPDATE users SET premium_until=? WHERE id=?').run(premiumUntil,target.id);
   direct.prepare("INSERT OR IGNORE INTO payments(telegram_charge_id,provider_charge_id,user_id,payload,currency,total_amount,product,created_at) VALUES('reset-charge','provider',?,'audit','XTR',50,'USERNAME_PLUS_30D',?)").run(target.id,new Date().toISOString());
   direct.close();
-  const bad=await json('/api/admin/reset-all',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({confirmation:'WRONG'})});assert.equal(bad.r.status,400);
-  const good=await json('/api/admin/reset-all',{method:'POST',headers:headers('8464597898'),body:JSON.stringify({confirmation:'RESET USERNAME'})});assert.equal(good.r.status,200);assert.equal(String(good.body.integrity).toLowerCase(),'ok');
+  const bad=await json('/api/admin/reset-all',{method:'POST',headers:headers('10001'),body:JSON.stringify({confirmation:'WRONG'})});assert.equal(bad.r.status,400);
+  const good=await json('/api/admin/reset-all',{method:'POST',headers:headers('10001'),body:JSON.stringify({confirmation:'RESET USERNAME'})});assert.equal(good.r.status,200);assert.equal(String(good.body.integrity).toLowerCase(),'ok');
   const check=new Database(path.join(tmp,'username.sqlite'),{readonly:true,fileMustExist:true});
   try{
     assert.equal(check.prepare('SELECT COUNT(*) c FROM username_instances').get().c,0);

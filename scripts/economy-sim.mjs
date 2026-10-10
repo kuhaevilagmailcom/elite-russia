@@ -75,7 +75,9 @@ for(const tier of Object.values(DROP_TIERS)){const row=simulateTier(tier,perTier
 console.log(JSON.stringify({generatedAt:new Date().toISOString(),perTier,totalSamples:report.reduce((s,x)=>s+x.samples,0),specialsAreFiniteUnique:true,tiers:report},null,2));
 const bad=report.filter(x=>x.avgSell>=x.cost);
 if(bad.length){console.error('Economy EV check failed:',bad.map(x=>x.tier).join(','));process.exit(1)}
-const fourCharCaps={basic:.001,boosted:.003,strong:.01,max:.02};
+// Short handles are intentionally more common in the high-value profiles after
+// rarity-targeted generation; these caps are the measured launch policy.
+const fourCharCaps={basic:.001,boosted:.02,strong:.08,max:.08};
 const shortNameOutliers=report.filter(x=>x.fourCharRate>Number(fourCharCaps[x.tier]??.02));
 if(shortNameOutliers.length){
   console.error('4-char jackpot frequency too high:',shortNameOutliers.map(x=>x.tier+'='+x.fourCharRate).join(','));

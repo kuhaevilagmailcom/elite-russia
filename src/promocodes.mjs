@@ -1,4 +1,4 @@
-import {nowIso} from './economy.mjs';
+import {nowIso,uid} from './economy.mjs';
 import {grantGems} from './payments.mjs';
 
 function normalizeCode(value){
@@ -43,14 +43,22 @@ export function adminCreatePromo(db,admin,{code,rewardType,rewardAmount,maxUses=
   const uses=Math.max(0,Math.min(1000000,Math.round(Number(maxUses)||0)));
   const expires=expiresAt?new Date(expiresAt).toISOString():null;
   if(expires&&Date.parse(expires)<=Date.now())throw new Error('bad_promo_expiry');
-  if(db.prepare('SELECT 1 FROM promo_codes WHERE code=?').get(normalized))throw new Error('promo_exists');
-  db.prepare('INSERT INTO promo_codes(code,reward_type,reward_amount,max_uses,uses,active,expires_at,created_by,created_at) VALUES(?,?,?,?,0,1,?,?,?)')
-    .run(normalized,reward.rewardType,reward.rewardAmount,uses,expires,admin.id,nowIso());
-  return {ok:true,code:normalized,...reward,maxUses:uses,expiresAt:expires};
+  return db.transaction(()=>{
+    if(db.prepare('SELECT 1 FROM promo_codes WHERE code=?').get(normalized))throw new Error('promo_exists');
+    db.prepare('INSERT INTO promo_codes(code,reward_type,reward_amount,max_uses,uses,active,expires_at,created_by,created_at) VALUES(?,?,?,?,0,1,?,?,?)')
+      .run(normalized,reward.rewardType,reward.rewardAmount,uses,expires,admin.id,nowIso());
+    db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+      .run(uid(),admin.id,'promo_create',normalized,JSON.stringify({rewardType:reward.rewardType,rewardAmount:reward.rewardAmount,maxUses:uses,expiresAt:expires}),nowIso());
+    return {ok:true,code:normalized,...reward,maxUses:uses,expiresAt:expires};
+  }).immediate();
 }
 export function adminSetPromoActive(db,admin,code,active){
   const normalized=normalizeCode(code);
-  const changes=db.prepare('UPDATE promo_codes SET active=? WHERE code=?').run(active?1:0,normalized).changes;
-  if(!changes)throw new Error('promo_not_found');
-  return {ok:true,code:normalized,active:!!active};
+  return db.transaction(()=>{
+    const changes=db.prepare('UPDATE promo_codes SET active=? WHERE code=?').run(active?1:0,normalized).changes;
+    if(!changes)throw new Error('promo_not_found');
+    db.prepare('INSERT INTO admin_audit(id,admin_id,action,target,metadata,created_at) VALUES(?,?,?,?,?,?)')
+      .run(uid(),admin.id,'promo_toggle',normalized,JSON.stringify({active:!!active}),nowIso());
+    return {ok:true,code:normalized,active:!!active};
+  }).immediate();
 }
