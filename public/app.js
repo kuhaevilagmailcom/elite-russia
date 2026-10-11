@@ -397,12 +397,24 @@ function crashRewardPreview(plan,multiplier,baseValue){
   Math.floor((Number(baseValue)||0)*Math.max(1,Number(multiplier)||1))));
  return {handle:reward.handle,value};
 }
+function crashParticipants(d){
+ const current=Array.isArray(d?.bets)?d.bets:[];
+ const previous=Array.isArray(d?.lastBets)?d.lastBets:[];
+ return {bets:current.length?current:previous,fromLast:current.length===0&&previous.length>0};
+}
+function crashParticipantsLabel(d){
+ const {bets,fromLast}=crashParticipants(d);
+ return fromLast?'Прошлый раунд':bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:bets.length+' ставок';
+}
 function crashRoster(bets){
  const list=(bets||[]).slice(-CRASH_VISIBLE_PLAYERS).reverse();
- return list.length?list.map(b=>
-  '<div class="crash-bet-row"><span class="crash-player-name">'+esc(b.player)+'</span>'+
-  '<span class="crash-stake-summary"><b>'+esc(b.handle)+'</b><small>'+fmt(b.value)+'</small></span></div>'
- ).join(''):'<div class="crash-empty">Пока нет ставок</div>';
+ return list.length?list.map(b=>{
+  const outcome=b.status==='cashed'?'won':b.status==='lost'?'lost':'live';
+  const label=outcome==='won'?'Забрал':outcome==='lost'?'Проигрыш':'В игре';
+  return '<div class="crash-bet-row"><span class="crash-player-name">'+esc(b.player)+'</span>'+
+   '<span class="crash-stake-summary"><b>'+esc(b.handle)+'</b><small>'+fmt(b.value)+'</small></span>'+
+   '<span class="crash-bet-result '+outcome+'">'+label+'</span></div>';
+ }).join(''):'<div class="crash-empty">Пока нет ставок</div>';
 }
 function crashAutoControls(d,bet,waiting){
  const selected=bet?.status==='staked'?bet.autoStopX:d.autoStopX;
@@ -453,8 +465,8 @@ function crashView(){
    crashAutoControls(d,bet,waiting)+
   '</section>'+
   '<section class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
-   (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
-   '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></section>'+
+   crashParticipantsLabel(d)+'</span></div>'+
+   '<div id="crashBets" class="crash-bet-list">'+crashRoster(crashParticipants(d).bets)+'</div></section>'+
   (footerPrize?'<p class="crash-mini-note crash-earned">'+(footerPrize.auto?'Автостоп · ':'Получен ')+
     '<b>'+esc(footerPrize.handle)+'</b> · '+fmt(footerPrize.value)+'</p>':
    '<p class="crash-mini-note">Выигрыш — новый username · Старый расходуется</p>')+
@@ -552,11 +564,14 @@ async function refreshCrashLive(){
   state.crash=next;
   if(change)render();
   else{
-   const roster=document.querySelector('#crashBets');if(roster&&roster.dataset.signature!==JSON.stringify(next.bets.slice(-CRASH_VISIBLE_PLAYERS).map(b=>[b.id,b.status]))){
-    roster.innerHTML=crashRoster(next.bets);
-    roster.dataset.signature=JSON.stringify(next.bets.slice(-CRASH_VISIBLE_PLAYERS).map(b=>[b.id,b.status]));
+   const participants=crashParticipants(next);
+   const roster=document.querySelector('#crashBets');
+   const signature=JSON.stringify([participants.fromLast,...participants.bets.slice(-CRASH_VISIBLE_PLAYERS).map(b=>[b.id,b.status])]);
+   if(roster&&roster.dataset.signature!==signature){
+    roster.innerHTML=crashRoster(participants.bets);
+    roster.dataset.signature=signature;
    }
-   const count=document.querySelector('#crashParticipantsCount');if(count)count.textContent=next.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:next.bets.length+' ставок';
+   const count=document.querySelector('#crashParticipantsCount');if(count)count.textContent=crashParticipantsLabel(next);
   }
   if(next.round.id!==crashActiveRoundId){crashActiveRoundId=next.round.id;state.crashBusy=false}
   startCrashVisualLoop();
