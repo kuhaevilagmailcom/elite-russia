@@ -833,12 +833,33 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    el.disabled=true;const r=await api('/api/promocode',{method:'POST',body:JSON.stringify({code})});
    applyUserLocal(r.user);state.promo=await api('/api/promocode');sound('reward');haptic('medium');toast('+'+fmtPlain(r.rewardAmount)+' 💎');render();return
  }
+ if(el.hasAttribute('data-crash-autostop-custom')){
+   state.crashCustomOpen=!state.crashCustomOpen;render();
+   if(state.crashCustomOpen)document.querySelector('#crashAutoInput')?.focus();
+   return;
+ }
+ if(el.hasAttribute('data-crash-autostop-save')||el.hasAttribute('data-crash-autostop')){
+   if(state.crashBusy)return;
+   const value=el.hasAttribute('data-crash-autostop-save')?
+     String(document.querySelector('#crashAutoInput')?.value||'').trim():el.dataset.crashAutostop;
+   if(el.hasAttribute('data-crash-autostop-save')&&!value){toast('Введи свой множитель');return}
+   state.crashBusy=true;el.disabled=true;
+   try{
+     const result=await api('/api/crash/autostop',{method:'POST',
+       body:JSON.stringify({value:value==='off'?null:value})});
+     state.crashCustomOpen=false;
+     crashSound('bet');
+     toast(result.autoStopX?'Автостоп ×'+Number(result.autoStopX).toFixed(2):'Автостоп выключен');
+     await load('crash',{force:true});
+   }finally{state.crashBusy=false;el.disabled=false}
+   return;
+ }
  if(el.dataset.crashBet){
    if(state.crashBusy)return;
    state.crashBusy=true;el.disabled=true;
    try{
      await api('/api/crash/bet',{method:'POST',body:JSON.stringify({instanceId:el.dataset.crashBet,roundId:state.crash.round.id})});
-     state.crashLastReward=null;toast('Username поставлен');await refreshUser();await load('crash',{force:true});
+     state.crashLastReward=null;crashSound('bet');toast('Username поставлен');await refreshUser();await load('crash',{force:true});
    }finally{state.crashBusy=false;el.disabled=false}
    return
  }
@@ -853,7 +874,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
      }else{
        toast('Старая ставка уже обработана');
      }
-     sound('reward');await refreshUser();await load('crash',{force:true});
+     crashSound('cashout');await refreshUser();await load('crash',{force:true});
    }finally{state.crashBusy=false;el.disabled=false}
    return
  }
