@@ -33,6 +33,7 @@ test('Crash: 100K stake evolves into a real unique username, never currency; sur
   assert.equal(round.status,'waiting');
   assert.equal(round.starts_at,at+CRASH_WAIT_MS);
   assert.equal(crashState(db,a,at).round.id,crashState(db,b,at).round.id);
+  assert.deepEqual(crashState(db,a,at).history,[],'history is empty until a round finishes');
   assert.equal(crashState(db,a,at).available.some(i=>i.id===ia),true);
   const pa=placeCrashBet(db,a,ia,at+1);
   const pb=placeCrashBet(db,b,ib,at+2);
@@ -89,6 +90,8 @@ test('Crash: 100K stake evolves into a real unique username, never currency; sur
   assert.equal(db.prepare('SELECT COUNT(*) n FROM crash_reward_options WHERE bet_id=?').get(pb.betId).n,0);
   const lastState=crashState(db,a,at+60001);
   assert.equal(lastState.last.id,round.id);
+  assert.equal(lastState.history[0].id,round.id,'recent rounds come from actual settled rounds');
+  assert.equal(lastState.history[0].multiplier,1000,'history exposes recorded crash result');
   assert.equal(lastState.bets.length,0,'next round starts with no current bets');
   assert.deepEqual(lastState.lastBets.map(x=>[x.player,x.status]),[
     ['Alpha','cashed'],['Beta','lost']
