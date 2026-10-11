@@ -427,8 +427,7 @@ function crashParticipantsLabel(d){
 function crashHistory(d){
  const rounds=(d?.history||[]).slice(0,8);
  if(!rounds.length)return '';
- return '<div class="crash-history" aria-label="История последних раундов">'+
-  '<span>Последние раунды</span><div class="crash-history-pills">'+
+ return '<div class="crash-history" aria-label="Последние раунды"><div class="crash-history-pills">'+
   rounds.map(x=>'<span class="crash-history-pill '+(Number(x.multiplier)>=2?'big':'')+'">×'+Number(x.multiplier).toFixed(2).replace('.',',')+'</span>').join('')+
   '</div></div>';
 }
@@ -446,51 +445,39 @@ function crashRoster(bets,waiting=false){
    '</span></div></div>';
  }).join(''):'<div class="crash-empty">В этом раунде ставок пока нет</div>';
 }
-function crashAutoControls(d,bet,waiting){
+function crashAutoControls(d){
  const current=d?.autoStopX;
  const active=current!==null&&current!==undefined;
- const nextOnly=bet?.status==='staked'&&!waiting;
  return '<div class="crash-auto">'+
-  '<label class="crash-auto-title" for="crashAutoInput"><b>Автостоп</b><span>'+
-   (nextOnly?'Для следующей ставки':'Автоматически забрать на заданном X')+'</span></label>'+
+  '<label class="crash-auto-title" for="crashAutoInput"><b>Автостоп</b></label>'+
   '<div class="crash-auto-field"><span aria-hidden="true">×</span>'+
    '<input id="crashAutoInput" type="text" inputmode="decimal" maxlength="7" autocomplete="off" spellcheck="false"'+
-   ' placeholder="Например, 2.50" aria-label="Множитель автостопа"'+
+   ' placeholder="2.00" aria-label="Автостоп"'+
    ' value="'+(active?Number(current).toFixed(2):'')+'"></div>'+
-  '<div class="crash-auto-hint">1.01–1000 × · Enter — сохранить · Пусто — выключить</div>'+
  '</div>';
 }
 function crashView(){
  const d=state.crash;
- if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
+ if(!d)return '<div class="page-body"><div class="empty">Загрузка…</div></div>';
  const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet;
  const available=(d.available||[]).map(x=>
   '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
  ).join('');
- const first=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'',value:bet?.value||0};
- const footerPrize=bet?.status==='cashed'?d.myWin:!bet?(state.crashLastReward||d.recentWin):null;
+ const first=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||''};
  let playerInfo='';
  if(bet){
   const status=bet.status==='cashed'?'<span class="crash-bet-tag won">Забрал</span>':
    bet.status==='lost'?'<span class="crash-bet-tag lost">Проигрыш</span>':
    '<span class="crash-bet-tag">'+(waiting?'Ожидает':'В игре')+'</span>';
-  playerInfo='<div class="crash-mybet"><div><small>Поставлен username</small><b>'+esc(bet.handle)+'</b><span>'+
-   fmt(bet.value)+(bet.autoStopX?' · автостоп ×'+Number(bet.autoStopX).toFixed(2):'')+'</span></div>'+status+'</div>';
+  playerInfo='<div class="crash-mybet"><div><b>'+esc(bet.handle)+'</b></div>'+status+'</div>';
   if(bet.status==='cashed')
-   playerInfo+='<div class="crash-cashed"><span>Вы получили</span><b>'+esc(d.myWin?.handle||'Username')+'</b><small>'+
-    fmt(d.myWin?.value||0)+(bet.settlementKind==='auto'?' · Автостоп':'')+'</small></div>';
-  else if(!running||bet.status!=='staked')
-   playerInfo+='<div class="crash-queued">'+(waiting?'Ожидаем начало раунда':'Раунд продолжается')+'</div>';
+   playerInfo+='<div class="crash-cashed"><b>'+esc(d.myWin?.handle||'Username')+'</b></div>';
  }else if(waiting){
-  playerInfo='<div class="crash-choice"><div class="crash-choice-head"><b>Выбери username для ставки</b><span>'+
-   (d.available||[]).length+' доступно</span></div><div class="crash-available">'+
-   (available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>';
- }else{
-  playerInfo='<div class="crash-queued">Приём ставок откроется в следующем раунде</div>';
+  playerInfo='<div class="crash-choice"><div class="crash-available">'+
+   (available||'<div class="crash-empty">Нет usernames</div>')+'</div></div>';
  }
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><div><b>Множитель растёт</b><span>Забери username до краша</span></div>'+
-   '<span class="crash-round-badge"><i></i>'+(waiting?'Приём ставок':'Раунд идёт')+'</span></div>'+
+  '<div class="crash-caption"><span class="crash-round-badge"><i></i>'+(waiting?'Приём ставок':'Раунд идёт')+'</span></div>'+
   crashHistory(d)+
   '<section class="crash-stage '+(waiting?'waiting':'running')+'" aria-label="График множителя">'+
    '<div class="crash-stage-grid"></div>'+
@@ -500,25 +487,20 @@ function crashView(){
     '</linearGradient></defs>'+
     '<path id="crashGuide" class="crash-guide" d=""/><path id="crashTrack" class="crash-track" d=""/>'+
    '</svg>'+
-   '<div class="crash-stage-header"><small>ТЕКУЩИЙ МНОЖИТЕЛЬ</small><strong id="crashMultiplier">×1.00</strong><span id="crashStatus">'+
-    (waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать до краша')+'</span></div>'+
+   '<div class="crash-stage-header"><strong id="crashMultiplier">×1.00</strong>'+
+    (waiting?'<span><b id="crashCountdown">10.0</b> с</span>':'')+'</div>'+
    '<span class="crash-marker" id="crashMarker" aria-hidden="true"></span>'+
-   (bet?'<div class="crash-skyline"><span id="crashFlyName">'+esc(first.handle)+'</span>'+
-    '<small id="crashFlyPrice">'+fmt(first.value)+'</small></div>':'')+
-   '<div class="crash-stage-foot"><span>×1.00</span><span>×1000</span></div>'+
+   (bet?'<div class="crash-skyline"><span id="crashFlyName">'+esc(first.handle)+'</span></div>':'')+
    '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><strong>КРАШ</strong><b>×'+Number(state.crashLastExplosionX||1).toFixed(2)+'</b></div>'+
   '</section>'+
-  '<section class="crash-controls"><div class="crash-controls-title"><b>Твоя ставка</b><span>'+(waiting?'Можно поставить username':'Ставки закрыты')+'</span></div>'+
-   playerInfo+crashAutoControls(d,bet,waiting)+'</section>'+
-  (footerPrize?'<div class="crash-reward-note"><span>Последний выигрыш</span><b>'+esc(footerPrize.handle)+'</b><strong>'+
-   fmt(footerPrize.value)+'</strong></div>':'')+
+  '<section class="crash-controls"><div class="crash-controls-title"><b>Username</b></div>'+
+   playerInfo+crashAutoControls(d)+'</section>'+
   '<section class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
    crashParticipantsLabel(d)+'</span></div>'+
    '<div id="crashBets" class="crash-bet-list">'+crashRoster(crashParticipants(d).bets,waiting&&d.bets.length>0)+'</div></section>'+
-  '<p class="crash-mini-note">При выигрыше получаешь новый username. Поставленный username расходуется.</p>'+
  '</div>'+
  (running&&bet?.status==='staked'?'<div class="crash-dock"><button class="crash-cashout" data-crash-cashout '+
-  (state.crashBusy?'disabled':'')+'>Забрать username <b id="crashCashout">×1.00</b></button></div>':'');
+  (state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button></div>':'');
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0;
 let crashActiveRoundId=0;
@@ -548,8 +530,6 @@ function startCrashVisualLoop(){
    const cashout=document.querySelector('#crashCashout');if(cashout)cashout.textContent='×'+mult.toFixed(2);
    const remain=Math.max(0,(r.startsAt-now)/1000);
    const countdown=document.querySelector('#crashCountdown');if(countdown)countdown.textContent=remain.toFixed(1);
-   const status=document.querySelector('#crashStatus');
-   if(status&&running&&status.textContent!=='Успей забрать до краша')status.textContent='Успей забрать до краша';
    const w=stage.clientWidth,h=stage.clientHeight;
    // End of the SVG track is exactly the point under the floating handle.
    const raw=Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000));
@@ -566,10 +546,8 @@ function startCrashVisualLoop(){
     flight.style.setProperty('--crash-x',point.x.toFixed(1)+'px');
     flight.style.setProperty('--crash-y',point.y.toFixed(1)+'px');
     const reward=d.myWin||crashRewardPreview(d.myRewardPlan,running?mult:1,d.myBet?.value);
-    const name=document.querySelector('#crashFlyName'),price=document.querySelector('#crashFlyPrice');
+    const name=document.querySelector('#crashFlyName');
     if(reward&&name&&name.textContent!==reward.handle)name.textContent=reward.handle;
-    const value=reward?fmt(reward.value):(d.myBet?fmt(d.myBet.value):'Выбери ставку');
-    if(price&&price.textContent!==value)price.textContent=value;
    }
    const svg=document.querySelector('#crashGraphSvg'),guide=document.querySelector('#crashGuide'),track=document.querySelector('#crashTrack');
    if(svg&&guide&&track&&(track!==lastTrack||Math.abs(p-lastPathProgress)>.002||w!==lastW||h!==lastH)){
