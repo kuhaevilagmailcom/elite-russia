@@ -164,6 +164,8 @@ export function crashState(db,user,now=Date.now()){
   return db.transaction(()=>{
     const round=sync(db,now);
     const last=db.prepare("SELECT id,crash_x,commitment,seed,ended_at FROM crash_rounds WHERE status='crashed' ORDER BY id DESC LIMIT 1").get();
+    const history=db.prepare("SELECT id,crash_x FROM crash_rounds WHERE status='crashed' ORDER BY id DESC LIMIT 8")
+      .all().map(x=>({id:x.id,multiplier:x.crash_x}));
     const bets=db.prepare(`SELECT b.*,i.handle,i.value,u.first_name,u.username
       FROM crash_bets b JOIN username_instances i ON i.id=b.instance_id JOIN users u ON u.id=b.user_id
       WHERE b.round_id=? ORDER BY b.created_at ASC LIMIT 100`).all(round.id).map(shapeBet);
@@ -196,7 +198,7 @@ export function crashState(db,user,now=Date.now()){
         .all(last.id).reverse().map(shapeBet):[];
     const available=db.prepare("SELECT id,handle,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id)
       .map(x=>({...x,handle:'@'+x.handle}));
-    return {round:publicRound(round,now),last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,
+    return {round:publicRound(round,now),history,last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,
       bets,lastBets,myBet:myAny,myRewardPlan,myWin,recentWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
   })();
 }
