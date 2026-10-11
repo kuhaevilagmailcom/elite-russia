@@ -1,108 +1,402 @@
-function crashRoster(bets){
- const list=(bets||[]).slice(-CRASH_VISIBLE_PLAYERS).reverse();
- return list.length?list.map(b=>
-  '<div class="crash-bet-row"><span class="crash-player-name">'+esc(b.player)+'</span>'+
-  '<span class="crash-stake-summary"><b>'+esc(b.handle)+'</b><small>'+fmt(b.value)+'</small></span></div>'
- ).join(''):'<div class="crash-empty">Пока нет ставок</div>';
+let TG=window.Telegram?.WebApp;
+const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
+const state={
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,crashLastReward:null,crashCustomOpen:false,crashLastExplosionX:0,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
+  filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
+  rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
+  pageLoadedAt:{}
+};
+const fmt=n=>new Intl.NumberFormat(currentLanguage()==='en'?'en-US':'ru-RU').format(Math.round(Number(n)||0))+' ₽';
+function untilText(iso){
+ const ms=Math.max(0,new Date(iso).getTime()-Date.now()),mins=Math.max(1,Math.ceil(ms/60000)),en=currentLanguage()==='en';
+ const h=Math.floor(mins/60),m=mins%60;
+ if(h>=24){const d=Math.floor(h/24),rh=h%24;return d+(en?' d':' дн.')+(rh?' '+rh+(en?' h':' ч'):'')}
+ if(h)return h+(en?' h':' ч')+(m?' '+m+(en?' min':' мин'):'');
+ return m+(en?' min':' мин');
 }
-function crashView(){
- const d=state.crash;
- if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
- const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet,selected=waiting&&!bet;
- const available=(d.available||[]).map(x=>
-  '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
- ).join('');
- const firstPreview=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'@username',value:bet?.value||0};
- return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><span class="crash-live-dot"></span><b>КРАШ</b><span>до ×1000</span></div>'+
-  '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
-    '<div class="crash-stage-grid"></div><div class="crash-flight-rail"></div>'+
-    '<div class="crash-skyline"><span id="crashFlyName">'+esc(firstPreview.handle)+'</span><small id="crashFlyPrice">'+(bet?fmt(firstPreview.value):'Выбери ставку')+'</small><span class="crash-thruster"></span></div>'+
-    '<div class="crash-stage-multiplier" id="crashMultiplier">×1.00</div>'+
-    '<div class="crash-stage-sub" id="crashStatus">'+(waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать')+'</div>'+
-    '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
-  '</div>'+
-  (bet?'<div class="crash-mybet"><div><small>Твоя ставка</small><b>'+esc(bet.handle)+'</b><span>'+fmt(bet.value)+'</span></div>'+
-     (running&&bet.status==='staked'?'<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button>':
-      bet.status==='cashed'?'<div class="crash-cashed">'+(d.myWin?'<b>'+esc(d.myWin.handle)+'</b><small>'+fmt(d.myWin.value)+'</small>':'Забрано ×'+Number(bet.cashoutX).toFixed(2))+'</div>':
-      '<div class="crash-queued">'+(waiting?'Ждём старта':'Ставка в игре')+'</div>')+'</div>':'')+
-  (selected?'<div class="crash-choice"><div class="crash-choice-head"><b>Твоя ставка</b><span>Выбери username</span></div>'+
-    '<div class="crash-available">'+(available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>':'')+
-  '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
-    (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
-   '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></div>'+
-  (state.crashLastReward?'<p class="crash-mini-note crash-earned">Получен <b>'+esc(state.crashLastReward.handle)+'</b> · '+fmt(state.crashLastReward.value)+'</p>':
-    '<p class="crash-mini-note">Забери новый username до взрыва · старая ставка заменяется</p>')+
-  '</div>';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ERR={
+  unauthorized:'Откройте игру через Telegram',blocked:'Аккаунт заблокирован',insufficient_funds:'Недостаточно денег',pending_drop:'Сначала решите, что делать с текущим username',no_username_available:'Не удалось подобрать username. Повтори попытку — деньги не списаны.',
+  collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
+  listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
+  lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
+  crash_round_changed:'Раунд сменился — выбери ставку заново',crash_betting_closed:'Ставки закрыты. Дождись следующего раунда',crash_already_bet:'Ты уже поставил username в этом раунде',crash_item_unavailable:'Этот username уже недоступен',crash_no_bet:'У тебя нет активной ставки',crash_too_late:'Поздно! Username сгорел при краше',crash_reward_unavailable:'Не удалось подготовить выигрыш, ставка не списана',crash_invalid_autostop:'Укажи множитель от ×1.01 до ×1000.00',wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
+  upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',network:'Нет соединения с сервером'
+};
+let viewportFrame=0,lastViewportKey='';
+function syncViewportNow(){
+ const vv=window.visualViewport,h=Math.round(TG?.viewportStableHeight||TG?.viewportHeight||vv?.height||innerHeight||0),w=Math.round(vv?.width||innerWidth||0),s=TG?.safeAreaInset||{},safe=TG?.contentSafeAreaInset||{};
+ const top=Math.max(s.top||0,safe.top||0),bottom=Math.max(s.bottom||0,safe.bottom||0),platform=String(TG?.platform||'browser').toLowerCase(),fine=!!matchMedia?.('(pointer:fine)')?.matches;
+ const desktop=['tdesktop','macos','web','weba','webk','browser'].includes(platform)&&fine,key=[h,w,top,bottom,platform,desktop?1:0].join(':');
+ if(key===lastViewportKey)return;lastViewportKey=key;
+ if(h)root.style.setProperty('--app-h',h+'px');if(w)root.style.setProperty('--app-w',w+'px');
+ root.style.setProperty('--safe-t',top+'px');root.style.setProperty('--safe-b',bottom+'px');
+ root.dataset.platform=platform;root.classList.toggle('is-desktop',desktop);root.classList.toggle('is-mobile',!desktop);
 }
-let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashKnownPrevious=0;
-function startCrashVisualLoop(){
- if(crashLoopOn)return;crashLoopOn=true;
- const frame=()=>{
-  if(state.page!=='crash'){crashLoopOn=false;return}
-  const d=state.crash,r=d?.round,stage=document.querySelector('.crash-stage');
-  if(r&&stage){
-   const at=Date.now()+crashVisualOffset,elapsed=Math.max(0,(at-r.startsAt)/1000),running=r.status==='running';
-   const mult=running?Math.min(1000,Math.floor(Math.exp(elapsed*.115)*100)/100):1;
-   const show=document.querySelector('#crashMultiplier');if(show)show.textContent='×'+mult.toFixed(2);
-   const cash=document.querySelector('#crashCashout');if(cash)cash.textContent='×'+mult.toFixed(2);
-   const remain=Math.max(0,(r.startsAt-at)/1000);
-   const countdown=document.querySelector('#crashCountdown');if(countdown)countdown.textContent=remain.toFixed(1);
-   const progress=running?Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000)):0;
-   const flying=document.querySelector('.crash-skyline');
-   if(flying){
-    // Move along a rising diagonal guide, keeping long names inside the stage.
-    const startingX=stage.clientWidth*.10;
-    const maxX=Math.max(0,stage.clientWidth-startingX-flying.offsetWidth-10);
-    const maxDx=Math.min(stage.clientWidth*.54,maxX);
-    const maxDy=Math.min(stage.clientHeight*.43,100,
-      Math.max(0,stage.clientHeight-23-flying.offsetHeight-12));
-    const dx=maxDx*progress,dy=-maxDy*progress;
-    // The visual guide follows exactly the same diagonal on every viewport.
-    stage.style.setProperty('--crash-line-length',Math.hypot(maxDx,maxDy).toFixed(1)+'px');
-    stage.style.setProperty('--crash-line-angle',(-Math.atan2(maxDy,Math.max(1,maxDx))*180/Math.PI).toFixed(1)+'deg');
-    flying.style.setProperty('--crash-x',dx.toFixed(1)+'px');
-    flying.style.setProperty('--crash-y',dy.toFixed(1)+'px');
-    const won=d.myWin;
-    const preview=won||crashRewardPreview(d.myRewardPlan,running?mult:1,d.myBet?.value);
-    const label=document.querySelector('#crashFlyName');
-    const price=document.querySelector('#crashFlyPrice');
-    if(label&&preview&&label.textContent!==preview.handle)label.textContent=preview.handle;
-    const val=preview?fmt(preview.value):(d.myBet?fmt(d.myBet.value):'Выбери ставку');
-    if(price&&price.textContent!==val)price.textContent=val;
-   }
-   stage.classList.toggle('exploded',Date.now()<Number(state.crashBlastUntil||0));
-  }
-  requestAnimationFrame(frame);
- };
- requestAnimationFrame(frame);
+function syncViewport(){
+ if(viewportFrame)return;
+ viewportFrame=requestAnimationFrame(()=>{viewportFrame=0;syncViewportNow()});
 }
-async function refreshCrashLive(){
- if(state.page!=='crash'||crashTickerBusy)return;
- crashTickerBusy=true;
+try{TG?.ready();TG?.expand();TG?.setHeaderColor?.('#F4F5F7');TG?.setBackgroundColor?.('#F4F5F7');syncViewportNow();TG?.onEvent?.('viewportChanged',syncViewport);TG?.onEvent?.('safeAreaChanged',syncViewport);TG?.onEvent?.('contentSafeAreaChanged',syncViewport)}catch{syncViewportNow()}
+addEventListener('resize',syncViewport,{passive:true});
+const SETTINGS_KEY='username.settings.v2';
+const DEFAULT_SETTINGS=Object.freeze({theme:'system',language:'ru',vibration:true,sound:true,animations:true});
+const EN_TEXT=Object.freeze({
+ 'Играть':'Play','Дроп':'Drop','Игры':'Games','Колесо':'Wheel','Апгрейдер':'Upgrader','Торговля':'Trading','Рынок':'Market',
+ 'Коллекция':'Collection','Подарки':'Transfers','Прогресс':'Progress','Задания':'Tasks','Уровни':'Levels','Достижения':'Achievements',
+ 'Топ':'Top','Аккаунт':'Account','Профиль':'Profile','Магазин':'Shop','Настройки':'Settings','Админ':'Admin','Админка':'Admin',
+ 'Фильтр':'Filter','Фильтр коллекции':'Collection filter','Фильтр рынка':'Market filter','Стоимость':'Value','Цена':'Price','Дата':'Date',
+ 'Длина':'Length','Тип':'Type','Сначала дорогие':'Highest first','Сначала дешёвые':'Lowest first','Сначала новые':'Newest first',
+ 'Сначала старые':'Oldest first','Короткие':'Shortest','Длинные':'Longest','Все':'All','Без цифр':'No digits','С цифрами':'With digits',
+ 'Общая стоимость':'Total value','Продать':'Sell','На рынок':'List on market','Оценка':'Score','В коллекции':'In collection',
+ 'Получено':'Claimed','Забрать':'Claim','В процессе':'In progress','Ближайшие награды':'Upcoming rewards','Все награды получены.':'All rewards claimed.',
+ 'Тема':'Theme','Светлая':'Light','Тёмная':'Dark','Системная':'System','Язык':'Language','Русский':'Russian','Вибрация':'Haptics','Звук':'Sound','Анимации':'Animations',
+ 'ЛУЧШИЙ ЮЗЕРНЕЙМ':'BEST USERNAME','ДОСТИЖЕНИЯ':'ACHIEVEMENTS','СТАТИСТИКА':'STATS','УДАЧА И НЕВЕЗЕНИЕ':'LUCK & BAD LUCK',
+ 'Юзернеймы':'Usernames','юзернеймов':'usernames','Сделки':'Deals','Друзья':'Friends','Удача':'Luck','Защита от невезения':'Bad-luck protection','Серия неудач':'Bad streak',
+ 'Нейтрально':'Neutral','Везёт':'Lucky','Очень везёт':'Very lucky','Невероятно везёт':'Legendary luck','Не везёт':'Unlucky','Жёстко не везёт':'Cursed',
+ 'Профиль не найден.':'Profile not found.','Пока нет':'None yet','Награда':'Reward','Лучший username':'Best username',
+ 'Выберите юзернейм':'Choose username','Получатель':'Recipient','Введите @username':'Enter @username','Передать':'Transfer','Комиссия 5%':'5% fee',
+ 'Комиссия':'Fee','Сумма':'Total','Твои юзернеймы':'Your usernames','Выбрать цель':'Choose target','Подбираем варианты…':'Finding targets…',
+ 'Шанс':'Chance','ШАНС':'CHANCE','Не выпало':'Missed','Продолжить':'Continue','Бесплатное вращение':'Free spin',
+ 'Уже использовано':'Already used','Одно вращение раз в 24 часа':'One spin every 24 hours','Крутить':'Spin','Недоступно':'Unavailable',
+ 'КОЛЕСО УДАЧИ':'LUCKY WHEEL','РАЗ В 24 ЧАСА':'EVERY 24 HOURS','24Ч':'24H','КРУТИ':'SPIN','Шансы':'Odds','Выпало':'Result',
+ 'Сегодня':'Today','Лучший':'Best','Какой дороже?':'Which is worth more?','Выше':'Higher','Ниже':'Lower','Проверить':'Check',
+ 'Сбросить':'Reset','Готово':'Done','К играм':'Back to games','Игра не запущена.':'Game not started.',
+ 'Кристаллы':'Crystals','Темы':'Themes','Купить':'Buy','Выбрано':'Selected','Применить':'Apply',
+ 'Пользователь':'Player','Игрок':'Player','Без username':'No username','Без юзернеймов':'No usernames',
+ 'Место':'Rank','Осталось':'Time left','Награды':'Rewards','Активные серии':'Active events','ТЕКУЩИЙ СЕЗОН':'CURRENT SEASON',
+ 'Приглашено':'Invited','До следующей':'Until next','ТВОЯ ССЫЛКА':'YOUR LINK','Скопировать':'Copy','Отправить другу':'Share',
+ 'Очки сезона':'Season Score','Новичок':'Beginner','Свой':'Regular','В теме':'In the know','Бывалый':'Experienced','Продвинутый':'Advanced','Мастер':'Master',
+ 'Профи':'Pro','Эксперт':'Expert','Топовый':'Top tier','Имба':'Overpowered','Ветеран':'Veteran','Авторитет':'Authority','Элита':'Elite',
+ 'Титан':'Titan','Босс':'Boss','Легенда':'Legend','Икона':'Icon','Чемпион':'Champion','Грандмастер':'Grandmaster','Абсолют':'Absolute','Легендарный':'Legendary',
+ 'Первый улов':'First catch','Полка':'Shelf','Коллекционер':'Collector','Чистая десятка':'Clean ten','Фиолетовый':'Purple',
+ 'Золотой билет':'Golden ticket','Золотой запас':'Golden reserve','Первая сделка':'First deal','На рынке':'On the market','Продавец':'Seller',
+ 'Щедрый':'Generous','Разминка':'Warm-up','Серия':'Streak','Миллион':'Million','Игрок':'Player',
+ 'Открыть дроп':'Open a drop','Открыть 2 дропа':'Open 2 drops','Открыть 3 дропа':'Open 3 drops','Открыть 5 дропов':'Open 5 drops',
+ 'Продать юзернейм':'Sell a username','Продать 2 юзернейма':'Sell 2 usernames','Продать 3 юзернейма':'Sell 3 usernames',
+ 'Оставить юзернейм':'Keep a username','Оставить 2 юзернейма':'Keep 2 usernames','Сыграть 1 мини-игру':'Play 1 mini-game',
+ 'Сыграть 3 мини-игры':'Play 3 mini-games','Сыграть 5 мини-игр':'Play 5 mini-games','Сыграть 7 мини-игр':'Play 7 mini-games','Сыграть 10 мини-игр':'Play 10 mini-games',
+ 'Выиграть Охоту за юзернеймом':'Win Username Hunt','Выиграть Охоту за юзернеймом дважды':'Win Username Hunt twice','Сыграть в Охоту за юзернеймом':'Play Username Hunt',
+ 'Сыграть в Выше / ниже':'Play Higher / Lower','Сыграть в Редактор':'Play Editor','Сыграть в Собери юзернейм':'Play Build username','Сыграть в Угадай цену':'Play Guess the price',
+ 'Купить юзернейм':'Buy a username','Купить 2 юзернейма':'Buy 2 usernames','Получить юзернейм от 15K ₽':'Get a username worth 15K ₽+',
+ 'Получить 2 юзернейма от 15K ₽':'Get 2 usernames worth 15K ₽+','Получить юзернейм без цифр':'Get a username without digits',
+ 'Получить 2 юзернейма без цифр':'Get 2 usernames without digits','Открыть колесо':'Spin the wheel','Сделать апгрейд':'Do an upgrade','Сделать 2 апгрейда':'Do 2 upgrades',
+ 'Передать юзернейм':'Transfer a username','Посмотреть профиль игрока':'View a player profile','Пригласить друга':'Invite a friend','Пригласить 2 друзей':'Invite 2 friends',
+ 'Купить 3 юзернейма на рынке':'Buy 3 usernames on the market'
+});
+const EN_TEXT_EXTRA=Object.freeze({
+ 'Закрыть':'Close','Стоимость попытки':'Attempt price','Выберите цену дропа':'Choose drop price','Получить username':'Get username',
+ 'Нажми, чтобы получить':'Tap to get one','Улучшить username':'Upgrade username','Быстрое вращение':'Quick spin',
+ 'По этому фильтру ничего нет.':'Nothing matches this filter.','Назад':'Back','Дальше':'Next','Поиск...':'Search...','Ничего не найдено.':'Nothing found.',
+ 'ОБЩИЙ КАПИТАЛ':'TOTAL CAPITAL','Кто богаче':'Who is richer','Баланс + стоимость всех активных юзернеймов':'Balance + value of all active usernames',
+ 'Снять':'Remove','Нет юзернеймов для апгрейда.':'No usernames available for upgrade.','Нет usernames для апгрейда':'No usernames available for upgrade',
+ 'Получено ':'Received ','Активного сезона нет.':'No active season.','Значок профиля':'Profile badge','Тема сезона':'Season theme','Эксклюзивная рамка':'Exclusive profile frame',
+ 'Приглашай друзей и собирай коллекцию вместе.':'Invite friends and build your collection together.','Ссылка загружается…':'Loading link…',
+ 'Пригласи первого друга.':'Invite your first friend.','Наград':'Rewards','До следующей':'Until next',
+ 'Нет соединения с сервером':'No connection to server','Откройте игру через Telegram':'Open the game through Telegram','Аккаунт заблокирован':'Account blocked',
+ 'Недостаточно денег':'Not enough money','Сначала решите, что делать с текущим username':'Resolve your current username first',
+ 'Коллекция заполнена':'Collection is full','У получателя заполнена коллекция':'Recipient collection is full','Тираж закончился':'Sold out',
+ 'Слишком быстро. Попробуйте ещё раз':'Too fast. Try again','Лот уже недоступен':'Listing is no longer available','Нельзя купить свой лот':'You cannot buy your own listing',
+ 'Юзернейм уже на рынке':'Username is already listed','Username должен быть длиной 4–15 символов: a-z, 0-9, _':'Username must be 4–15 characters: a-z, 0-9, _',
+ 'Подожди пару секунд перед следующей оценкой':'Wait a couple of seconds before the next rating','Ты уже оценивал этот username':'You already rated this username',
+ 'Слишком похож на уже оценённый сегодня username':'Too similar to a username already rated today','Ежедневная награда уже получена':'Daily reward already claimed',
+ 'Сейчас не удалось собрать вопрос':'Could not create a question right now','Слишком много игр подряд':'Too many games in a row',
+ 'Игра уже недоступна':'Game is no longer available','Раунд устарел':'Round expired','Раунд закончен':'Round finished',
+ 'Измени username только одним допустимым действием':'Change the username using one allowed action','Собери username только из выданных частей':'Build the username using all provided parts',
+ 'Недостаточно 💎':'Not enough 💎','Колесо уже использовано сегодня':'Wheel already used today','Выбранный username недоступен':'Selected username is unavailable',
+ 'Этот username нельзя улучшить':'This username cannot be upgraded','Предпросмотр устарел. Выберите usernames заново':'Preview expired. Select usernames again',
+ 'Состав апгрейда изменился':'Upgrade selection changed','Сейчас не удалось подобрать цели. Попробуйте ещё раз':'Could not find upgrade targets. Try again',
+ 'Telegram Stars пока недоступны':'Telegram Stars are unavailable','Получатель заблокирован':'Recipient is blocked','Пользователь не найден. Он должен сначала открыть игру':'Player not found. They must open the game first','Слишком много действий. Попробуйте через минуту':'Too many actions. Try again in a minute',
+ 'Нет доступа':'Access denied','Некорректный username':'Invalid username','Такой username уже существует':'This username already exists',
+ 'Нельзя передать username самому себе':'You cannot transfer a username to yourself','Этот ответ уже был обработан':'This answer was already processed',
+ 'Нельзя заблокировать самого себя':'You cannot block yourself','Что-то пошло не так':'Something went wrong','Не удалось загрузить раздел':'Failed to load section',
+ 'Океан':'Ocean','Голубой акцент':'Blue accent','Фиолетовая':'Violet','Фиолетовый акцент':'Violet accent','Лайм':'Lime','Зелёный акцент':'Green accent',
+ 'Закат':'Sunset','Тёплый оранжевый акцент':'Warm orange accent','Моно':'Mono','Чёрно-белый акцент':'Black-and-white accent',
+ 'Охота за юзернеймом':'Username Hunt','Выше / ниже':'Higher / Lower','Редактор':'Editor','Собери юзернейм':'Build username','Угадай цену':'Guess the price',
+ 'Коллекция':'Collection','Редкости':'Rarities','Торговля':'Trading','Прогресс':'Progress','Игры':'Games',
+ 'Читаемость':'Readability','Краткость':'Brevity','Чистота':'Cleanliness','Спрос':'Demand','Система сразу начислит':'The system will instantly credit',
+ '💎 — только оформление. На дроп, колесо и апгрейд они не влияют.':'💎 — cosmetics only. They do not affect drops, wheel or upgrades.',
+ 'УР.':'LVL','МАКС':'MAX','опыта':'XP','звёзд':'Stars','ПРОТИВ':'VS','дропов':'drops','ДРОП':'DROP','Юзернейм':'Username'
+});
+function currentLanguage(){return state.settings?.language==='en'?'en':'ru'}
+function tx(ru,en){return currentLanguage()==='en'?en:ru}
+function translateLiteral(value){
+ if(currentLanguage()!=='en')return String(value??'');
+ let s=String(value??''),direct=EN_TEXT[s]||EN_TEXT_EXTRA[s];if(direct)return direct;
+ const patterns=[
+  [/^До следующего: (.+) XP$/,'To next level: $1 XP'],
+  [/^Общая стоимость · (.+)$/,'Total value · $1'],
+  [/^Следующее вращение через (.+)$/,'Next spin in $1'],
+  [/^Выпало: (.+)$/,'Result: $1'],
+  [/^Продать · (.+)$/,'Sell · $1'],
+  [/^Оценка (.+)$/,'Score $1'],
+  [/^ур\. (\d+)$/,'lvl $1'],
+  [/^до (.+)$/,'until $1'],
+  [/^Комиссия 5% · получите (.+)$/,'5% fee · you receive $1'],
+  [/^УР\. (\d+)$/,'LVL $1'],
+  [/^(\d+) \/ (\d+) опыта$/,'$1 / $2 XP'],
+  [/^(\d+) дропов$/,'$1 drops'],
+  [/^(\d+) юзернеймов$/,'$1 usernames']
+ ];
+ for(const [re,to] of patterns)if(re.test(s))return s.replace(re,to);
+ return s;
+}
+function localizeDom(scope){
+ if(currentLanguage()!=='en'||!scope)return;
+ const walker=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT);const nodes=[];
+ while(walker.nextNode())nodes.push(walker.currentNode);
+ for(const node of nodes){
+  const raw=node.nodeValue,trim=raw.trim();if(!trim)continue;
+  const next=translateLiteral(trim);if(next!==trim)node.nodeValue=raw.replace(trim,next);
+ }
+ scope.querySelectorAll?.('[placeholder],[aria-label],[title]').forEach(el=>{
+  for(const attr of ['placeholder','aria-label','title'])if(el.hasAttribute(attr)){const v=el.getAttribute(attr),n=translateLiteral(v);if(n!==v)el.setAttribute(attr,n)}
+ });
+}
+function readSettings(){
+ try{return {...DEFAULT_SETTINGS,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}}catch{return {...DEFAULT_SETTINGS}}
+}
+state.settings=readSettings();
+function effectiveTheme(){
+ if(state.settings.theme==='system')return matchMedia?.('(prefers-color-scheme: dark)')?.matches?'dark':'light';
+ return state.settings.theme==='dark'?'dark':'light';
+}
+function applyPreferences(){
+ const theme=effectiveTheme();root.dataset.theme=theme;root.style.colorScheme=theme;root.lang=currentLanguage();
+ root.classList.toggle('no-animations',!state.settings.animations);
+ const accent=state.user?.cosmetics?.theme||'';
+ root.dataset.accentTheme=accent;
+ root.dataset.profileFrame=state.user?.cosmetics?.frame||'';
+ root.dataset.cardStyle=state.user?.cosmetics?.card||'';
+ const themeColor=theme==='dark'?'#111316':'#F4F5F7',meta=document.querySelector('meta[name="theme-color"]');
+ if(meta)meta.setAttribute('content',themeColor);
+ try{TG?.setHeaderColor?.(themeColor);TG?.setBackgroundColor?.(themeColor);TG?.setBottomBarColor?.(themeColor)}catch{}
+}
+function saveSettings(patch){
+ state.settings={...state.settings,...patch};localStorage.setItem(SETTINGS_KEY,JSON.stringify(state.settings));applyPreferences();
+}
+try{matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change',()=>{if(state.settings.theme==='system'){applyPreferences();render()}})}catch{}
+function haptic(type='light'){if(!state.settings.vibration)return;try{TG?.HapticFeedback?.impactOccurred(type)}catch{}}
+let audioCtx;
+function tone(hz,{delay=0,duration=.08,volume=.026,type='sine'}={}){
+ if(!state.settings.sound)return;
  try{
-  const next=await api('/api/crash');
-  const previous=state.crash;
-  crashVisualOffset=next.round.serverNow-Date.now();
-  const nextLast=next.last?.id||0;
-  if(previous&&next.round.id!==previous.round.id&&nextLast===previous.round.id)
-    state.crashBlastUntil=Date.now()+850;
-  crashKnownPrevious=nextLast;
-  const rerender=!previous||next.round.id!==previous.round.id||next.round.status!==previous.round.status||
-    (next.myBet?.status||'')!==(previous.myBet?.status||'')||
-    (next.myBet?.id||0)!==(previous.myBet?.id||0);
-  state.crash=next;
-  if(rerender)render();
-  else{
-   const roster=document.querySelector('#crashBets');if(roster)roster.innerHTML=crashRoster(next.bets);
-   const count=document.querySelector('#crashParticipantsCount');
-   if(count)count.textContent=next.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:next.bets.length+' ставок';
-  }
-  startCrashVisualLoop();
- }catch(e){console.warn('Crash refresh:',e.message)}
- finally{crashTickerBusy=false}
+  audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')audioCtx.resume?.();
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),at=audioCtx.currentTime+Math.max(0,delay);
+  o.type=type;o.frequency.setValueAtTime(Math.max(40,Number(hz)||360),at);
+  g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(Math.max(.001,volume),at+.008);g.gain.exponentialRampToValueAtTime(.0001,at+duration);
+  o.connect(g);g.connect(audioCtx.destination);o.start(at);o.stop(at+duration+.02);
+ }catch{}
 }
-setInterval(()=>{void refreshCrashLive()},850);
+function sound(kind='tap'){
+ if(!state.settings.sound)return;
+ const map={
+  tap:[[420,{duration:.045,volume:.018,type:'triangle'}]],
+  select:[[520,{duration:.055,volume:.02,type:'triangle'}],[660,{delay:.035,duration:.055,volume:.014,type:'triangle'}]],
+  tick:[[780,{duration:.028,volume:.012,type:'square'}]],
+  spin:[[220,{duration:.09,volume:.018,type:'triangle'}],[330,{delay:.07,duration:.1,volume:.016,type:'triangle'}],[440,{delay:.15,duration:.11,volume:.014,type:'triangle'}]],
+  reveal:[[360,{duration:.07,volume:.02,type:'triangle'}],[520,{delay:.055,duration:.09,volume:.022,type:'triangle'}]],
+  story:[[560,{duration:.06,volume:.018,type:'triangle'}],[760,{delay:.05,duration:.09,volume:.019,type:'triangle'}]],
+  reward:[[523,{duration:.11,volume:.024,type:'sine'}],[659,{delay:.055,duration:.13,volume:.022,type:'sine'}],[784,{delay:.11,duration:.16,volume:.02,type:'sine'}]],
+  fail:[[190,{duration:.12,volume:.022,type:'sawtooth'}],[140,{delay:.08,duration:.16,volume:.018,type:'sawtooth'}]]
+ };
+ for(const [hz,opts] of (map[kind]||map.tap))tone(hz,opts);
+}
+let crashAudioUnlocked=false,crashLastAudioAt=0;
+document.addEventListener('pointerdown',()=>{crashAudioUnlocked=true},{once:true});
+document.addEventListener('keydown',()=>{crashAudioUnlocked=true},{once:true});
+function crashSound(kind){
+ if(!state.settings.sound||!crashAudioUnlocked||document.hidden)return;
+ const now=Date.now();if(now-crashLastAudioAt<150)return;
+ crashLastAudioAt=now;
+ try{
+  audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended'){void audioCtx.resume?.();return}
+  const c=audioCtx,t=c.currentTime;
+  const configs={bet:[380,590,.18,.035],start:[250,490,.36,.024],
+   cashout:[440,880,.33,.045],auto:[490,980,.37,.040],crash:[220,65,.44,.038]};
+  const [begin,end,len,vol]=configs[kind]||configs.bet;
+  const osc=c.createOscillator(),gain=c.createGain(),filter=c.createBiquadFilter();
+  osc.type=kind==='crash'?'sawtooth':'triangle';
+  osc.frequency.setValueAtTime(begin,t);osc.frequency.exponentialRampToValueAtTime(end,t+len);
+  filter.type='lowpass';filter.frequency.value=kind==='crash'?650:1700;
+  gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(vol,t+.022);
+  gain.gain.exponentialRampToValueAtTime(.0001,t+len);
+  osc.connect(filter);filter.connect(gain);gain.connect(c.destination);
+  osc.start(t);osc.stop(t+len+.025);
+  if(kind==='crash'){
+   const buffer=c.createBuffer(1,Math.floor(c.sampleRate*.22),c.sampleRate),arr=buffer.getChannelData(0);
+   for(let i=0;i<arr.length;i++)arr[i]=(Math.random()*2-1)*(1-i/arr.length);
+   const noise=c.createBufferSource(),ng=c.createGain(),nf=c.createBiquadFilter();
+   noise.buffer=buffer;nf.type='lowpass';nf.frequency.value=520;ng.gain.value=.025;
+   noise.connect(nf);nf.connect(ng);ng.connect(c.destination);noise.start(t);noise.stop(t+.22);
+  }
+ }catch(e){console.debug('Crash audio unavailable:',e.message)}
+}
+function motionEnabled(){return !!state.settings.animations}
+function toast(t){toastEl.textContent=translateLiteral(t);toastEl.classList.add('show');clearTimeout(window.__toast);window.__toast=setTimeout(()=>toastEl.classList.remove('show'),1900)}
+async function initData(){let d=TG?.initData||'',end=Date.now()+1600;while(!d&&Date.now()<end){await new Promise(r=>setTimeout(r,50));TG=window.Telegram?.WebApp||TG;d=TG?.initData||''}return d}
+function startParam(){
+ const q=new URLSearchParams(location.search);
+ return String(TG?.initDataUnsafe?.start_param||q.get('tgWebAppStartParam')||q.get('startapp')||q.get('ref')||'');
+}
+const inflightGet=new Map();
+async function api(url,opts={}){
+ const method=String(opts.method||'GET').toUpperCase(),key=method==='GET'?url:'';
+ if(key&&inflightGet.has(key))return inflightGet.get(key);
+ const run=(async()=>{
+  const headers={'Content-Type':'application/json',...(opts.headers||{})},d=await initData();
+  if(d)headers['X-Telegram-Init-Data']=d;else if(location.hostname==='localhost'||location.hostname==='127.0.0.1')headers['X-Dev-User']=localStorage.devUser||'10001';
+  const sp=startParam();if(sp)headers['X-Start-Param']=sp;
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),method==='POST'&&url==='/api/drop'?15000:9000);
+  try{
+   const r=await fetch(url,{...opts,headers,cache:'no-store',signal:ctl.signal}),j=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(j.error||'network');return j
+  }catch(e){if(e.name==='AbortError'||e instanceof TypeError)throw new Error('network');throw e}
+  finally{clearTimeout(tm)}
+ })();
+ if(key)inflightGet.set(key,run);
+ try{return await run}finally{if(key&&inflightGet.get(key)===run)inflightGet.delete(key)}
+}
+const ICON_NAME=Object.freeze({
+ home:'package',menu:'menu-01',close:'cancel-01',back:'arrow-left-01',
+ market:'store-01',rank:'ranking',tasks:'layers-01',wheel:'target-01',
+ friends:'user-group',gift:'gift',upgrade:'square-arrow-up-double',season:'award-01',
+ collection:'layers-01',profile:'user-circle-02',shop:'shopping-bag-01',filter:'filter',
+ search:'search-01',games:'gamepad',levels:'medal-01',achievements:'medal-01',notifications:'notification-02',settings:'settings-02',
+ theme:'moon-02',sound:'volume-high',motion:'play',admin:'shield-01',story:'share-08',chevron:'arrow-right-01',
+ down:'arrow-down-01',plus:'add-01',promo:'coupon-01',x:'cancel-01'
+});
+function icon(k){const name=ICON_NAME[k]||ICON_NAME.menu;return '<i class="ico hugeicon hgi-stroke hgi-'+name+'" aria-hidden="true"></i>'}
+function marketFilterIcon(){return icon('filter')}
+function FilterButton(scope){
+ const attr=scope==='collection'?'data-collection-filter-open':'data-market-filter-open';
+ return '<button class="filter-button-v7" '+attr+' aria-label="Фильтр"><span class="filter-button-icon">'+marketFilterIcon()+'</span><span class="filter-button-label">Фильтр</span></button>';
+}
+function hydrateIcons(){}
+function metric(label,value){return '<div class="metric"><span>'+label+'</span><b>'+value+'</b></div>'}
+function valueClass(x){return ' value-'+(['blue','purple','gold'].includes(String(x?.visual||''))?x.visual:'normal')}
+function xpBar(u){
+ const pct=Math.max(0,Math.min(100,Math.round(Number(u?.levelProgress||0)*100)));
+ return '<div class="xp-block"><div class="xp-head"><b>УР. '+Number(u?.level||1)+' · '+esc(u?.title||'Новичок')+'</b><span>'+(Number(u?.level||1)>=200?'МАКС':(Number(u?.levelXp||0)+' / '+Number(u?.nextLevelXp||0)+' опыта'))+'</span></div><div class="xp-track"><i style="width:'+pct+'%"></i></div></div>';
+}
+function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
+const MENU_SECTIONS=[
+ {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['crash','upgrade','Краш'],['upgrader','upgrade','Апгрейдер'],['wheel','wheel','Колесо']]},
+ {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
+ {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
+ {title:'Аккаунт',items:[['profile','profile','Профиль'],['notifications','notifications','Уведомления'],['promo','promo','Промокод'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
+];
+function setMenuOpen(open){
+ state.menu=!!open;
+ const menu=document.querySelector('.menu-backdrop');
+ if(menu){menu.classList.toggle('open',state.menu);menu.setAttribute('aria-hidden',state.menu?'false':'true');return}
+ render();
+}
+function menuHtml(){
+ const tiles=list=>list.map(([p,i,t])=>'<button class="menu-section-tile" data-page="'+p+'" aria-label="'+esc(t)+'"><span class="menu-tile-icon">'+icon(i)+'</span><span class="menu-tile-label">'+esc(t)+'</span></button>').join('');
+ const groups=MENU_SECTIONS.map(s=>'<section class="menu-section"><b>'+esc(s.title)+'</b><div>'+tiles(s.items.concat(s.title==='Аккаунт'&&state.user?.isAdmin?[['admin','admin','Админка']]:[]))+'</div></section>').join('');
+ return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-sections-sheet" data-menu-sheet>'+
+  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin">'+icon('admin')+'<span>Админка</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+  '<div class="menu-sections-scroll">'+groups+'</div>'+
+ '</aside></div>'
+}
+function topbar(title,{back=false}={}){const unread=Number(state.user?.unreadNotifications||0);return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button class="notification-top" data-page="notifications" aria-label="Уведомления">'+icon('notifications')+(unread?'<i>'+Math.min(unread,99)+(unread>99?'+':'')+'</i>':'')+'</button><button data-menu-open>'+icon('menu')+'</button></div></header>'}
+function shell(title,html,opts={}){
+ window.__USERNAME_READY=true;applyPreferences();
+ app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';localizeDom(app);
+ requestAnimationFrame(()=>{fitAllUsernames();hydrateIcons();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
+}
+function fitUsername(el,max=48,min=20){
+ if(!el)return;const room=Math.max(1,(el.parentElement?.clientWidth||el.clientWidth)-8),hiMax=Math.max(min,Number(max)||48);
+ el.style.fontSize=hiMax+'px';if(el.scrollWidth<=room)return;
+ let lo=Math.max(8,Number(min)||20),hi=hiMax;
+ for(let i=0;i<6&&hi-lo>.5;i++){const mid=(lo+hi)/2;el.style.fontSize=mid+'px';if(el.scrollWidth<=room)lo=mid;else hi=mid}
+ el.style.fontSize=Math.floor(lo*10)/10+'px';
+}
+function fitAllUsernames(){document.querySelectorAll('[data-fit-username]').forEach(el=>fitUsername(el,Number(el.dataset.maxSize||48),Number(el.dataset.minSize||20)))}
+const ROLL_BASES=['velorian','coldvibe','nightfall','serenity','monarch','privated','lunaris','hazewave','nightcore','rareline','daylight','blackout','phantom','vision','storm','dealer','master','prime','street','matrix','lucky','silent','crimson','shadow','winter','aurora','glacier','moonwave','novaline','royal'];
+function rollRandomInt(max){if(max<=1)return 0;try{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%max}catch{return Math.floor(Math.random()*max)}}
+function randomRollUsername(used=new Set(),blocked=''){
+ for(let tries=0;tries<80;tries++){
+  const base=ROLL_BASES[rollRandomInt(ROLL_BASES.length)];
+  const mode=rollRandomInt(5);let raw=base;
+  if(mode===1)raw=(base+'x').slice(0,10);
+  else if(mode===2)raw=(base+String(rollRandomInt(90)+10)).slice(0,10);
+  else if(mode===3)raw=(base+String(rollRandomInt(900)+100)).slice(0,10);
+  else if(mode===4&&base.length>7)raw=base.slice(0,7)+String(rollRandomInt(9)+1);
+  raw=raw.replace(/[^a-z0-9_]/g,'').slice(0,10);
+  const handle='@'+raw;if(raw.length>=4&&handle!==blocked&&!used.has(handle)){used.add(handle);return handle}
+ }
+ let fallback;do{fallback='@user'+String(rollRandomInt(900000)+100000).slice(0,6)}while(used.has(fallback)||fallback===blocked);used.add(fallback);return fallback;
+}
+function buildRollSequence(count,finalHandle=''){const used=new Set();const rows=[];for(let i=0;i<count;i++)rows.push(randomRollUsername(used,String(finalHandle||'')));return rows}
+function shuffleUpgradeItems(items){const out=[...(items||[])];for(let i=out.length-1;i>0;i--){const j=rollRandomInt(i+1);[out[i],out[j]]=[out[j],out[i]]}return out}
+
+function resultCard(x,pending=false){
+ return '<article class="drop-result-card minimal-result'+(pending?' pending-result':'')+valueClass(x)+'">'+
+   '<div class="drop-result-main minimal"><h1 data-fit-username data-max-size="48" data-min-size="24">'+esc(x.handle)+'</h1></div>'+
+   (pending?'<div class="drop-result-actions">'+
+     '<div class="drop-result-resolve"><button data-resolve="keep" data-id="'+x.id+'">Оставить</button><button class="secondary" data-resolve="sell" data-id="'+x.id+'">Продать · '+fmt(x.value)+'</button></div>'+
+     '<button class="story-action" data-share-story="'+x.id+'" aria-label="В историю" title="В историю">'+icon('story')+'</button>'+
+   '</div>':'')+
+ '</article>';
+}
+function storyRoundRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+}
+function storyFitFont(ctx,text,maxWidth,startSize,minSize=50,weight=800){
+  let size=startSize;while(size>minSize){ctx.font=weight+' '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';if(ctx.measureText(text).width<=maxWidth)break;size-=4}return size;
+}
+function generateStoryImage(item){
+  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;
+  const ctx=canvas.getContext('2d'),handle=String(item.handle||'@username');
+  const bg=ctx.createLinearGradient(0,0,0,1920);bg.addColorStop(0,'#f4f5f7');bg.addColorStop(1,'#e8ebef');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1920);
+  ctx.fillStyle='#111318';ctx.font='900 52px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,118);
+  ctx.fillStyle='#68717d';ctx.font='600 30px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('COLLECTION GAME',72,166);
+  ctx.fillStyle='#ffffff';storyRoundRect(ctx,60,280,960,1120,44);ctx.fill();
+  ctx.strokeStyle='#dde1e5';ctx.lineWidth=2;storyRoundRect(ctx,60,280,960,1120,44);ctx.stroke();
+  ctx.fillStyle='#68717d';ctx.font='750 31px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.textAlign='center';ctx.fillText('МНЕ ВЫПАЛ ЮЗЕРНЕЙМ',540,455);
+  ctx.fillStyle='#111318';const size=storyFitFont(ctx,handle,820,150,68,900);ctx.font='900 '+size+'px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText(handle,540,800);
+  ctx.fillStyle='#eef1f3';storyRoundRect(ctx,250,1000,580,104,30);ctx.fill();
+  ctx.fillStyle='#111318';ctx.font='800 32px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('ИГРАЙ СО МНОЙ',540,1067);
+  ctx.fillStyle='#8a929c';ctx.font='550 27px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME · коллекционная игра',540,1170);
+  ctx.textAlign='left';ctx.fillStyle='#111318';ctx.font='800 34px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('USERNAME',72,1770);
+  ctx.fillStyle='#69727d';ctx.font='550 25px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif';ctx.fillText('Каждый username существует в игре только один раз',72,1815);
+  return canvas.toDataURL('image/jpeg',.92);
+}
+async function shareDropStory(item){
+  if(!item)return;
+  if(typeof TG?.shareToStory!=='function'||(typeof TG?.isVersionAtLeast==='function'&&!TG.isVersionAtLeast('7.8')))throw new Error('story_unsupported');
+  const dataUrl=generateStoryImage(item);
+  const uploaded=await api('/api/story-share',{method:'POST',body:JSON.stringify({instanceId:item.id,dataUrl})});
+  const mediaUrl=uploaded.mediaPath?new URL(uploaded.mediaPath,location.origin).href:uploaded.mediaUrl;
+  if(!/^https:\/\//i.test(mediaUrl||''))throw new Error('story_https_required');
+  TG.shareToStory(mediaUrl,{text:'Я выиграл '+item.handle+' в USERNAME'});
+  haptic('medium');
+}
+function selectedDropTier(){
+  const tiers=state.home?.config?.dropTiers||{};
+  return tiers[state.dropTier]||tiers.basic||{key:'basic',label:'3K',cost:3000};
+}
+function dropPricePicker(tiers){
+ if(!state.dropPicker)return '';
+ return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
+}
+
+const CRASH_VISIBLE_PLAYERS=10;
+// All possible winning usernames are reserved by the server in SQLite when
+// the player places a bet; no more decorative handles or fictional payouts.
+function crashRewardPreview(plan,multiplier,baseValue){
+ if(!Array.isArray(plan)||!plan.length)return null;
+ let reward=plan[0];
+ for(const next of plan){if(Number(next.multiplier)<=Number(multiplier)+1e-7)reward=next;else break}
+ const value=Math.min(1000000000,Math.max(Number(baseValue)||0,
+  Math.floor((Number(baseValue)||0)*Math.max(1,Number(multiplier)||1))));
+ return {handle:reward.handle,value};
+}
 function crashRoster(bets){
  const list=(bets||[]).slice(-CRASH_VISIBLE_PLAYERS).reverse();
  return list.length?list.map(b=>
