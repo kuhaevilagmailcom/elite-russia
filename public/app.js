@@ -355,40 +355,59 @@ function dropPricePicker(tiers){
  return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
 
+const CRASH_VISIBLE_PLAYERS=10;
+// Decorative names and illustrative values only; they are NOT minted or wagered
+// usernames and must not be mistaken for actual cashout payouts.
+const CRASH_FLIGHT_PREVIEW=[
+ ['@play',1000],['@wave',1600],['@pulse',2700],['@spark',4500],
+ ['@lucky',7200],['@ghost',12000],['@raven',19000],['@scam',30000],
+ ['@monk',49000],['@elite',78000],['@devil',125000],['@legend',200000],
+ ['@krasava',340000],['@prime',560000],['@vision',900000],['@ultra',1500000],
+ ['@crypto',2600000],['@vault',4500000],['@money',8000000],['@game',15000000],
+ ['@gold',28000000],['@coin',52000000],['@chat',100000000],['@name',200000000]
+];
+function crashPreviewForMultiplier(multiplier){
+ const progress=Math.max(0,Math.min(1,Math.log(Math.max(1,Number(multiplier)||1))/Math.log(1000)));
+ return CRASH_FLIGHT_PREVIEW[Math.min(CRASH_FLIGHT_PREVIEW.length-1,
+  Math.floor(progress*(CRASH_FLIGHT_PREVIEW.length-1)+1e-8))];
+}
 function crashRoster(bets){
- const list=(bets||[]).slice(0,30);
- return list.length?list.map(b=>'<div class="crash-bet-row"><div class="crash-player"><b>'+esc(b.player)+'</b><span>'+esc(b.handle)+'</span></div><div class="crash-bet-result '+(b.status==='cashed'?'won':b.status==='lost'?'lost':'')+'">'+(b.status==='cashed'?'×'+Number(b.cashoutX||1).toFixed(2)+' · +'+fmt(b.win):b.status==='lost'?'Сгорел':fmt(b.value))+'</div></div>').join(''):'<div class="crash-empty">Ставок пока нет. Можешь быть первым.</div>';
+ const list=(bets||[]).slice(-CRASH_VISIBLE_PLAYERS).reverse();
+ return list.length?list.map(b=>
+  '<div class="crash-bet-row"><span class="crash-player-name">'+esc(b.player)+'</span>'+
+  '<span class="crash-stake-summary"><b>'+esc(b.handle)+'</b><small>'+fmt(b.value)+'</small></span></div>'
+ ).join(''):'<div class="crash-empty">Пока нет ставок</div>';
 }
 function crashView(){
  const d=state.crash;
- if(!d)return '<div class="page-body"><div class="empty">Загрузка раунда…</div></div>';
- const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet;
- const selected=waiting&&!bet;
- const history=d.last?'<span>Прошлый раунд <b>×'+Number(d.last.multiplier).toFixed(2)+'</b></span>':'<span>Первый раунд</span>';
- const available=(d.available||[]).map(x=>'<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>').join('');
+ if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
+ const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet,selected=waiting&&!bet;
+ const available=(d.available||[]).map(x=>
+  '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
+ ).join('');
+ const firstPreview=CRASH_FLIGHT_PREVIEW[0];
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><span class="crash-live-dot"></span><b>ОБЩИЙ КРАШ</b><span>Раунд #'+r.id+'</span></div>'+
+  '<div class="crash-caption"><span class="crash-live-dot"></span><b>КРАШ</b><span>до ×1000</span></div>'+
   '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
     '<div class="crash-stage-grid"></div><div class="crash-flight-rail"></div>'+
-    '<div class="crash-skyline"><span id="crashFlyName">@username</span><span class="crash-thruster"></span></div>'+
+    '<div class="crash-skyline"><span id="crashFlyName">'+firstPreview[0]+'</span><small id="crashFlyPrice">'+fmt(firstPreview[1])+'</small><span class="crash-thruster"></span></div>'+
     '<div class="crash-stage-multiplier" id="crashMultiplier">×1.00</div>'+
-    '<div class="crash-stage-sub" id="crashStatus">'+(waiting?'Начало через <b id="crashCountdown">10.0</b> сек.':'Забирай до взрыва')+'</div>'+
+    '<div class="crash-stage-sub" id="crashStatus">'+(waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать')+'</div>'+
     '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
   '</div>'+
-  '<div class="crash-meta">'+history+'<span>Максимум <b>×1000</b></span></div>'+
   (bet?'<div class="crash-mybet"><div><small>Твоя ставка</small><b>'+esc(bet.handle)+'</b><span>'+fmt(bet.value)+'</span></div>'+
      (running&&bet.status==='staked'?'<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button>':
       bet.status==='cashed'?'<div class="crash-cashed">Забрано ×'+Number(bet.cashoutX).toFixed(2)+'<br><b>+'+fmt(bet.win)+'</b></div>':
       '<div class="crash-queued">'+(waiting?'Ждём старта':'Ставка в игре')+'</div>')+'</div>':'')+
-  (selected?'<div class="crash-choice"><div class="crash-choice-head"><b>Поставить username</b><span>До старта: <b id="crashBetCountdown">10</b> сек.</span></div>'+
-    '<div class="crash-available">'+(available||'<div class="crash-empty">В коллекции пока нет юзернеймов.</div>')+'</div></div>':'')+
-  '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+d.bets.length+' ставок</span></div>'+
-   '<div id="crashBets">'+crashRoster(d.bets)+'</div></div>'+
-  '<p class="crash-rules">Если успеешь забрать — username вернётся и принесёт игровую валюту по множителю (до '+fmt(d.payoutCap)+'). Если произойдёт краш — username сгорит. Ставить можно только до начала общего раунда.</p>'+
+  (selected?'<div class="crash-choice"><div class="crash-choice-head"><b>Твоя ставка</b><span>Выбери username</span></div>'+
+    '<div class="crash-available">'+(available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>':'')+
+  '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
+    (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
+   '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></div>'+
+  '<p class="crash-mini-note">При взрыве ставка сгорает · Цены в полёте — пример</p>'+
   '</div>';
 }
-const CRASH_FLOAT_NAMES=['@monk','@devil','@krasava','@scam','@ghost','@elite','@prime','@username','@legend','@lucky'];
-let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashLastSwap=0,crashLastName=0,crashKnownPrevious=0;
+let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashKnownPrevious=0;
 function startCrashVisualLoop(){
  if(crashLoopOn)return;crashLoopOn=true;
  const frame=()=>{
@@ -401,13 +420,26 @@ function startCrashVisualLoop(){
    const cash=document.querySelector('#crashCashout');if(cash)cash.textContent='×'+mult.toFixed(2);
    const remain=Math.max(0,(r.startsAt-at)/1000);
    const countdown=document.querySelector('#crashCountdown');if(countdown)countdown.textContent=remain.toFixed(1);
-   const betCountdown=document.querySelector('#crashBetCountdown');if(betCountdown)betCountdown.textContent=Math.ceil(remain);
-   stage.style.setProperty('--crash-progress',String(Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000))));
-   const flying=document.querySelector('#crashFlyName');
-   if(flying&&running&&at-crashLastSwap>520){
-    crashLastSwap=at;crashLastName++;
-    const names=d.bets.filter(b=>b.handle).map(b=>b.handle);
-    flying.textContent=names.length?names[crashLastName%names.length]:CRASH_FLOAT_NAMES[crashLastName%CRASH_FLOAT_NAMES.length];
+   const progress=running?Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000)):0;
+   const flying=document.querySelector('.crash-skyline');
+   if(flying){
+    // Move along a rising diagonal guide, keeping long names inside the stage.
+    const startingX=stage.clientWidth*.10;
+    const maxX=Math.max(0,stage.clientWidth-startingX-flying.offsetWidth-10);
+    const maxDx=Math.min(stage.clientWidth*.54,maxX);
+    const maxDy=Math.min(stage.clientHeight*.43,100,
+      Math.max(0,stage.clientHeight-23-flying.offsetHeight-12));
+    const dx=maxDx*progress,dy=-maxDy*progress;
+    // The visual guide follows exactly the same diagonal on every viewport.
+    stage.style.setProperty('--crash-line-length',Math.hypot(maxDx,maxDy).toFixed(1)+'px');
+    stage.style.setProperty('--crash-line-angle',(-Math.atan2(maxDy,Math.max(1,maxDx))*180/Math.PI).toFixed(1)+'deg');
+    flying.style.setProperty('--crash-x',dx.toFixed(1)+'px');
+    flying.style.setProperty('--crash-y',dy.toFixed(1)+'px');
+    const [name,value]=crashPreviewForMultiplier(mult);
+    const label=document.querySelector('#crashFlyName');
+    const price=document.querySelector('#crashFlyPrice');
+    if(label&&label.textContent!==name)label.textContent=name;
+    const val=fmt(value);if(price&&price.textContent!==val)price.textContent=val;
    }
    stage.classList.toggle('exploded',Date.now()<Number(state.crashBlastUntil||0));
   }
@@ -423,7 +455,6 @@ async function refreshCrashLive(){
   const previous=state.crash;
   crashVisualOffset=next.round.serverNow-Date.now();
   const nextLast=next.last?.id||0;
-  // Fire on every observed round transition, including the very first crash.
   if(previous&&next.round.id!==previous.round.id&&nextLast===previous.round.id)
     state.crashBlastUntil=Date.now()+850;
   crashKnownPrevious=nextLast;
@@ -434,7 +465,8 @@ async function refreshCrashLive(){
   if(rerender)render();
   else{
    const roster=document.querySelector('#crashBets');if(roster)roster.innerHTML=crashRoster(next.bets);
-   const count=document.querySelector('#crashParticipantsCount');if(count)count.textContent=next.bets.length+' ставок';
+   const count=document.querySelector('#crashParticipantsCount');
+   if(count)count.textContent=next.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:next.bets.length+' ставок';
   }
   startCrashVisualLoop();
  }catch(e){console.warn('Crash refresh:',e.message)}
