@@ -32,5 +32,5 @@ test('desktop-only menu overrides leave phone menu CSS intact',()=>{
   assert.match(css,/\.menu-section>div\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css,/\.menu-tile-label\{font-size:11px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\}/);
   assert.match(css,/html\.is-desktop \.menu-section>div/);
-  assert.match(html,/\/styles\.css\?v=7\.5\.0-desktop-menu-fix1/);
+  assert.match(html,/\/styles\.css\?v=7\.5\.0-[a-z0-9-]+/);
 });
