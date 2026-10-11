@@ -56,6 +56,22 @@ export function createDatabase(dataDir){
   );
   CREATE INDEX IF NOT EXISTS idx_crash_bets_round ON crash_bets(round_id,status);
   CREATE INDEX IF NOT EXISTS idx_crash_bets_user ON crash_bets(user_id,round_id);
+  CREATE TABLE IF NOT EXISTS crash_reward_options(
+    bet_id INTEGER NOT NULL,
+    stage INTEGER NOT NULL,
+    multiplier REAL NOT NULL,
+    handle TEXT NOT NULL UNIQUE,
+    PRIMARY KEY(bet_id,stage)
+  );
+  CREATE INDEX IF NOT EXISTS idx_crash_reward_options_bet ON crash_reward_options(bet_id,stage);
+  CREATE TABLE IF NOT EXISTS crash_wins(
+    bet_id INTEGER PRIMARY KEY,
+    instance_id TEXT NOT NULL UNIQUE,
+    handle TEXT NOT NULL,
+    value INTEGER NOT NULL,
+    multiplier REAL NOT NULL,
+    created_at TEXT NOT NULL
+  );
 
   CREATE TABLE IF NOT EXISTS bot_start_outbox(
     update_id INTEGER PRIMARY KEY,
