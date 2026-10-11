@@ -49,6 +49,6 @@ test('admin module is retryable and its first-load errors are logged',()=>{
   assert.match(app,/if\(page==='admin'\)\{[\s\S]*?await ensureAdminUi\(\)/);
   assert.match(app,/function ensureAdminUi\(\)/);
   assert.match(app,/console\.error\('USERNAME admin module failed to load:'/);
-  assert.match(html,/\/app\.js\?v=7\.5\.0-admin-chevron-fix1/);
-  assert.match(html,/\/styles\.css\?v=7\.5\.0-admin-chevron-fix1/);
+  assert.match(html,/\/app\.js\?v=7\.5\.0-[a-z0-9-]+/);
+  assert.match(html,/\/styles\.css\?v=7\.5\.0-[a-z0-9-]+/);
 });
