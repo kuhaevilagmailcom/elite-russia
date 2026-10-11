@@ -873,7 +873,7 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
 
 
 /* CRASH 2.0: purpose-built, responsive round interface. No other pages affected. */
-.crash-page,.is-desktop .crash-page{
+.crash-page,html.is-desktop .crash-page{
   width:100%;max-width:750px;height:100%;max-height:100%;min-height:0;
   margin:0 auto;padding:10px 13px;gap:8px;overflow:hidden;
   display:flex;flex-direction:column;
@@ -882,7 +882,7 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
 .crash-caption b{font-size:14px;letter-spacing:-.02em}
 .crash-caption>span:last-child{margin-left:auto;font-size:10px;letter-spacing:0;color:var(--muted)}
 .crash-live-dot{width:7px;height:7px;box-shadow:none}
-.crash-stage,.is-desktop .crash-stage{
+.crash-stage,html.is-desktop .crash-stage{
   --crash-bg:#101926;
   height:clamp(160px,29dvh,230px);min-height:0;flex:none;
   position:relative;isolation:isolate;overflow:hidden;
@@ -1034,7 +1034,7 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
  .crash-participants{padding:6px 8px;gap:3px}
 }
 @media(max-height:640px){
- .crash-stage,.is-desktop .crash-stage{height:clamp(112px,23dvh,150px)}
+ .crash-stage,html.is-desktop .crash-stage{height:clamp(112px,23dvh,150px)}
  .crash-controls{padding:6px 8px;gap:5px}
  .crash-auto{gap:3px}
  .crash-auto-chip{height:28px;font-size:10px}
@@ -1043,10 +1043,10 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
  .crash-stage-header strong{font-size:32px}
  .crash-stage-header span{font-size:10px}
  .crash-bet-row{max-height:19px}
- .crash-page,.is-desktop .crash-page{padding-top:5px;padding-bottom:5px;gap:4px}
+ .crash-page,html.is-desktop .crash-page{padding-top:5px;padding-bottom:5px;gap:4px}
 }
 @media(max-height:450px){
- .crash-stage,.is-desktop .crash-stage{height:100px}
+ .crash-stage,html.is-desktop .crash-stage{height:100px}
  .crash-participants{overflow-y:auto}
  .crash-auto-entry{height:30px}
 }
