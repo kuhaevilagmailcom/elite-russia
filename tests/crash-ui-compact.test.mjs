@@ -66,8 +66,8 @@ test('Crash flight uses animated SVG curved path and remains single-screen',()=>
   assert.match(js,/data-crash-autostop-custom/);
   assert.match(js,/data-crash-autostop-save/);
   assert.match(js,/\/api\/crash\/autostop/);
-  assert.match(css,/\.crash-page,\.is-desktop \.crash-page\{/);
-  assert.match(css,/\.crash-stage,.is-desktop \.crash-stage\{/);
+  assert.match(css,/\.crash-page,html\.is-desktop \.crash-page\{/);
+  assert.match(css,/\.crash-stage,html\.is-desktop \.crash-stage\{/);
   assert.match(css,/\.crash-auto-presets\{/);
   assert.match(css,/\.crash-auto-chip\.active\{/);
   assert.match(html,/\/styles\.css\?v=7\.5\.0-crash2/);
