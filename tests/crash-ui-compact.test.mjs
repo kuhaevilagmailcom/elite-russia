@@ -29,7 +29,7 @@ test('Crash header does not show shared crash or public round number',()=>{
   const screen=js.slice(js.indexOf('function crashView(){'),js.indexOf('let crashTickerBusy=',js.indexOf('function crashView(){')));
   assert.match(screen,/>КРАШ<\/b>/);
   assert.doesNotMatch(screen,/ОБЩИЙ КРАШ|Раунд #|Прошлый раунд|Первый раунд/);
-  assert.match(screen,/Последние '+CRASH_VISIBLE_PLAYERS/);
+  assert.ok(screen.includes("'Последние '+CRASH_VISIBLE_PLAYERS"));
 });
 
 test('Crash flying preview price increases monotonically with the shared multiplier',()=>{
