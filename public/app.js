@@ -425,6 +425,7 @@ function crashView(){
   '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
  ).join('');
  const first=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'@username',value:bet?.value||0};
+ const footerPrize=bet?.status==='cashed'?d.myWin:!bet?(state.crashLastReward||d.recentWin):null;
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
   '<div class="crash-caption"><span class="crash-live-dot"></span><b>Краш</b><span>Макс. ×1000</span></div>'+
   '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
@@ -454,7 +455,8 @@ function crashView(){
   '<section class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
    (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
    '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></section>'+
-  (state.crashLastReward?'<p class="crash-mini-note crash-earned">Получен <b>'+esc(state.crashLastReward.handle)+'</b> · '+fmt(state.crashLastReward.value)+'</p>':
+  (footerPrize?'<p class="crash-mini-note crash-earned">'+(footerPrize.auto?'Автостоп · ':'Получен ')+
+    '<b>'+esc(footerPrize.handle)+'</b> · '+fmt(footerPrize.value)+'</p>':
    '<p class="crash-mini-note">Выигрыш — новый username · Старый расходуется</p>')+
  '</div>';
 }
