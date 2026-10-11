@@ -443,45 +443,62 @@ function crashAutoControls(d,bet,waiting){
  '</div>';
 }
 function crashView(){
- const d=state.crash;if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
- const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet,canBet=waiting&&!bet;
+ const d=state.crash;
+ if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
+ const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet;
  const available=(d.available||[]).map(x=>
   '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
  ).join('');
- const first=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'@username',value:bet?.value||0};
+ const first=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'',value:bet?.value||0};
  const footerPrize=bet?.status==='cashed'?d.myWin:!bet?(state.crashLastReward||d.recentWin):null;
+ let playerInfo='';
+ if(bet){
+  const status=bet.status==='cashed'?'<span class="crash-bet-tag won">Забрал</span>':
+   bet.status==='lost'?'<span class="crash-bet-tag lost">Проигрыш</span>':
+   '<span class="crash-bet-tag">'+(waiting?'Ожидает':'В игре')+'</span>';
+  playerInfo='<div class="crash-mybet"><div><small>Поставлен username</small><b>'+esc(bet.handle)+'</b><span>'+
+   fmt(bet.value)+(bet.autoStopX?' · автостоп ×'+Number(bet.autoStopX).toFixed(2):'')+'</span></div>'+status+'</div>';
+  if(running&&bet.status==='staked')
+   playerInfo+='<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать username <b id="crashCashout">×1.00</b></button>';
+  else if(bet.status==='cashed')
+   playerInfo+='<div class="crash-cashed"><span>Вы получили</span><b>'+esc(d.myWin?.handle||'Username')+'</b><small>'+
+    fmt(d.myWin?.value||0)+(bet.settlementKind==='auto'?' · Автостоп':'')+'</small></div>';
+  else playerInfo+='<div class="crash-queued">'+(waiting?'Ожидаем начало раунда':'Раунд продолжается')+'</div>';
+ }else if(waiting){
+  playerInfo='<div class="crash-choice"><div class="crash-choice-head"><b>Выбери username для ставки</b><span>'+
+   (d.available||[]).length+' доступно</span></div><div class="crash-available">'+
+   (available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>';
+ }else{
+  playerInfo='<div class="crash-queued">Приём ставок откроется в следующем раунде</div>';
+ }
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><span class="crash-live-dot"></span><b>Краш</b><span>Макс. ×1000</span></div>'+
-  '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
+  '<div class="crash-caption"><div><b>Краш</b><span>Множитель растёт — успей забрать username</span></div>'+
+   '<span class="crash-round-badge"><i></i>'+(waiting?'Приём ставок':'Раунд идёт')+'</span></div>'+
+  crashHistory(d)+
+  '<section class="crash-stage" aria-label="График множителя">'+
    '<div class="crash-stage-grid"></div>'+
-   '<svg class="crash-graph" id="crashGraphSvg" aria-hidden="true" viewBox="0 0 400 200" preserveAspectRatio="none">'+
-    '<defs><linearGradient id="crashLineColor" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#398970"/><stop offset="75%" stop-color="#69d6a8"/><stop offset="100%" stop-color="#b5f3d3"/></linearGradient></defs>'+
+   '<svg class="crash-graph" id="crashGraphSvg" aria-hidden="true" viewBox="0 0 400 300" preserveAspectRatio="none">'+
+    '<defs><linearGradient id="crashLineColor" x1="0%" y1="100%" x2="100%" y2="0%">'+
+     '<stop offset="0%" stop-color="#8993a3"/><stop offset="100%" stop-color="#f5f7fa"/>'+
+    '</linearGradient></defs>'+
     '<path id="crashGuide" class="crash-guide" d=""/><path id="crashTrack" class="crash-track" d=""/>'+
    '</svg>'+
-   '<div class="crash-stage-header"><strong id="crashMultiplier">×1.00</strong><span id="crashStatus">'+
-    (waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать')+'</span></div>'+
-   '<div class="crash-skyline"><span id="crashFlyName">'+esc(first.handle)+'</span>'+
-    '<small id="crashFlyPrice">'+(bet?fmt(first.value):'Выбери ставку')+'</small></div>'+
+   '<div class="crash-stage-header"><small>ТЕКУЩИЙ МНОЖИТЕЛЬ</small><strong id="crashMultiplier">×1.00</strong><span id="crashStatus">'+
+    (waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать до краша')+'</span></div>'+
+   '<span class="crash-marker" id="crashMarker" aria-hidden="true"></span>'+
+   (bet?'<div class="crash-skyline"><span id="crashFlyName">'+esc(first.handle)+'</span>'+
+    '<small id="crashFlyPrice">'+fmt(first.value)+'</small></div>':'')+
+   '<div class="crash-stage-foot"><span>×1.00</span><span>×1000</span></div>'+
    '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><strong>КРАШ</strong><b>×'+Number(state.crashLastExplosionX||1).toFixed(2)+'</b></div>'+
-   '<div class="crash-stage-foot"><span>USERNAME</span><span>CRASH</span></div>'+
-  '</div>'+
-  '<section class="crash-controls">'+
-   (bet?'<div class="crash-mybet"><div><small>Поставлено</small><b>'+esc(bet.handle)+'</b><span>'+fmt(bet.value)+
-     (bet.autoStopX?' · Автостоп ×'+Number(bet.autoStopX).toFixed(2):'')+'</span></div>'+
-     (running&&bet.status==='staked'?'<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button>':
-       bet.status==='cashed'?'<div class="crash-cashed"><b>'+esc(d.myWin?.handle||'Забрано')+'</b><small>'+fmt(d.myWin?.value||0)+(bet.settlementKind==='auto'?' · Авто':'')+'</small></div>':
-       '<div class="crash-queued">'+(waiting?'Ожидание':'В игре')+'</div>')+'</div>':
-       (canBet?'<div class="crash-choice"><div class="crash-choice-head"><b>Выбери username для ставки</b></div>'+
-        '<div class="crash-available">'+(available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>':
-        '<div class="crash-queued">Ставки откроются через несколько секунд</div>'))+
-   crashAutoControls(d,bet,waiting)+
   '</section>'+
+  '<section class="crash-controls"><div class="crash-controls-title"><b>Твоя ставка</b><span>'+(waiting?'Можно поставить username':'Ставки закрыты')+'</span></div>'+
+   playerInfo+crashAutoControls(d,bet,waiting)+'</section>'+
+  (footerPrize?'<div class="crash-reward-note"><span>Последний выигрыш</span><b>'+esc(footerPrize.handle)+'</b><strong>'+
+   fmt(footerPrize.value)+'</strong></div>':'')+
   '<section class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
    crashParticipantsLabel(d)+'</span></div>'+
-   '<div id="crashBets" class="crash-bet-list">'+crashRoster(crashParticipants(d).bets)+'</div></section>'+
-  (footerPrize?'<p class="crash-mini-note crash-earned">'+(footerPrize.auto?'Автостоп · ':'Получен ')+
-    '<b>'+esc(footerPrize.handle)+'</b> · '+fmt(footerPrize.value)+'</p>':
-   '<p class="crash-mini-note">Выигрыш — новый username · Старый расходуется</p>')+
+   '<div id="crashBets" class="crash-bet-list">'+crashRoster(crashParticipants(d).bets,waiting&&d.bets.length>0)+'</div></section>'+
+  '<p class="crash-mini-note">При выигрыше получаешь новый username. Поставленный username расходуется.</p>'+
  '</div>';
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0;
