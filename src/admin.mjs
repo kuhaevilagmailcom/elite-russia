@@ -193,6 +193,8 @@ export function resetSingleUser(db,admin,targetId){
   return db.transaction(()=>{
     const u=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!u)throw new Error('user_not_found');
     // Cancel this player's wager before deleting its reserved username.
+    db.prepare('DELETE FROM crash_reward_options WHERE bet_id IN (SELECT id FROM crash_bets WHERE user_id=?)').run(u.id);
+    db.prepare('DELETE FROM crash_wins WHERE bet_id IN (SELECT id FROM crash_bets WHERE user_id=?)').run(u.id);
     db.prepare('DELETE FROM crash_bets WHERE user_id=?').run(u.id);
     releaseActiveUsernames(db,u.id);
     const deletes=[
@@ -219,7 +221,7 @@ export function resetAllUsers(db,admin,confirmation){
   if(String(confirmation||'')!=='RESET USERNAME')throw new Error('reset_confirmation_required');
   return db.transaction(()=>{
     const clearTables=[
-      'crash_bets','crash_rounds','inventory','profile_showcase','market_listings','market_transactions','drop_requests','drop_history','balance_transactions',
+      'crash_reward_options','crash_wins','crash_bets','crash_rounds','inventory','profile_showcase','market_listings','market_transactions','drop_requests','drop_history','balance_transactions',
       'task_progress','task_claims','xp_history','level_reward_claims','achievement_unlocks','mini_game_sessions','mini_game_records',
       'mini_game_daily_earnings','username_lab_attempts','referrals','friends','referral_rewards','username_transfers','wheel_claims',
       'wheel_history','upgrade_sessions','upgrade_history','upgrade_progress','season_stats','season_rewards','season_history'
