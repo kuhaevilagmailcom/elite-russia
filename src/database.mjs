@@ -56,6 +56,11 @@ export function createDatabase(dataDir){
   );
   CREATE INDEX IF NOT EXISTS idx_crash_bets_round ON crash_bets(round_id,status);
   CREATE INDEX IF NOT EXISTS idx_crash_bets_user ON crash_bets(user_id,round_id);
+  CREATE TABLE IF NOT EXISTS crash_auto_settings(
+    user_id INTEGER PRIMARY KEY REFERENCES users(id),
+    multiplier REAL,
+    updated_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS crash_reward_options(
     bet_id INTEGER NOT NULL,
     stage INTEGER NOT NULL,
@@ -209,6 +214,11 @@ export function createDatabase(dataDir){
   CREATE INDEX IF NOT EXISTS idx_promo_active ON promo_codes(active,expires_at);
   CREATE INDEX IF NOT EXISTS idx_promo_redemptions_user ON promo_redemptions(user_id,redeemed_at DESC);
   `);
+  // Non-destructive migration for players with existing Crash bets.
+  const crashBetCols=new Set(db.prepare('PRAGMA table_info(crash_bets)').all().map(x=>x.name));
+  if(!crashBetCols.has('auto_stop_x'))db.exec("ALTER TABLE crash_bets ADD COLUMN auto_stop_x REAL");
+  if(!crashBetCols.has('settlement_kind'))db.exec("ALTER TABLE crash_bets ADD COLUMN settlement_kind TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_crash_auto_due ON crash_bets(round_id,status,auto_stop_x)");
   const userCols=new Set(db.prepare('PRAGMA table_info(users)').all().map(x=>x.name));
   if(!userCols.has('luck_points'))db.exec("ALTER TABLE users ADD COLUMN luck_points INTEGER NOT NULL DEFAULT 0");
   if(!userCols.has('bad_drop_streak'))db.exec("ALTER TABLE users ADD COLUMN bad_drop_streak INTEGER NOT NULL DEFAULT 0");

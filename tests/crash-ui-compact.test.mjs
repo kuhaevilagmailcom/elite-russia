@@ -27,7 +27,7 @@ test('Crash visibly lists at most ten recent bets in one compact row each',()=>{
 
 test('Crash header does not show shared crash or public round number',()=>{
   const screen=js.slice(js.indexOf('function crashView(){'),js.indexOf('let crashTickerBusy=',js.indexOf('function crashView(){')));
-  assert.match(screen,/>КРАШ<\/b>/);
+  assert.match(screen,/>Краш<\/b>/);
   assert.doesNotMatch(screen,/ОБЩИЙ КРАШ|Раунд #|Прошлый раунд|Первый раунд/);
   assert.ok(screen.includes("'Последние '+CRASH_VISIBLE_PLAYERS"));
 });
@@ -55,17 +55,21 @@ test('Crash flight displays server-reserved real usernames whose values increase
   assert.doesNotMatch(js,/CRASH_FLIGHT_PREVIEW|Цены в полёте — пример/);
 });
 
-test('Crash has diagonal x/y movement and stays on one screen',()=>{
-  assert.match(js,/flying\.style\.setProperty\('--crash-x',/);
-  assert.match(js,/flying\.style\.setProperty\('--crash-y',/);
-  assert.match(js,/stage\.clientWidth\*\.54/);
-  assert.match(js,/stage\.clientHeight\*\.43/);
-  assert.match(js,/--crash-line-length/);
-  assert.match(js,/--crash-line-angle/);
-  assert.match(css,/\.crash-page\{\s*height:100%;max-height:100%;min-height:0;overflow:hidden/);
-  assert.match(css,/\.crash-flight-rail\{[\s\S]*?rotate\(var\(--crash-line-angle,-23deg\)\)/);
-  assert.match(css,/\.crash-skyline\{[\s\S]*?translate\(var\(--crash-x,0px\),var\(--crash-y,0px\)\)/);
-  assert.match(css,/\.crash-available\{\s*display:flex;gap:5px;height:42px;max-height:42px;overflow-x:auto;overflow-y:hidden/);
-  assert.match(html,/\/styles\.css\?v=7\.5\.0-crash-prize3/);
-  assert.match(html,/\/app\.js\?v=7\.5\.0-crash-prize3/);
+test('Crash flight uses animated SVG curved path and remains single-screen',()=>{
+  assert.match(js,/function crashBezierPoint\(p,w,h\)/);
+  assert.match(js,/setAttribute\('d',pathFor\(p\)\)/);
+  assert.match(js,/flying\.style|flight\.style\.setProperty\('--crash-x'/);
+  assert.match(js,/\.style\.setProperty\('--crash-y'/);
+  assert.match(js,/requestAnimationFrame\(frame\)/);
+  assert.match(js,/id="crashGraphSvg"/);
+  assert.match(js,/data-crash-autostop="off"/);
+  assert.match(js,/data-crash-autostop-custom/);
+  assert.match(js,/data-crash-autostop-save/);
+  assert.match(js,/\/api\/crash\/autostop/);
+  assert.match(css,/\.crash-page,html\.is-desktop \.crash-page\{/);
+  assert.match(css,/\.crash-stage,html\.is-desktop \.crash-stage\{/);
+  assert.match(css,/\.crash-auto-presets\{/);
+  assert.match(css,/\.crash-auto-chip\.active\{/);
+  assert.match(html,/\/styles\.css\?v=7\.5\.0-crash2/);
+  assert.match(html,/\/app\.js\?v=7\.5\.0-crash2/);
 });

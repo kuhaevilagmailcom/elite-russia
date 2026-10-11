@@ -65,6 +65,41 @@ function crashTarget(seed){
   return Math.max(1,Math.min(CRASH_MAX_X,Math.floor((0.97/(1-r))*100)/100));
 }
 const finishMs=(startAt,target)=>startAt+Math.ceil(Math.log(target)/CRASH_GROWTH*1000);
+export function parseCrashAutoStop(raw){
+  if(raw===null||raw===undefined||raw===false||String(raw).trim()==='')return null;
+  const text=String(raw).trim().replace(',','.');
+  if(!/^(?:[1-9]\d{0,2}|1000)(?:\.\d{1,2})?$/.test(text))throw new Error('crash_invalid_autostop');
+  const value=Number(text);
+  if(!Number.isFinite(value)||value<1.01||value>1000)throw new Error('crash_invalid_autostop');
+  return Math.round(value*100)/100;
+}
+export function crashAutoStopAt(startAt,autoX){
+  const x=parseCrashAutoStop(autoX);
+  if(x===null)return null;
+  // Compensate for two-decimal flooring in the shared authoritative counter.
+  const ms=Math.ceil((Math.log(x)/CRASH_GROWTH)*1000+0.000001);
+  return startAt+ms;
+}
+function getAutoStop(db,userId){
+  const row=db.prepare('SELECT multiplier FROM crash_auto_settings WHERE user_id=?').get(userId);
+  return row?.multiplier??null;
+}
+export function setCrashAutoStop(db,user,raw,now=Date.now()){
+  const multiplier=parseCrashAutoStop(raw);
+  return db.transaction(()=>{
+    const round=sync(db,now);
+    db.prepare(`INSERT INTO crash_auto_settings(user_id,multiplier,updated_at) VALUES(?,?,?)
+      ON CONFLICT(user_id) DO UPDATE SET multiplier=excluded.multiplier,updated_at=excluded.updated_at`)
+      .run(user.id,multiplier,now);
+    // Preference applies to the current wager only while betting is open.
+    if(round.status==='waiting'&&now<round.starts_at){
+      db.prepare("UPDATE crash_bets SET auto_stop_x=? WHERE round_id=? AND user_id=? AND status='staked'")
+        .run(multiplier,round.id,user.id);
+    }
+    return {autoStopX:multiplier};
+  })();
+}
+
 export function crashMultiplier(startAt,at=Date.now()){
   const s=Math.max(0,(at-startAt)/1000);
   return Math.max(1,Math.min(CRASH_MAX_X,Math.floor(Math.exp(s*CRASH_GROWTH)*100)/100));
@@ -92,6 +127,9 @@ function settleLost(db,roundId,now){
 function sync(db,now){
   let round=db.prepare("SELECT * FROM crash_rounds WHERE status IN ('waiting','running') ORDER BY id DESC LIMIT 1").get();
   if(!round)return createRound(db,now);
+  // Settle automatic stops first, including thresholds crossed during process
+  // downtime, before a crashed round consumes any remaining staked usernames.
+  if(now>=round.starts_at)settleDueAutoStops(db,round,now);
   if(now>=round.crashes_at){
     db.prepare("UPDATE crash_rounds SET status='crashed',ended_at=? WHERE id=? AND status IN ('waiting','running')").run(round.crashes_at,round.id);
     settleLost(db,round.id,round.crashes_at);
@@ -119,7 +157,7 @@ function shapeBet(row){
   return row?{
     id:row.id,userId:row.user_id,player:row.first_name||row.username||'Игрок',
     handle:'@'+row.handle,value:row.value,status:row.status,
-    cashoutX:row.cashout_x||null,win:0,settledAt:row.settled_at||null
+    cashoutX:row.cashout_x||null,win:0,autoStopX:row.auto_stop_x??null,settlementKind:row.settlement_kind||null,settledAt:row.settled_at||null
   }:null;
 }
 export function crashState(db,user,now=Date.now()){
@@ -141,10 +179,17 @@ export function crashState(db,user,now=Date.now()){
       db.prepare("SELECT multiplier,handle FROM crash_reward_options WHERE bet_id=? ORDER BY stage").all(myAny.id)
         .map(x=>({multiplier:x.multiplier,handle:'@'+x.handle})):[];
     const myWin=myAny?rewardReceipt(db,myAny):null;
+    const lastWin=db.prepare(`SELECT w.instance_id,w.handle,w.value,w.multiplier,b.settlement_kind,b.round_id,b.settled_at
+      FROM crash_wins w JOIN crash_bets b ON b.id=w.bet_id
+      WHERE b.user_id=? ORDER BY b.settled_at DESC LIMIT 1`).get(user.id);
+    const recentWin=lastWin&&now-Number(lastWin.settled_at)<86400000?
+      {id:lastWin.instance_id,handle:'@'+lastWin.handle,value:lastWin.value,
+       multiplier:lastWin.multiplier,auto:lastWin.settlement_kind==='auto',
+       roundId:lastWin.round_id}:null;
     const available=db.prepare("SELECT id,handle,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id)
       .map(x=>({...x,handle:'@'+x.handle}));
     return {round:publicRound(round,now),last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,
-      bets,myBet:myAny,myRewardPlan,myWin,available,payoutCap:CRASH_MAX_PAYOUT};
+      bets,myBet:myAny,myRewardPlan,myWin,recentWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
   })();
 }
 export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=null){
@@ -162,11 +207,56 @@ export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=
     const changed=db.prepare("UPDATE username_instances SET status='crash_staked' WHERE id=? AND owner_id=? AND status='owned'").run(inst.id,user.id).changes;
     if(!changed)throw new Error('crash_item_unavailable');
     db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(inst.id);
-    const result=db.prepare(`INSERT INTO crash_bets(round_id,user_id,instance_id,status,created_at)
-      VALUES (?,?,?,'staked',?)`).run(round.id,user.id,inst.id,now);
+    const chosen=getAutoStop(db,user.id);
+    const result=db.prepare(`INSERT INTO crash_bets(round_id,user_id,instance_id,status,created_at,auto_stop_x)
+      VALUES (?,?,?,'staked',?,?)`).run(round.id,user.id,inst.id,now,chosen);
     reserveRewardNames(db,Number(result.lastInsertRowid),inst.value);
     return {ok:true,roundId:round.id,betId:Number(result.lastInsertRowid),replayed:false};
   })();
+}
+function settlePrize(db,round,bet,now,multiplier,kind='manual'){
+  const item=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='crash_staked'")
+    .get(bet.instance_id,bet.user_id);
+  if(!item)throw new Error('crash_item_unavailable');
+  reserveRewardNames(db,bet.id,item.value);
+  const option=rewardOptionAt(db,bet.id,multiplier);
+  if(!option)throw new Error('crash_reward_unavailable');
+  const value=crashRewardValue(item.value,multiplier);
+  const assessment=analyzeUsername(option.handle);
+  const rarity=rarityFromValue(value),score=assessment.score||0;
+  const visual=visualTier(value,score),quality=JSON.stringify(assessment.breakdown||{});
+  const template=db.prepare(`INSERT INTO username_templates
+    (handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at)
+    VALUES(?,?,?,?,1,'crash',0,1,?,?,?,?)`)
+    .run(option.handle,rarity,value,1,score,visual,quality,nowIso());
+  const id=uid(),created=nowIso();
+  db.prepare(`INSERT INTO username_instances
+    (id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,username_score,visual_tier,quality_json)
+    VALUES (?,?,?,?,?,1,1,?,'owned',?,'crash',?,?,?)`)
+    .run(id,template.lastInsertRowid,option.handle,rarity,value,bet.user_id,created,score,visual,quality);
+  db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)')
+    .run(id,bet.user_id,created);
+  const changed=db.prepare("UPDATE crash_bets SET status='cashed',cashout_x=?,win_amount=0,settled_at=?,settlement_kind=? WHERE id=? AND status='staked'")
+    .run(multiplier,now,kind,bet.id).changes;
+  if(!changed)throw new Error('crash_too_late');
+  db.prepare("UPDATE username_instances SET status='crash_exchanged' WHERE id=? AND status='crash_staked'").run(item.id);
+  db.prepare('DELETE FROM inventory WHERE instance_id=?').run(item.id);
+  db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(item.id);
+  db.prepare('INSERT INTO crash_wins(bet_id,instance_id,handle,value,multiplier,created_at) VALUES(?,?,?,?,?,?)')
+    .run(bet.id,id,option.handle,value,multiplier,created);
+  db.prepare('DELETE FROM crash_reward_options WHERE bet_id=?').run(bet.id);
+  return {ok:true,multiplier,reward:{id,handle:'@'+option.handle,value,rarity,visual},replayed:false,auto:kind==='auto'};
+}
+function settleDueAutoStops(db,round,now){
+  const bets=db.prepare("SELECT * FROM crash_bets WHERE round_id=? AND status='staked' AND auto_stop_x IS NOT NULL")
+    .all(round.id);
+  for(const bet of bets){
+    const dueAt=crashAutoStopAt(round.starts_at,bet.auto_stop_x);
+    if(dueAt===null||dueAt>=round.crashes_at||dueAt>now)continue;
+    // Reconcile from authoritative timestamps, NOT the worker's execution time.
+    // Even after server downtime, a threshold reached before the crash wins.
+    settlePrize(db,round,bet,dueAt,bet.auto_stop_x,'auto');
+  }
 }
 export function cashoutCrash(db,user,now=Date.now(),expectedRoundId=null){
   return db.transaction(()=>{
@@ -177,41 +267,9 @@ export function cashoutCrash(db,user,now=Date.now(),expectedRoundId=null){
     if(!bet)throw new Error('crash_no_bet');
     if(bet.status==='cashed'){
       const reward=rewardReceipt(db,bet);
-      // Legacy money-based cashouts must stay idempotent after this migration.
-      return {ok:true,multiplier:bet.cashout_x,reward,replayed:true,legacy:!reward};
+      return {ok:true,multiplier:bet.cashout_x,reward,replayed:true,legacy:!reward,auto:bet.settlement_kind==='auto'};
     }
     if(roundId!==round.id||round.status!=='running'||bet.status!=='staked')throw new Error('crash_too_late');
-    const item=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='crash_staked'").get(bet.instance_id,user.id);
-    if(!item)throw new Error('crash_item_unavailable');
-    reserveRewardNames(db,bet.id,item.value);
-    const multiplier=crashMultiplier(round.starts_at,now);
-    const option=rewardOptionAt(db,bet.id,multiplier);
-    if(!option)throw new Error('crash_reward_unavailable');
-    const value=crashRewardValue(item.value,multiplier);
-    const assessment=analyzeUsername(option.handle);
-    const rarity=rarityFromValue(value),score=assessment.score||0;
-    const visual=visualTier(value,score),quality=JSON.stringify(assessment.breakdown||{});
-    // The reward handle was uniquely reserved at stake time. A single SQLite
-    // transaction consumes the source and mints the new asset, or rolls back.
-    const template=db.prepare(`INSERT INTO username_templates
-      (handle,rarity,base_value,max_supply,current_supply,category,special,active,username_score,visual_tier,quality_json,created_at)
-      VALUES(?,?,?,?,1,'crash',0,1,?,?,?,?)`)
-      .run(option.handle,rarity,value,1,score,visual,quality,nowIso());
-    const id=uid(),created=nowIso();
-    db.prepare(`INSERT INTO username_instances
-      (id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,username_score,visual_tier,quality_json)
-      VALUES (?,?,?,?,?,1,1,?,'owned',?,'crash',?,?,?)`)
-      .run(id,template.lastInsertRowid,option.handle,rarity,value,user.id,created,score,visual,quality);
-    db.prepare('INSERT INTO inventory(instance_id,user_id,created_at) VALUES(?,?,?)').run(id,user.id,created);
-    const changed=db.prepare("UPDATE crash_bets SET status='cashed',cashout_x=?,win_amount=0,settled_at=? WHERE id=? AND status='staked'")
-      .run(multiplier,now,bet.id).changes;
-    if(!changed)throw new Error('crash_too_late');
-    db.prepare("UPDATE username_instances SET status='crash_exchanged' WHERE id=? AND status='crash_staked'").run(item.id);
-    db.prepare('DELETE FROM inventory WHERE instance_id=?').run(item.id);
-    db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(item.id);
-    db.prepare('INSERT INTO crash_wins(bet_id,instance_id,handle,value,multiplier,created_at) VALUES(?,?,?,?,?,?)')
-      .run(bet.id,id,option.handle,value,multiplier,created);
-    db.prepare('DELETE FROM crash_reward_options WHERE bet_id=?').run(bet.id);
-    return {ok:true,multiplier,reward:{id,handle:'@'+option.handle,value,rarity,visual},replayed:false};
+    return settlePrize(db,round,bet,now,crashMultiplier(round.starts_at,now),'manual');
   })();
 }

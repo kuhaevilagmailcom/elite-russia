@@ -70,6 +70,48 @@ test('100K drop can be retried immediately after an unsuccessful first attempt',
   assert.equal(replay.body.instance.id,good.body.instance.id);
 });
 
+test('HTTP Crash auto-stop settings are validated, persisted and attached to real bets',async()=>{
+  const user='34577',h=headers(user);
+  const home=await json('/api/home',{headers:h});
+  assert.equal(home.r.status,200);
+  const bad=await json('/api/crash/autostop',{method:'POST',headers:h,
+    body:JSON.stringify({value:'1001'})});
+  assert.equal(bad.r.status,400);
+  assert.equal(bad.body.error,'crash_invalid_autostop');
+  const saved=await json('/api/crash/autostop',{method:'POST',headers:h,
+    body:JSON.stringify({value:'2,50'})});
+  assert.equal(saved.r.status,200);
+  assert.equal(saved.body.autoStopX,2.5);
+  const add=await json('/api/admin/users/'+home.body.user.id+'/add-username',{
+    method:'POST',headers:headers('10001'),
+    body:JSON.stringify({handle:'auto_http_21',value:100000})
+  });
+  assert.equal(add.r.status,200,JSON.stringify(add.body));
+  const conn=new Database(path.join(tmp,'username.sqlite'));
+  let instanceId;
+  try{
+    instanceId=conn.prepare("SELECT id FROM username_instances WHERE owner_id=? AND handle='auto_http_21'").get(home.body.user.id).id;
+    const current=conn.prepare("SELECT id FROM crash_rounds WHERE status IN ('waiting','running') ORDER BY id DESC LIMIT 1").get();
+    conn.prepare("UPDATE crash_rounds SET status='waiting',starts_at=?,crashes_at=?,crash_x=1000 WHERE id=?")
+      .run(Date.now()+15000,Date.now()+90000,current.id);
+  }finally{conn.close()}
+  const before=await json('/api/crash',{headers:h});
+  assert.equal(before.body.autoStopX,2.5);
+  const bet=await json('/api/crash/bet',{method:'POST',headers:h,
+    body:JSON.stringify({roundId:before.body.round.id,instanceId})});
+  assert.equal(bet.r.status,200,JSON.stringify(bet.body));
+  const waiting=await json('/api/crash',{headers:h});
+  assert.equal(waiting.body.myBet.autoStopX,2.5);
+  const changed=await json('/api/crash/autostop',{method:'POST',headers:h,
+    body:JSON.stringify({value:1.5})});
+  assert.equal(changed.r.status,200);
+  assert.equal((await json('/api/crash',{headers:h})).body.myBet.autoStopX,1.5);
+  const off=await json('/api/crash/autostop',{method:'POST',headers:h,body:JSON.stringify({value:null})});
+  assert.equal(off.r.status,200);
+  assert.equal(off.body.autoStopX,null);
+  assert.equal((await json('/api/crash',{headers:h})).body.myBet.autoStopX,null);
+});
+
 test('HTTP Crash has one public round and idempotent bet and cashout across clients',async()=>{
   const uid='34501',other='34502',admin='10001';
   const home=await json('/api/home',{headers:headers(uid)});
