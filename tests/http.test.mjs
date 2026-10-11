@@ -108,6 +108,9 @@ test('HTTP Crash has one public round and idempotent bet and cashout across clie
   assert.equal(stale.body.error,'crash_round_changed');
   const spectator=await json('/api/crash',{headers:headers(other)});
   assert.ok(spectator.body.bets.some(x=>x.handle==='@crash_http_777'));
+  const myPreview=await json('/api/crash',{headers:headers(uid)});
+  assert.equal(myPreview.body.myRewardPlan.length,35);
+  assert.ok(myPreview.body.myRewardPlan.every(x=>x.handle.startsWith('@')));
 
   const db=new Database(path.join(tmp,'username.sqlite'));
   try{
@@ -117,21 +120,31 @@ test('HTTP Crash has one public round and idempotent bet and cashout across clie
   const cash=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
   assert.equal(cash.r.status,200,JSON.stringify(cash.body));
   assert.ok(cash.body.multiplier>1);
-  assert.ok(cash.body.win>0);
+  assert.ok(cash.body.reward.value>6000);
+  assert.ok(cash.body.reward.handle.startsWith('@'));
+  assert.notEqual(cash.body.reward.handle,'@crash_http_777');
+  assert.equal(cash.body.reward.value,Math.floor(6000*cash.body.multiplier));
   const second=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
   assert.equal(second.r.status,200);
   assert.equal(second.body.replayed,true);
-  assert.equal(second.body.win,cash.body.win);
+  assert.equal(second.body.reward.id,cash.body.reward.id);
   const db2=new Database(path.join(tmp,'username.sqlite'));
   try{
-    assert.equal(db2.prepare('SELECT COUNT(*) n FROM balance_transactions WHERE user_id=? AND type=?').get(home.body.user.id,'crash_win').n,1);
-    assert.equal(db2.prepare('SELECT status FROM username_instances WHERE id=?').get(instanceId).status,'owned');
+    assert.equal(db2.prepare('SELECT COUNT(*) n FROM balance_transactions WHERE user_id=? AND type=?').get(home.body.user.id,'crash_win').n,0);
+    assert.equal(db2.prepare('SELECT status FROM username_instances WHERE id=?').get(instanceId).status,'crash_exchanged');
+    const reward=db2.prepare('SELECT * FROM username_instances WHERE id=?').get(cash.body.reward.id);
+    assert.equal(reward.owner_id,home.body.user.id);
+    assert.equal(reward.obtained_type,'crash');
+    assert.equal(reward.status,'owned');
+    assert.equal(reward.handle,cash.body.reward.handle.slice(1));
+    assert.equal(db2.prepare('SELECT COUNT(*) n FROM crash_wins WHERE instance_id=?').get(reward.id).n,1);
     db2.prepare('UPDATE crash_rounds SET crashes_at=? WHERE id=?').run(Date.now()-2,roundId);
   }finally{db2.close()}
   // Even after rollover, replay must not mint a second reward.
   const after=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
   assert.equal(after.r.status,200);
   assert.equal(after.body.replayed,true);
+  assert.equal(after.body.reward.id,cash.body.reward.id);
 });
 
 test('HTTP story endpoint returns a public same-origin media path and JPEG without auth',async()=>{
