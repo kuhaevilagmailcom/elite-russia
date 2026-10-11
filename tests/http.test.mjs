@@ -84,13 +84,13 @@ test('HTTP Crash auto-stop settings are validated, persisted and attached to rea
   assert.equal(saved.body.autoStopX,2.5);
   const add=await json('/api/admin/users/'+home.body.user.id+'/add-username',{
     method:'POST',headers:headers('10001'),
-    body:JSON.stringify({handle:'http_autostop_21',value:100000})
+    body:JSON.stringify({handle:'auto_http_21',value:100000})
   });
   assert.equal(add.r.status,200,JSON.stringify(add.body));
   const conn=new Database(path.join(tmp,'username.sqlite'));
   let instanceId;
   try{
-    instanceId=conn.prepare("SELECT id FROM username_instances WHERE owner_id=? AND handle='http_autostop_21'").get(home.body.user.id).id;
+    instanceId=conn.prepare("SELECT id FROM username_instances WHERE owner_id=? AND handle='auto_http_21'").get(home.body.user.id).id;
     const current=conn.prepare("SELECT id FROM crash_rounds WHERE status IN ('waiting','running') ORDER BY id DESC LIMIT 1").get();
     conn.prepare("UPDATE crash_rounds SET status='waiting',starts_at=?,crashes_at=?,crash_x=1000 WHERE id=?")
       .run(Date.now()+15000,Date.now()+90000,current.id);
