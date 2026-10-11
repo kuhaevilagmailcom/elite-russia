@@ -29,6 +29,34 @@ export function createDatabase(dataDir){
     premium_until TEXT, created_at TEXT NOT NULL, last_seen TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS game_config(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS crash_rounds(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL CHECK(status IN ('waiting','running','crashed')),
+    created_at INTEGER NOT NULL,
+    starts_at INTEGER NOT NULL,
+    crashes_at INTEGER NOT NULL,
+    crash_x REAL NOT NULL,
+    seed TEXT NOT NULL,
+    commitment TEXT NOT NULL,
+    ended_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_crash_rounds_state ON crash_rounds(status,id);
+  CREATE TABLE IF NOT EXISTS crash_bets(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round_id INTEGER NOT NULL REFERENCES crash_rounds(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    instance_id TEXT NOT NULL REFERENCES username_instances(id),
+    status TEXT NOT NULL CHECK(status IN ('staked','cashed','lost')),
+    created_at INTEGER NOT NULL,
+    settled_at INTEGER,
+    cashout_x REAL,
+    win_amount INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(round_id,user_id),
+    UNIQUE(round_id,instance_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_crash_bets_round ON crash_bets(round_id,status);
+  CREATE INDEX IF NOT EXISTS idx_crash_bets_user ON crash_bets(user_id,round_id);
+
   CREATE TABLE IF NOT EXISTS bot_start_outbox(
     update_id INTEGER PRIMARY KEY,
     chat_id TEXT NOT NULL,
