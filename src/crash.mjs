@@ -92,7 +92,7 @@ export function crashState(db,user,now=Date.now()){
 export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=null){
   return db.transaction(()=>{
     const round=sync(db,now);
-    if(Number(expectedRoundId||round.id)!==round.id)throw new Error('crash_round_changed');
+    if(Number(expectedRoundId===null?round.id:expectedRoundId)!==round.id)throw new Error('crash_round_changed');
     if(round.status!=='waiting'||now>=round.starts_at)throw new Error('crash_betting_closed');
     const existing=db.prepare('SELECT id,instance_id FROM crash_bets WHERE round_id=? AND user_id=?').get(round.id,user.id);
     if(existing){
