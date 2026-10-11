@@ -89,9 +89,10 @@ export function crashState(db,user,now=Date.now()){
     return {round:publicRound(round,now),last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,bets,myBet:myAny,available,payoutCap:CRASH_MAX_PAYOUT};
   })();
 }
-export function placeCrashBet(db,user,instanceId,now=Date.now()){
+export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=null){
   return db.transaction(()=>{
     const round=sync(db,now);
+    if(Number(expectedRoundId||round.id)!==round.id)throw new Error('crash_round_changed');
     if(round.status!=='waiting'||now>=round.starts_at)throw new Error('crash_betting_closed');
     const existing=db.prepare('SELECT id,instance_id FROM crash_bets WHERE round_id=? AND user_id=?').get(round.id,user.id);
     if(existing){
@@ -108,15 +109,18 @@ export function placeCrashBet(db,user,instanceId,now=Date.now()){
     return {ok:true,roundId:round.id,betId:Number(result.lastInsertRowid),replayed:false};
   })();
 }
-export function cashoutCrash(db,user,now=Date.now()){
+export function cashoutCrash(db,user,now=Date.now(),expectedRoundId=null){
   return db.transaction(()=>{
     // Transition the round to crashed before checking whether a cashout
     // arrived in time. Client-sent multipliers or timestamps are never trusted.
     const round=sync(db,now);
-    const bet=db.prepare('SELECT * FROM crash_bets WHERE round_id=? AND user_id=?').get(round.id,user.id);
+    const roundId=expectedRoundId===null?round.id:Number(expectedRoundId);
+    if(!Number.isSafeInteger(roundId)||roundId<=0)throw new Error('crash_round_changed');
+    const bet=db.prepare('SELECT * FROM crash_bets WHERE round_id=? AND user_id=?').get(roundId,user.id);
     if(!bet)throw new Error('crash_no_bet');
+    // Permit a safe replay of a completed cashout after round rollover.
     if(bet.status==='cashed')return {ok:true,multiplier:bet.cashout_x,win:bet.win_amount,replayed:true};
-    if(round.status!=='running'||bet.status!=='staked')throw new Error('crash_too_late');
+    if(roundId!==round.id||round.status!=='running'||bet.status!=='staked')throw new Error('crash_too_late');
     const item=db.prepare("SELECT * FROM username_instances WHERE id=? AND owner_id=? AND status='crash_staked'").get(bet.instance_id,user.id);
     if(!item)throw new Error('crash_item_unavailable');
     const multiplier=crashMultiplier(round.starts_at,now);
