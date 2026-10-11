@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
@@ -21,7 +21,7 @@ const ERR={
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
-  wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
+  crash_betting_closed:'Ставки закрыты. Дождись следующего раунда',crash_already_bet:'Ты уже поставил username в этом раунде',crash_item_unavailable:'Этот username уже недоступен',crash_no_bet:'У тебя нет активной ставки',crash_too_late:'Поздно! Username сгорел при краше',wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
@@ -253,7 +253,7 @@ function xpBar(u){
 }
 function balance(){return fmt(state.user?.balance||state.home?.user?.balance||0)}
 const MENU_SECTIONS=[
- {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['wheel','wheel','Колесо'],['upgrader','upgrade','Апгрейдер']]},
+ {title:'Играть',items:[['home','home','Дроп'],['games','games','Игры'],['crash','upgrade','Краш'],['upgrader','upgrade','Апгрейдер'],['wheel','wheel','Колесо']]},
  {title:'Торговля',items:[['market','market','Рынок'],['collection','collection','Коллекция'],['gift','gift','Подарки']]},
  {title:'Прогресс',items:[['tasks','tasks','Задания'],['levels','levels','Уровни'],['achievements','achievements','Достижения'],['top','rank','Топ']]},
  {title:'Аккаунт',items:[['profile','profile','Профиль'],['notifications','notifications','Уведомления'],['promo','promo','Промокод'],['shop','shop','Магазин'],['settings','settings','Настройки']]}
@@ -354,6 +354,92 @@ function dropPricePicker(tiers){
  if(!state.dropPicker)return '';
  return '<div class="drop-cost-overlay"><button class="drop-cost-back" data-drop-picker-close aria-label="Закрыть"></button><div class="drop-cost-sheet"><div class="drop-cost-title"><b>Стоимость попытки</b><span>Выберите цену дропа</span></div>'+Object.values(tiers).map(t=>'<button class="drop-cost-option '+(state.dropTier===t.key?'active':'')+'" data-drop-tier="'+t.key+'"><span>'+esc(t.label)+'</span><b>'+fmt(t.cost)+'</b></button>').join('')+'</div></div>';
 }
+
+function crashRoster(bets){
+ const list=(bets||[]).slice(0,30);
+ return list.length?list.map(b=>'<div class="crash-bet-row"><div class="crash-player"><b>'+esc(b.player)+'</b><span>'+esc(b.handle)+'</span></div><div class="crash-bet-result '+(b.status==='cashed'?'won':b.status==='lost'?'lost':'')+'">'+(b.status==='cashed'?'×'+Number(b.cashoutX||1).toFixed(2)+' · +'+fmt(b.win):b.status==='lost'?'Сгорел':fmt(b.value))+'</div></div>').join(''):'<div class="crash-empty">Ставок пока нет. Можешь быть первым.</div>';
+}
+function crashView(){
+ const d=state.crash;
+ if(!d)return '<div class="page-body"><div class="empty">Загрузка раунда…</div></div>';
+ const r=d.round,waiting=r.status==='waiting',running=r.status==='running',bet=d.myBet;
+ const selected=waiting&&!bet;
+ const history=d.last?'<span>Прошлый раунд <b>×'+Number(d.last.multiplier).toFixed(2)+'</b></span>':'<span>Первый раунд</span>';
+ const available=(d.available||[]).map(x=>'<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>').join('');
+ return '<div class="crash-page" data-crash-round="'+r.id+'">'+
+  '<div class="crash-caption"><span class="crash-live-dot"></span><b>ОБЩИЙ КРАШ</b><span>Раунд #'+r.id+'</span></div>'+
+  '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
+    '<div class="crash-stage-grid"></div><div class="crash-flight-rail"></div>'+
+    '<div class="crash-skyline"><span id="crashFlyName">@username</span><span class="crash-thruster"></span></div>'+
+    '<div class="crash-stage-multiplier" id="crashMultiplier">×1.00</div>'+
+    '<div class="crash-stage-sub" id="crashStatus">'+(waiting?'Начало через <b id="crashCountdown">10.0</b> сек.':'Забирай до взрыва')+'</div>'+
+    '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
+  '</div>'+
+  '<div class="crash-meta">'+history+'<span>Максимум <b>×1000</b></span></div>'+
+  (bet?'<div class="crash-mybet"><div><small>Твоя ставка</small><b>'+esc(bet.handle)+'</b><span>'+fmt(bet.value)+'</span></div>'+
+     (running&&bet.status==='staked'?'<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button>':
+      bet.status==='cashed'?'<div class="crash-cashed">Забрано ×'+Number(bet.cashoutX).toFixed(2)+'<br><b>+'+fmt(bet.win)+'</b></div>':
+      '<div class="crash-queued">'+(waiting?'Ждём старта':'Ставка в игре')+'</div>')+'</div>':'')+
+  (selected?'<div class="crash-choice"><div class="crash-choice-head"><b>Поставить username</b><span>До старта: <b id="crashBetCountdown">10</b> сек.</span></div>'+
+    '<div class="crash-available">'+(available||'<div class="crash-empty">В коллекции пока нет юзернеймов.</div>')+'</div></div>':'')+
+  '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+d.bets.length+' ставок</span></div>'+
+   '<div id="crashBets">'+crashRoster(d.bets)+'</div></div>'+
+  '<p class="crash-rules">Если успеешь забрать — username вернётся и принесёт игровую валюту по множителю (до '+fmt(d.payoutCap)+'). Если произойдёт краш — username сгорит. Ставить можно только до начала общего раунда.</p>'+
+  '</div>';
+}
+const CRASH_FLOAT_NAMES=['@monk','@devil','@krasava','@scam','@ghost','@elite','@prime','@username','@legend','@lucky'];
+let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashLastSwap=0,crashLastName=0,crashKnownPrevious=0;
+function startCrashVisualLoop(){
+ if(crashLoopOn)return;crashLoopOn=true;
+ const frame=()=>{
+  if(state.page!=='crash'){crashLoopOn=false;return}
+  const d=state.crash,r=d?.round,stage=document.querySelector('.crash-stage');
+  if(r&&stage){
+   const at=Date.now()+crashVisualOffset,elapsed=Math.max(0,(at-r.startsAt)/1000),running=r.status==='running';
+   const mult=running?Math.min(1000,Math.floor(Math.exp(elapsed*.115)*100)/100):1;
+   const show=document.querySelector('#crashMultiplier');if(show)show.textContent='×'+mult.toFixed(2);
+   const cash=document.querySelector('#crashCashout');if(cash)cash.textContent='×'+mult.toFixed(2);
+   const remain=Math.max(0,(r.startsAt-at)/1000);
+   const countdown=document.querySelector('#crashCountdown');if(countdown)countdown.textContent=remain.toFixed(1);
+   const betCountdown=document.querySelector('#crashBetCountdown');if(betCountdown)betCountdown.textContent=Math.ceil(remain);
+   stage.style.setProperty('--crash-progress',String(Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000))));
+   const flying=document.querySelector('#crashFlyName');
+   if(flying&&running&&at-crashLastSwap>520){
+    crashLastSwap=at;crashLastName++;
+    const names=d.bets.filter(b=>b.handle).map(b=>b.handle);
+    flying.textContent=names.length?names[crashLastName%names.length]:CRASH_FLOAT_NAMES[crashLastName%CRASH_FLOAT_NAMES.length];
+   }
+   stage.classList.toggle('exploded',Date.now()<Number(state.crashBlastUntil||0));
+  }
+  requestAnimationFrame(frame);
+ };
+ requestAnimationFrame(frame);
+}
+async function refreshCrashLive(){
+ if(state.page!=='crash'||crashTickerBusy)return;
+ crashTickerBusy=true;
+ try{
+  const next=await api('/api/crash');
+  const previous=state.crash;
+  crashVisualOffset=next.round.serverNow-Date.now();
+  const nextLast=next.last?.id||0;
+  if(previous&&nextLast!==crashKnownPrevious&&crashKnownPrevious>0)state.crashBlastUntil=Date.now()+850;
+  crashKnownPrevious=nextLast;
+  const rerender=!previous||next.round.id!==previous.round.id||next.round.status!==previous.round.status||
+    (next.myBet?.status||'')!==(previous.myBet?.status||'')||
+    (next.myBet?.id||0)!==(previous.myBet?.id||0);
+  state.crash=next;
+  if(rerender)render();
+  else{
+   const roster=document.querySelector('#crashBets');if(roster)roster.innerHTML=crashRoster(next.bets);
+   const count=document.querySelector('#crashParticipantsCount');if(count)count.textContent=next.bets.length+' ставок';
+  }
+  startCrashVisualLoop();
+ }catch(e){console.warn('Crash refresh:',e.message)}
+ finally{crashTickerBusy=false}
+}
+setInterval(()=>{void refreshCrashLive()},850);
+
 function homeView(){
  const h=state.home,u=h.user,p=h.pending,tiers=h.config?.dropTiers||{},tier=selectedDropTier(),free=u.freeDrops>0&&tier.key==='basic',payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
  return '<div class="home-v7">'+
@@ -362,7 +448,7 @@ function homeView(){
   '<section class="drop-zone home-drop-v7">'+
     (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b><span>Нажми, чтобы получить</span></button>')+
   '</section>'+
-  (!p?'<section class="home-quick-v7"><button class="home-quick-action" data-page="upgrader"><span class="home-quick-icon">'+icon('upgrade')+'</span><div><b>Апгрейдер</b><small>Улучшить username</small></div>'+icon('chevron')+'</button><button class="home-quick-action" data-page="wheel"><span class="home-quick-icon">'+icon('wheel')+'</span><div><b>Колесо</b><small>Быстрое вращение</small></div>'+icon('chevron')+'</button></section>':'')+
+  (!p?'<section class="home-quick-v7"><button class="home-quick-action" data-page="upgrader"><span class="home-quick-icon">'+icon('upgrade')+'</span><div><b>Апгрейдер</b><small>Улучшить username</small></div>'+icon('chevron')+'</button><button class="home-quick-action" data-page="crash"><span class="home-quick-icon">'+icon('upgrade')+'</span><div><b>Краш</b><small>Общий раунд · ×1000</small></div>'+icon('chevron')+'</button></section>':'')+
   dropPricePicker(tiers)+
  '</div>';
 }
@@ -654,6 +740,7 @@ function render(){const page=state.page;
  else if(page==='notifications')shell('Уведомления',notificationsView());
  else if(page==='settings')shell('Настройки',settingsView());
  else if(page==='wheel')shell('Колесо',wheelView());
+ else if(page==='crash')shell('Краш',crashView());
  else if(page==='friends')shell('Друзья',friendsView());
  else if(page==='gift')shell('Подарки',giftView());
  else if(page==='upgrader')shell('Апгрейдер',upgraderView());
@@ -667,7 +754,7 @@ function render(){const page=state.page;
  else if(page==='admin')shell('Админка',window.USERNAME_ADMIN?.view?.()||'<div class="empty">Админка загружается…</div>')
 }
 async function refreshUser(){const h=await api('/api/home');state.home=h;state.user=h.user;return h}
-const PAGE_TITLE={home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',promo:'Промокод',games:'Игры',miniGame:'Игра',admin:'Админка'};
+const PAGE_TITLE={crash:'Краш',home:'USERNAME',collection:'Коллекция',market:'Рынок',top:'Топ',tasks:'Задания',levels:'Уровни',achievements:'Достижения',notifications:'Уведомления',settings:'Настройки',wheel:'Колесо',friends:'Друзья',gift:'Подарки',upgrader:'Апгрейдер',seasons:'Сезоны',profile:'Профиль',shop:'Магазин',promo:'Промокод',games:'Игры',miniGame:'Игра',admin:'Админка'};
 const PAGE_CACHE_TTL=12000;
 let routeSeq=0;
 function pageReady(page){
@@ -681,6 +768,7 @@ function pageReady(page){
   page==='notifications'?!!state.notifications:
   page==='settings'?true:
   page==='wheel'?!!state.wheel:
+  page==='crash'?!!state.crash:
   page==='friends'?!!state.friends:
   page==='gift'?!!state.gift:
   page==='upgrader'?!!state.upgrader:
@@ -708,6 +796,7 @@ async function fetchPage(page){
  if(page==='notifications'){state.notifications=await api('/api/notifications');if(state.user)state.user.unreadNotifications=Number(state.notifications.unread||0)}
  if(page==='games')state.games=await api('/api/games');
  if(page==='wheel')state.wheel=await api('/api/wheel');
+ if(page==='crash')state.crash=await api('/api/crash');
  if(page==='friends')state.friends=await api('/api/friends');
  if(page==='gift'){state.gift=await api('/api/gift/options');state.giftSheet='';state.giftRecipientUsername='';}
  if(page==='upgrader'){
@@ -728,7 +817,7 @@ async function load(page,{force=false}={}){
  if(!initial)routeLoading(true);
  try{
   await fetchPage(page);if(seq!==routeSeq)return;
-  state.page=page;state.pageLoadedAt[page]=Date.now();render();
+  state.page=page;state.pageLoadedAt[page]=Date.now();render();if(page==='crash'){crashVisualOffset=state.crash.round.serverNow-Date.now();startCrashVisualLoop()}
  }catch(e){
   if(seq!==routeSeq)return;
   if(initial){state.page=page;shell('USERNAME','<div class="error"><b>'+esc(ERR[e.message]||'Что-то пошло не так')+'</b><button data-page="'+page+'">Повторить</button></div>')}
@@ -915,6 +1004,25 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    el.disabled=true;const r=await api('/api/promocode',{method:'POST',body:JSON.stringify({code})});
    applyUserLocal(r.user);state.promo=await api('/api/promocode');sound('reward');haptic('medium');toast('+'+fmtPlain(r.rewardAmount)+' 💎');render();return
  }
+ if(el.dataset.crashBet){
+   if(state.crashBusy)return;
+   state.crashBusy=true;el.disabled=true;
+   try{
+     await api('/api/crash/bet',{method:'POST',body:JSON.stringify({instanceId:el.dataset.crashBet})});
+     toast('Username поставлен');await refreshUser();await load('crash',{force:true});
+   }finally{state.crashBusy=false;el.disabled=false}
+   return
+ }
+ if(el.hasAttribute('data-crash-cashout')){
+   if(state.crashBusy)return;
+   state.crashBusy=true;el.disabled=true;
+   try{
+     const payout=await api('/api/crash/cashout',{method:'POST',body:'{}'});
+     toast('Забрано ×'+Number(payout.multiplier).toFixed(2)+' · +'+fmt(payout.win));
+     sound('reward');await refreshUser();await load('crash',{force:true});
+   }finally{state.crashBusy=false;el.disabled=false}
+   return
+ }
  if(el.dataset.page){state.dropPicker=false;await load(el.dataset.page);return}
  if(el.hasAttribute('data-drop-picker-open')){state.dropPicker=true;render();return}
  if(el.dataset.dropTier){state.dropTier=el.dataset.dropTier;state.dropPicker=false;render();return}
@@ -1067,5 +1175,5 @@ function ensureAdminUi(){
 }
 // Eager for fast navigation, but retryable when the user opens Admin.
 void ensureAdminUi().catch(()=>{});
-const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
+const deepPage=(()=>{const m=startParam().match(/^page_(home|crash|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
