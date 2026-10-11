@@ -476,12 +476,11 @@ function crashView(){
    '<span class="crash-bet-tag">'+(waiting?'Ожидает':'В игре')+'</span>';
   playerInfo='<div class="crash-mybet"><div><small>Поставлен username</small><b>'+esc(bet.handle)+'</b><span>'+
    fmt(bet.value)+(bet.autoStopX?' · автостоп ×'+Number(bet.autoStopX).toFixed(2):'')+'</span></div>'+status+'</div>';
-  if(running&&bet.status==='staked'){
-   // Active cashout stays in the fixed bottom dock, never buried in the scroll.
-  }else if(bet.status==='cashed')
+  if(bet.status==='cashed')
    playerInfo+='<div class="crash-cashed"><span>Вы получили</span><b>'+esc(d.myWin?.handle||'Username')+'</b><small>'+
     fmt(d.myWin?.value||0)+(bet.settlementKind==='auto'?' · Автостоп':'')+'</small></div>';
-  else playerInfo+='<div class="crash-queued">'+(waiting?'Ожидаем начало раунда':'Раунд продолжается')+'</div>';
+  else if(!running||bet.status!=='staked')
+   playerInfo+='<div class="crash-queued">'+(waiting?'Ожидаем начало раунда':'Раунд продолжается')+'</div>';
  }else if(waiting){
   playerInfo='<div class="crash-choice"><div class="crash-choice-head"><b>Выбери username для ставки</b><span>'+
    (d.available||[]).length+' доступно</span></div><div class="crash-available">'+
