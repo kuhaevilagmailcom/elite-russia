@@ -73,6 +73,8 @@ test('Crash: 100K stake evolves into a real unique username, never currency; sur
   assert.equal(db.prepare('SELECT COUNT(*) n FROM crash_wins WHERE bet_id=?').get(pa.betId).n,1);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM crash_reward_options WHERE bet_id=?').get(pa.betId).n,0);
   assert.equal(crashState(db,a,at+1).myWin.handle,cash.reward.handle);
+  assert.equal(crashState(db,b,at+1).bets.find(x=>x.userId===a.id).status,'cashed');
+  assert.equal(crashState(db,b,at+1).bets.find(x=>x.userId===b.id).status,'staked');
 
   const replay=cashoutCrash(db,a,at+10);
   assert.equal(replay.replayed,true);
@@ -85,8 +87,13 @@ test('Crash: 100K stake evolves into a real unique username, never currency; sur
   assert.equal(db.prepare('SELECT status FROM username_instances WHERE id=?').get(ib).status,'crash_lost');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM inventory WHERE instance_id=?').get(ib).n,0);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM crash_reward_options WHERE bet_id=?').get(pb.betId).n,0);
-  assert.equal(crashState(db,a,at+60001).last.id,round.id);
-  assert.equal(crypto.createHash('sha256').update(crashState(db,a,at+60001).last.seed).digest('hex'),round.commitment);
+  const lastState=crashState(db,a,at+60001);
+  assert.equal(lastState.last.id,round.id);
+  assert.equal(lastState.bets.length,0,'next round starts with no current bets');
+  assert.deepEqual(lastState.lastBets.map(x=>[x.player,x.status]),[
+    ['Alpha','cashed'],['Beta','lost']
+  ],'settled participants remain visible until new stakes arrive');
+  assert.equal(crypto.createHash('sha256').update(lastState.last.seed).digest('hex'),round.commitment);
 
   db.close();db=createDatabase(dir);
   assert.equal(syncCrashRound(db,at+60002).id,next.id);
