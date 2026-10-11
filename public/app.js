@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,crashLastReward:null,crashCustomOpen:false,crashLastExplosionX:0,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,crashLastReward:null,crashLastExplosionX:0,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
@@ -427,7 +427,7 @@ function crashAutoControls(d,bet,waiting){
    '<input id="crashAutoInput" type="text" inputmode="decimal" maxlength="7" autocomplete="off" spellcheck="false"'+
    ' placeholder="Например, 2.50" aria-label="Множитель автостопа"'+
    ' value="'+(active?Number(current).toFixed(2):'')+'"></div>'+
-  '<div class="crash-auto-hint">1.01–1000 · Enter или выход из поля — сохранить · Очистить — выключить</div>'+
+  '<div class="crash-auto-hint">1.01–1000 × · Enter — сохранить · Пусто — выключить</div>'+
  '</div>';
 }
 function crashView(){
@@ -489,7 +489,7 @@ function crashBezierPoint(p,w,h,cardW=124,cardH=50){
 }
 function startCrashVisualLoop(){
  if(crashLoopOn)return;crashLoopOn=true;
- let lastPathProgress=-1,lastW=0,lastH=0;
+ let lastPathProgress=-1,lastW=0,lastH=0,lastTrack=null;
  const frame=()=>{
   if(state.page!=='crash'){crashLoopOn=false;return}
   const d=state.crash,r=d?.round,stage=document.querySelector('.crash-stage');
@@ -519,7 +519,7 @@ function startCrashVisualLoop(){
     if(price&&price.textContent!==value)price.textContent=value;
    }
    const svg=document.querySelector('#crashGraphSvg'),guide=document.querySelector('#crashGuide'),track=document.querySelector('#crashTrack');
-   if(svg&&guide&&track&&(Math.abs(p-lastPathProgress)>.002||w!==lastW||h!==lastH)){
+   if(svg&&guide&&track&&(track!==lastTrack||Math.abs(p-lastPathProgress)>.002||w!==lastW||h!==lastH)){
     svg.setAttribute('viewBox','0 0 '+w+' '+h);
     const pathFor=(end)=>{
      let path='';const samples=Math.max(1,Math.ceil(44*end));
@@ -530,7 +530,7 @@ function startCrashVisualLoop(){
      return path;
     };
     guide.setAttribute('d',pathFor(1));track.setAttribute('d',pathFor(p));
-    lastPathProgress=p;lastW=w;lastH=h;
+    lastPathProgress=p;lastW=w;lastH=h;lastTrack=track;
    }
    stage.classList.toggle('exploded',Date.now()<Number(state.crashBlastUntil||0));
   }
