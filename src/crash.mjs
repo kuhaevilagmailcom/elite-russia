@@ -194,7 +194,7 @@ export function crashState(db,user,now=Date.now()){
     const lastBets=(!bets.length&&last?.id)?
       db.prepare(`SELECT b.*,i.handle,i.value,u.first_name,u.username
         FROM crash_bets b JOIN username_instances i ON i.id=b.instance_id JOIN users u ON u.id=b.user_id
-        WHERE b.round_id=? ORDER BY b.created_at DESC,b.id DESC LIMIT 10`)
+        WHERE b.round_id=? ORDER BY b.created_at DESC,b.id DESC LIMIT 25`)
         .all(last.id).reverse().map(shapeBet):[];
     const available=db.prepare("SELECT id,handle,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id)
       .map(x=>({...x,handle:'@'+x.handle}));
