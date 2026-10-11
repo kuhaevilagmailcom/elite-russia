@@ -490,10 +490,10 @@ function crashView(){
   playerInfo='<div class="crash-queued">Приём ставок откроется в следующем раунде</div>';
  }
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><div><b>Краш</b><span>Множитель растёт — успей забрать username</span></div>'+
+  '<div class="crash-caption"><div><b>Множитель растёт</b><span>Забери username до краша</span></div>'+
    '<span class="crash-round-badge"><i></i>'+(waiting?'Приём ставок':'Раунд идёт')+'</span></div>'+
   crashHistory(d)+
-  '<section class="crash-stage" aria-label="График множителя">'+
+  '<section class="crash-stage '+(waiting?'waiting':'running')+'" aria-label="График множителя">'+
    '<div class="crash-stage-grid"></div>'+
    '<svg class="crash-graph" id="crashGraphSvg" aria-hidden="true" viewBox="0 0 400 300" preserveAspectRatio="none">'+
     '<defs><linearGradient id="crashLineColor" x1="0%" y1="100%" x2="100%" y2="0%">'+
