@@ -767,12 +767,12 @@ html.is-desktop .crash-stage{height:300px}
   height:clamp(132px,25dvh,195px);
   border-radius:15px;
 }
-.crash-stage-multiplier{top:15px;font-size:clamp(30px,8vw,42px)}
-.crash-stage-sub{top:64px;font-size:11px}
+.crash-stage-multiplier{top:13px;left:15px;width:auto;text-align:left;font-size:clamp(30px,8vw,42px)}
+.crash-stage-sub{top:58px;left:16px;width:auto;text-align:left;font-size:11px}
 .crash-flight-rail{
-  width:57%;height:2px;left:10%;bottom:39px;
+  width:var(--crash-line-length,57%);height:2px;left:10%;bottom:39px;
   background:linear-gradient(90deg,rgba(64,167,255,.12),rgba(83,187,255,.76),rgba(102,192,255,.14));
-  transform-origin:left center;transform:rotate(-23deg);
+  transform-origin:left center;transform:rotate(var(--crash-line-angle,-23deg));
   border-radius:100px;
   box-shadow:0 0 12px rgba(71,165,255,.12);
 }
@@ -855,7 +855,7 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
 }
 @media(max-height:610px){
   .crash-stage,html.is-desktop .crash-stage{height:clamp(105px,22dvh,135px)}
-  .crash-stage-sub{top:52px}
+  .crash-stage-sub{top:49px}
   .crash-stage-multiplier{top:7px;font-size:30px}
   .crash-mybet{padding:4px 8px}
   .crash-available{height:35px;max-height:35px}
