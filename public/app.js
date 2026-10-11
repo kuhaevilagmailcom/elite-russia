@@ -423,7 +423,9 @@ async function refreshCrashLive(){
   const previous=state.crash;
   crashVisualOffset=next.round.serverNow-Date.now();
   const nextLast=next.last?.id||0;
-  if(previous&&nextLast!==crashKnownPrevious&&crashKnownPrevious>0)state.crashBlastUntil=Date.now()+850;
+  // Fire on every observed round transition, including the very first crash.
+  if(previous&&next.round.id!==previous.round.id&&nextLast===previous.round.id)
+    state.crashBlastUntil=Date.now()+850;
   crashKnownPrevious=nextLast;
   const rerender=!previous||next.round.id!==previous.round.id||next.round.status!==previous.round.status||
     (next.myBet?.status||'')!==(previous.myBet?.status||'')||
