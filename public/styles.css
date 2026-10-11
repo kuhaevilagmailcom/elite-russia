@@ -864,3 +864,9 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
   .crash-bet-row{max-height:19px}
   .crash-page,html.is-desktop .crash-page{gap:4px;padding-top:5px;padding-bottom:5px}
 }
+/* Crash v3: actual user-owned upgraded item after cashout, still one screen. */
+.crash-cashed{display:grid;gap:2px;max-width:50%;min-width:0;justify-items:end}
+.crash-cashed>b{font-size:12px;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.crash-cashed>small{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.crash-mini-note.crash-earned{color:var(--accent);font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crash-mini-note.crash-earned b{color:var(--text)}
