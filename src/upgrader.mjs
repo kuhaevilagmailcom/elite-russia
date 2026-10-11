@@ -39,6 +39,7 @@ function prepareTarget(db,minValue,maxValue=Infinity){
   for(let i=0;i<420;i++){
     const handle=buildGeneratedHandle(profile);if(!isValidHandle(handle))continue;
     if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))continue;
+    if(db.prepare('SELECT 1 FROM crash_reward_options WHERE handle=? LIMIT 1').get(handle))continue;
     if(db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso()))continue;
     const raw=scoreHandle(handle),value=Math.max(raw,minValue),rarity=rarityFromValue(value);
     if(value>maxValue)continue;
@@ -96,7 +97,7 @@ function targetOptions(db,user,rows,preview){
 }
 function allocateSessionTarget(db,user,session){
   const t=db.prepare('SELECT * FROM username_templates WHERE id=?').get(session.target_template_id);
-  if(!t||!t.active||t.current_supply>=1||db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle))throw new Error('upgrade_unavailable');
+  if(!t||!t.active||t.current_supply>=1||db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(t.handle)||db.prepare('SELECT 1 FROM crash_reward_options WHERE handle=? LIMIT 1').get(t.handle))throw new Error('upgrade_unavailable');
   const n=1,id=uid(),value=Math.max(Number(session.target_value)||0,scoreHandle(t.handle)),rarity=rarityFromValue(value);if(rarity!==session.target_rarity)throw new Error('upgrade_session_mismatch');
   if(!db.prepare('UPDATE username_templates SET current_supply=1,max_supply=1 WHERE id=? AND current_supply=0').run(t.id).changes)throw new Error('upgrade_unavailable');
   db.prepare('INSERT INTO username_instances(id,template_id,handle,rarity,value,instance_number,max_supply,owner_id,status,obtained_at,obtained_type,season_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)')

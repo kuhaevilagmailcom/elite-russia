@@ -1,7 +1,7 @@
 let TG=window.Telegram?.WebApp;
 const root=document.documentElement,app=document.querySelector('#app'),toastEl=document.querySelector('#toast');
 const state={
-  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
+  page:'home',user:null,home:null,collection:null,market:null,leaderboard:null,tasks:null,wheel:null,crash:null,crashBusy:false,crashBlastUntil:0,crashLastReward:null,friends:null,gift:null,upgrader:null,season:null,profile:null,shop:null,promo:null,levels:null,achievements:null,notifications:null,games:null,gameSession:null,gameKey:'',daily:null,detail:null,admin:null,adminDetail:null,
   menu:false,busy:false,backPage:'collection',dropTier:'basic',dropPicker:false,collectionFilterOpen:false,marketFilterOpen:false,upgradeOutcome:null,
   filters:{sort:'new',digits:'all',page:1},marketFilters:{sort:'new',digits:'all',q:'',page:1},
   rankPage:1,upgradeSelectedIds:[],upgradePreview:null,upgradeStage:'source',upgradeTargetSessionId:'',upgradeSpinning:false,upgradeVisibleCount:30,upgradeScrollTop:0,upgradeLastRound:null,upgradeLandingAngle:0,wheelLastResult:null,giftSelectedItem:'',giftSelectedFriend:'',giftRecipientUsername:'',giftSheet:'',gameFeedback:null,gameBuildValue:'',adminPage:1,adminQuery:'',adminResetStage:0,
@@ -21,7 +21,7 @@ const ERR={
   collection_full:'Коллекция заполнена',recipient_full:'У получателя заполнена коллекция',sold_out:'Тираж закончился',too_fast:'Слишком быстро. Попробуйте ещё раз',
   listing_not_found:'Лот уже недоступен',own_listing:'Нельзя купить свой лот',already_listed:'Юзернейм уже на рынке',not_friend:'Пользователь не в списке друзей',
   lab_invalid_username:'Username должен быть длиной 4–15 символов: a-z, 0-9, _',lab_cooldown:'Подожди пару секунд перед следующей оценкой',lab_duplicate:'Ты уже оценивал этот username',lab_too_similar:'Слишком похож на уже оценённый сегодня username',daily_already_claimed:'Ежедневная награда уже получена',game_unavailable:'Сейчас не удалось собрать вопрос',game_cooldown:'Слишком много игр подряд',game_session_not_found:'Игра уже недоступна',game_session_expired:'Раунд устарел',game_finished:'Раунд закончен',game_bad_edit:'Измени username только одним допустимым действием',game_bad_build:'Собери username только из выданных частей',insufficient_gems:'Недостаточно 💎',
-  crash_round_changed:'Раунд сменился — выбери ставку заново',crash_betting_closed:'Ставки закрыты. Дождись следующего раунда',crash_already_bet:'Ты уже поставил username в этом раунде',crash_item_unavailable:'Этот username уже недоступен',crash_no_bet:'У тебя нет активной ставки',crash_too_late:'Поздно! Username сгорел при краше',wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
+  crash_round_changed:'Раунд сменился — выбери ставку заново',crash_betting_closed:'Ставки закрыты. Дождись следующего раунда',crash_already_bet:'Ты уже поставил username в этом раунде',crash_item_unavailable:'Этот username уже недоступен',crash_no_bet:'У тебя нет активной ставки',crash_too_late:'Поздно! Username сгорел при краше',crash_reward_unavailable:'Не удалось подготовить выигрыш, ставка не списана',wheel_cooldown:'Колесо уже использовано сегодня',upgrade_invalid_items:'Выбранный username недоступен',upgrade_bad_recipe:'Этот username нельзя улучшить',
   upgrade_session_expired:'Предпросмотр устарел. Выберите usernames заново',upgrade_session_mismatch:'Состав апгрейда изменился',upgrade_unavailable:'Сейчас не удалось подобрать цели. Попробуйте ещё раз',premium_unavailable:'Telegram Stars пока недоступны',recipient_blocked:'Получатель заблокирован',user_not_found:'Пользователь не найден. Он должен сначала открыть игру',rate_limited:'Слишком много действий. Попробуйте через минуту',story_unsupported:'Обновите Telegram — истории из Mini App поддерживаются в новых версиях',story_https_required:'Не удалось подготовить HTTPS-картинку истории',forbidden:'Нет доступа',bad_username:'Некорректный username',username_exists:'Такой username уже существует',reset_confirmation_required:'Введите RESET USERNAME',gift_self:'Нельзя передать username самому себе',game_stale_answer:'Этот ответ уже был обработан',self_admin_block:'Нельзя заблокировать самого себя',promo_not_found:'Промокод не найден',promo_expired:'Срок промокода истёк',promo_limit:'Лимит активаций промокода закончился',promo_used:'Ты уже активировал этот промокод',promo_exists:'Такой промокод уже существует',bad_promo_code:'Проверь написание промокода',bad_promo_reward:'Некорректная награда промокода',channel_task_unavailable:'Проверка подписки сейчас недоступна',channel_subscription_required:'Сначала подпишись на Telegram-канал',network:'Нет соединения с сервером'
 };
 let viewportFrame=0,lastViewportKey='';
@@ -356,20 +356,15 @@ function dropPricePicker(tiers){
 }
 
 const CRASH_VISIBLE_PLAYERS=10;
-// Decorative names and illustrative values only; they are NOT minted or wagered
-// usernames and must not be mistaken for actual cashout payouts.
-const CRASH_FLIGHT_PREVIEW=[
- ['@play',1000],['@wave',1600],['@pulse',2700],['@spark',4500],
- ['@lucky',7200],['@ghost',12000],['@raven',19000],['@scam',30000],
- ['@monk',49000],['@elite',78000],['@devil',125000],['@legend',200000],
- ['@krasava',340000],['@prime',560000],['@vision',900000],['@ultra',1500000],
- ['@crypto',2600000],['@vault',4500000],['@money',8000000],['@game',15000000],
- ['@gold',28000000],['@coin',52000000],['@chat',100000000],['@name',200000000]
-];
-function crashPreviewForMultiplier(multiplier){
- const progress=Math.max(0,Math.min(1,Math.log(Math.max(1,Number(multiplier)||1))/Math.log(1000)));
- return CRASH_FLIGHT_PREVIEW[Math.min(CRASH_FLIGHT_PREVIEW.length-1,
-  Math.floor(progress*(CRASH_FLIGHT_PREVIEW.length-1)+1e-8))];
+// All possible winning usernames are reserved by the server in SQLite when
+// the player places a bet; no more decorative handles or fictional payouts.
+function crashRewardPreview(plan,multiplier,baseValue){
+ if(!Array.isArray(plan)||!plan.length)return null;
+ let reward=plan[0];
+ for(const next of plan){if(Number(next.multiplier)<=Number(multiplier)+1e-7)reward=next;else break}
+ const value=Math.min(1000000000,Math.max(Number(baseValue)||0,
+  Math.floor((Number(baseValue)||0)*Math.max(1,Number(multiplier)||1))));
+ return {handle:reward.handle,value};
 }
 function crashRoster(bets){
  const list=(bets||[]).slice(-CRASH_VISIBLE_PLAYERS).reverse();
@@ -385,26 +380,27 @@ function crashView(){
  const available=(d.available||[]).map(x=>
   '<button class="crash-item" data-crash-bet="'+esc(x.id)+'" '+(state.crashBusy?'disabled':'')+'><span><b>'+esc(x.handle)+'</b><small>'+fmt(x.value)+'</small></span><span class="crash-item-plus">+</span></button>'
  ).join('');
- const firstPreview=CRASH_FLIGHT_PREVIEW[0];
+ const firstPreview=crashRewardPreview(d.myRewardPlan,1,bet?.value)||{handle:bet?.handle||'@username',value:bet?.value||0};
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
   '<div class="crash-caption"><span class="crash-live-dot"></span><b>КРАШ</b><span>до ×1000</span></div>'+
   '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
     '<div class="crash-stage-grid"></div><div class="crash-flight-rail"></div>'+
-    '<div class="crash-skyline"><span id="crashFlyName">'+firstPreview[0]+'</span><small id="crashFlyPrice">'+fmt(firstPreview[1])+'</small><span class="crash-thruster"></span></div>'+
+    '<div class="crash-skyline"><span id="crashFlyName">'+esc(firstPreview.handle)+'</span><small id="crashFlyPrice">'+(bet?fmt(firstPreview.value):'Выбери ставку')+'</small><span class="crash-thruster"></span></div>'+
     '<div class="crash-stage-multiplier" id="crashMultiplier">×1.00</div>'+
     '<div class="crash-stage-sub" id="crashStatus">'+(waiting?'Старт через <b id="crashCountdown">10.0</b> с':'Успей забрать')+'</div>'+
     '<div class="crash-explosion" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>'+
   '</div>'+
   (bet?'<div class="crash-mybet"><div><small>Твоя ставка</small><b>'+esc(bet.handle)+'</b><span>'+fmt(bet.value)+'</span></div>'+
      (running&&bet.status==='staked'?'<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать <b id="crashCashout">×1.00</b></button>':
-      bet.status==='cashed'?'<div class="crash-cashed">Забрано ×'+Number(bet.cashoutX).toFixed(2)+'<br><b>+'+fmt(bet.win)+'</b></div>':
+      bet.status==='cashed'?'<div class="crash-cashed">'+(d.myWin?'<b>'+esc(d.myWin.handle)+'</b><small>'+fmt(d.myWin.value)+'</small>':'Забрано ×'+Number(bet.cashoutX).toFixed(2))+'</div>':
       '<div class="crash-queued">'+(waiting?'Ждём старта':'Ставка в игре')+'</div>')+'</div>':'')+
   (selected?'<div class="crash-choice"><div class="crash-choice-head"><b>Твоя ставка</b><span>Выбери username</span></div>'+
     '<div class="crash-available">'+(available||'<div class="crash-empty">Нет доступных usernames</div>')+'</div></div>':'')+
   '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
     (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
    '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></div>'+
-  '<p class="crash-mini-note">При взрыве ставка сгорает · Цены в полёте — пример</p>'+
+  (state.crashLastReward?'<p class="crash-mini-note crash-earned">Получен <b>'+esc(state.crashLastReward.handle)+'</b> · '+fmt(state.crashLastReward.value)+'</p>':
+    '<p class="crash-mini-note">Забери новый username до взрыва · старая ставка заменяется</p>')+
   '</div>';
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashKnownPrevious=0;
@@ -435,11 +431,13 @@ function startCrashVisualLoop(){
     stage.style.setProperty('--crash-line-angle',(-Math.atan2(maxDy,Math.max(1,maxDx))*180/Math.PI).toFixed(1)+'deg');
     flying.style.setProperty('--crash-x',dx.toFixed(1)+'px');
     flying.style.setProperty('--crash-y',dy.toFixed(1)+'px');
-    const [name,value]=crashPreviewForMultiplier(mult);
+    const won=d.myWin;
+    const preview=won||crashRewardPreview(d.myRewardPlan,running?mult:1,d.myBet?.value);
     const label=document.querySelector('#crashFlyName');
     const price=document.querySelector('#crashFlyPrice');
-    if(label&&label.textContent!==name)label.textContent=name;
-    const val=fmt(value);if(price&&price.textContent!==val)price.textContent=val;
+    if(label&&preview&&label.textContent!==preview.handle)label.textContent=preview.handle;
+    const val=preview?fmt(preview.value):(d.myBet?fmt(d.myBet.value):'Выбери ставку');
+    if(price&&price.textContent!==val)price.textContent=val;
    }
    stage.classList.toggle('exploded',Date.now()<Number(state.crashBlastUntil||0));
   }
@@ -1043,7 +1041,7 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    state.crashBusy=true;el.disabled=true;
    try{
      await api('/api/crash/bet',{method:'POST',body:JSON.stringify({instanceId:el.dataset.crashBet,roundId:state.crash.round.id})});
-     toast('Username поставлен');await refreshUser();await load('crash',{force:true});
+     state.crashLastReward=null;toast('Username поставлен');await refreshUser();await load('crash',{force:true});
    }finally{state.crashBusy=false;el.disabled=false}
    return
  }
@@ -1052,7 +1050,12 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    state.crashBusy=true;el.disabled=true;
    try{
      const payout=await api('/api/crash/cashout',{method:'POST',body:JSON.stringify({roundId:state.crash.round.id})});
-     toast('Забрано ×'+Number(payout.multiplier).toFixed(2)+' · +'+fmt(payout.win));
+     if(payout.reward){
+       state.crashLastReward=payout.reward;
+       toast('Получен '+payout.reward.handle+' · '+fmt(payout.reward.value));
+     }else{
+       toast('Старая ставка уже обработана');
+     }
      sound('reward');await refreshUser();await load('crash',{force:true});
    }finally{state.crashBusy=false;el.disabled=false}
    return

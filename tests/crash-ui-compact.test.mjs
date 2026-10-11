@@ -10,7 +10,7 @@ const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8
 const from=js.indexOf('const CRASH_VISIBLE_PLAYERS=10;');
 const until=js.indexOf('function crashRoster(bets){',from);
 assert.ok(from>=0&&until>from,'crash preview source was not found');
-const preview=vm.runInNewContext(js.slice(from,until)+';({crashPreviewForMultiplier,CRASH_FLIGHT_PREVIEW})');
+const preview=vm.runInNewContext(js.slice(from,until)+';({crashRewardPreview})');
 
 test('Crash visibly lists at most ten recent bets in one compact row each',()=>{
   const roster=js.slice(js.indexOf('function crashRoster(bets){'),js.indexOf('function crashView(){'));
@@ -32,19 +32,27 @@ test('Crash header does not show shared crash or public round number',()=>{
   assert.ok(screen.includes("'Последние '+CRASH_VISIBLE_PLAYERS"));
 });
 
-test('Crash flying preview price increases monotonically with the shared multiplier',()=>{
+test('Crash flight displays server-reserved real usernames whose values increase',()=>{
   const xs=[1,1.1,1.5,2,3,5,10,20,50,100,200,500,1000];
+  const plan=Array.from({length:35},(_,i)=>({
+    multiplier:Number(Math.exp(Math.log(1000)*i/34).toFixed(6)),
+    handle:'@reward_'+i
+  }));
   let prior=0;
   const names=new Set();
   for(const x of xs){
-    const [handle,value]=preview.crashPreviewForMultiplier(x);
-    assert.ok(handle.startsWith('@'));
-    assert.ok(value>=prior,'value decreased at x'+x);
-    names.add(handle);
-    prior=value;
+    const result=preview.crashRewardPreview(plan,x,100000);
+    assert.ok(result.handle.startsWith('@'));
+    assert.ok(result.value>=prior,'value decreased at x'+x);
+    names.add(result.handle);
+    prior=result.value;
   }
-  assert.ok(names.size>=10,'username preview does not change often enough');
-  assert.equal(preview.crashPreviewForMultiplier(1000)[1],200000000);
+  assert.ok(names.size>=10,'winning username does not change often enough');
+  assert.equal(preview.crashRewardPreview(plan,2.5,100000).value,250000);
+  assert.equal(preview.crashRewardPreview(plan,1000,100000).value,100000000);
+  assert.equal(preview.crashRewardPreview(plan,1000,100000000).value,1000000000);
+  assert.equal(preview.crashRewardPreview([],2.5,100000),null);
+  assert.doesNotMatch(js,/CRASH_FLIGHT_PREVIEW|Цены в полёте — пример/);
 });
 
 test('Crash has diagonal x/y movement and stays on one screen',()=>{
@@ -58,6 +66,6 @@ test('Crash has diagonal x/y movement and stays on one screen',()=>{
   assert.match(css,/\.crash-flight-rail\{[\s\S]*?rotate\(var\(--crash-line-angle,-23deg\)\)/);
   assert.match(css,/\.crash-skyline\{[\s\S]*?translate\(var\(--crash-x,0px\),var\(--crash-y,0px\)\)/);
   assert.match(css,/\.crash-available\{\s*display:flex;gap:5px;height:42px;max-height:42px;overflow-x:auto;overflow-y:hidden/);
-  assert.match(html,/\/styles\.css\?v=7\.5\.0-crash-ui2/);
-  assert.match(html,/\/app\.js\?v=7\.5\.0-crash-ui2/);
+  assert.match(html,/\/styles\.css\?v=7\.5\.0-crash-prize3/);
+  assert.match(html,/\/app\.js\?v=7\.5\.0-crash-prize3/);
 });
