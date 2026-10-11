@@ -399,8 +399,8 @@ function crashView(){
   '<div class="crash-participants"><div class="crash-participants-head"><b>Участники</b><span id="crashParticipantsCount">'+
     (d.bets.length>CRASH_VISIBLE_PLAYERS?'Последние '+CRASH_VISIBLE_PLAYERS:d.bets.length+' ставок')+'</span></div>'+
    '<div id="crashBets" class="crash-bet-list">'+crashRoster(d.bets)+'</div></div>'+
-  (state.crashLastReward?'<div class="crash-earned"><small>Получено в коллекцию</small><b>'+esc(state.crashLastReward.handle)+'</b><strong>'+fmt(state.crashLastReward.value)+'</strong></div>':'')+
-  '<p class="crash-mini-note">Забери новый username до взрыва · старая ставка заменяется</p>'+
+  (state.crashLastReward?'<p class="crash-mini-note crash-earned">Получен <b>'+esc(state.crashLastReward.handle)+'</b> · '+fmt(state.crashLastReward.value)+'</p>':
+    '<p class="crash-mini-note">Забери новый username до взрыва · старая ставка заменяется</p>')+
   '</div>';
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0,crashKnownPrevious=0;
