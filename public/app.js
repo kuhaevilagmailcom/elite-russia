@@ -476,9 +476,9 @@ function crashView(){
    '<span class="crash-bet-tag">'+(waiting?'Ожидает':'В игре')+'</span>';
   playerInfo='<div class="crash-mybet"><div><small>Поставлен username</small><b>'+esc(bet.handle)+'</b><span>'+
    fmt(bet.value)+(bet.autoStopX?' · автостоп ×'+Number(bet.autoStopX).toFixed(2):'')+'</span></div>'+status+'</div>';
-  if(running&&bet.status==='staked')
-   playerInfo+='<button class="crash-cashout" data-crash-cashout '+(state.crashBusy?'disabled':'')+'>Забрать username <b id="crashCashout">×1.00</b></button>';
-  else if(bet.status==='cashed')
+  if(running&&bet.status==='staked'){
+   // Active cashout stays in the fixed bottom dock, never buried in the scroll.
+  }else if(bet.status==='cashed')
    playerInfo+='<div class="crash-cashed"><span>Вы получили</span><b>'+esc(d.myWin?.handle||'Username')+'</b><small>'+
     fmt(d.myWin?.value||0)+(bet.settlementKind==='auto'?' · Автостоп':'')+'</small></div>';
   else playerInfo+='<div class="crash-queued">'+(waiting?'Ожидаем начало раунда':'Раунд продолжается')+'</div>';
@@ -517,7 +517,9 @@ function crashView(){
    crashParticipantsLabel(d)+'</span></div>'+
    '<div id="crashBets" class="crash-bet-list">'+crashRoster(crashParticipants(d).bets,waiting&&d.bets.length>0)+'</div></section>'+
   '<p class="crash-mini-note">При выигрыше получаешь новый username. Поставленный username расходуется.</p>'+
- '</div>';
+ '</div>'+
+ (running&&bet?.status==='staked'?'<div class="crash-dock"><button class="crash-cashout" data-crash-cashout '+
+  (state.crashBusy?'disabled':'')+'>Забрать username <b id="crashCashout">×1.00</b></button></div>':'');
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0;
 let crashActiveRoundId=0;
