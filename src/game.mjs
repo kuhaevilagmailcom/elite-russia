@@ -33,6 +33,7 @@ function weightedTierProfile(tier,rng=randomUnit){
 }
 function handleUnavailable(db,handle){
   if(db.prepare('SELECT 1 FROM username_instances WHERE handle=? LIMIT 1').get(handle))return true;
+  if(db.prepare('SELECT 1 FROM crash_reward_options WHERE handle=? LIMIT 1').get(handle))return true;
   return !!db.prepare('SELECT 1 FROM upgrade_sessions WHERE target_handle=? AND used_at IS NULL AND expires_at>? LIMIT 1').get(handle,nowIso());
 }
 function badLuckProtection(player){
