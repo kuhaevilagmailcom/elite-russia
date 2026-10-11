@@ -305,8 +305,26 @@ function menuHtml(){
 }
 function topbar(title,{back=false}={}){const unread=Number(state.user?.unreadNotifications||0);return '<header class="topbar">'+(back?'<button class="top-back" data-back>'+icon('back')+'</button>':'')+'<div class="top-title"><b>'+esc(title)+'</b></div><div class="top-actions"><span>'+balance()+'</span><button class="notification-top" data-page="notifications" aria-label="Уведомления">'+icon('notifications')+(unread?'<i>'+Math.min(unread,99)+(unread>99?'+':'')+'</i>':'')+'</button><button data-menu-open>'+icon('menu')+'</button></div></header>'}
 function shell(title,html,opts={}){
+ const oldCrash=document.querySelector('.crash-page');
+ const oldScroll=oldCrash?.scrollTop||0;
+ const oldAuto=document.querySelector('#crashAutoInput');
+ const editingAuto=oldAuto&&document.activeElement===oldAuto;
+ const editingText=editingAuto?oldAuto.value:null;
+ const editingPos=editingAuto?oldAuto.selectionStart:null;
  window.__USERNAME_READY=true;applyPreferences();
  app.innerHTML='<div class="shell"><section class="screen">'+topbar(title,opts)+html+'</section>'+menuHtml()+'</div>';localizeDom(app);
+ if(state.page==='crash'){
+  const currentCrash=document.querySelector('.crash-page');
+  if(currentCrash)currentCrash.scrollTop=oldScroll;
+  if(editingAuto){
+   const newInput=document.querySelector('#crashAutoInput');
+   if(newInput){
+    newInput.value=editingText;
+    newInput.focus({preventScroll:true});
+    if(editingPos!=null)newInput.setSelectionRange(editingPos,editingPos);
+   }
+  }
+ }
  requestAnimationFrame(()=>{fitAllUsernames();hydrateIcons();if(state.page==='upgrader'){const list=document.querySelector('.upgrade-list');if(list)list.scrollTop=state.upgradeScrollTop||0}});
 }
 function fitUsername(el,max=48,min=20){
@@ -530,7 +548,7 @@ function startCrashVisualLoop(){
    const remain=Math.max(0,(r.startsAt-now)/1000);
    const countdown=document.querySelector('#crashCountdown');if(countdown)countdown.textContent=remain.toFixed(1);
    const status=document.querySelector('#crashStatus');
-   if(status&&running&&status.textContent!=='Успей забрать')status.textContent='Успей забрать';
+   if(status&&running&&status.textContent!=='Успей забрать до краша')status.textContent='Успей забрать до краша';
    const w=stage.clientWidth,h=stage.clientHeight;
    // End of the SVG track is exactly the point under the floating handle.
    const raw=Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000));
@@ -538,6 +556,11 @@ function startCrashVisualLoop(){
    const flight=document.querySelector('.crash-skyline');
    const flightW=flight?.offsetWidth||124,flightH=flight?.offsetHeight||50;
    const point=crashBezierPoint(p,w,h,flightW,flightH);
+   const marker=document.querySelector('#crashMarker');
+   if(marker){
+    marker.style.setProperty('--crash-x',point.x.toFixed(1)+'px');
+    marker.style.setProperty('--crash-y',point.y.toFixed(1)+'px');
+   }
    if(flight){
     flight.style.setProperty('--crash-x',point.x.toFixed(1)+'px');
     flight.style.setProperty('--crash-y',point.y.toFixed(1)+'px');
