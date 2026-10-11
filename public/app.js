@@ -417,18 +417,18 @@ function crashRoster(bets){
  }).join(''):'<div class="crash-empty">Пока нет ставок</div>';
 }
 function crashAutoControls(d,bet,waiting){
- const selected=bet?.status==='staked'?bet.autoStopX:d.autoStopX;
- const presets=[1.5,2,2.5];
- const custom=selected!==null&&selected!==undefined&&!presets.some(x=>x===Number(selected));
- return '<div class="crash-auto"><div class="crash-auto-title"><b>Автостоп</b><span>'+
-  (selected===null||selected===undefined?'Выкл.':'×'+Number(selected).toFixed(2))+'</span></div>'+
-  '<div class="crash-auto-presets">'+
-   '<button class="crash-auto-chip '+(selected==null?'active':'')+'" data-crash-autostop="off">Выкл.</button>'+
-   presets.map(x=>'<button class="crash-auto-chip '+(selected===x?'active':'')+'" data-crash-autostop="'+x+'">×'+x.toFixed(2)+'</button>').join('')+
-   '<button class="crash-auto-chip '+(custom||state.crashCustomOpen?'active':'')+'" data-crash-autostop-custom>Свой ×</button>'+
-  '</div>'+
-  (state.crashCustomOpen?'<div class="crash-auto-entry"><input id="crashAutoInput" type="text" inputmode="decimal" maxlength="7" placeholder="Напр. 3,75" value="'+(custom?Number(selected).toFixed(2):'')+'"><button data-crash-autostop-save>Сохранить</button></div>':'')+
-  '</div>';
+ const current=d?.autoStopX;
+ const active=current!==null&&current!==undefined;
+ const nextOnly=bet?.status==='staked'&&!waiting;
+ return '<div class="crash-auto">'+
+  '<label class="crash-auto-title" for="crashAutoInput"><b>Автостоп</b><span>'+
+   (nextOnly?'Для следующей ставки':'Автоматически забрать на заданном X')+'</span></label>'+
+  '<div class="crash-auto-field"><span aria-hidden="true">×</span>'+
+   '<input id="crashAutoInput" type="text" inputmode="decimal" maxlength="7" autocomplete="off" spellcheck="false"'+
+   ' placeholder="Например, 2.50" aria-label="Множитель автостопа"'+
+   ' value="'+(active?Number(current).toFixed(2):'')+'"></div>'+
+  '<div class="crash-auto-hint">1.01–1000 · Enter или выход из поля — сохранить · Очистить — выключить</div>'+
+ '</div>';
 }
 function crashView(){
  const d=state.crash;if(!d)return '<div class="page-body"><div class="empty">Загрузка краша…</div></div>';
@@ -443,7 +443,7 @@ function crashView(){
   '<div class="crash-stage '+(waiting?'waiting':'flying')+'">'+
    '<div class="crash-stage-grid"></div>'+
    '<svg class="crash-graph" id="crashGraphSvg" aria-hidden="true" viewBox="0 0 400 200" preserveAspectRatio="none">'+
-    '<defs><linearGradient id="crashLineColor" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#246ab4"/><stop offset="75%" stop-color="#48bbf7"/><stop offset="100%" stop-color="#b1e9ff"/></linearGradient></defs>'+
+    '<defs><linearGradient id="crashLineColor" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#398970"/><stop offset="75%" stop-color="#69d6a8"/><stop offset="100%" stop-color="#b5f3d3"/></linearGradient></defs>'+
     '<path id="crashGuide" class="crash-guide" d=""/><path id="crashTrack" class="crash-track" d=""/>'+
    '</svg>'+
    '<div class="crash-stage-header"><strong id="crashMultiplier">×1.00</strong><span id="crashStatus">'+
@@ -474,10 +474,15 @@ function crashView(){
 }
 let crashTickerBusy=false,crashLoopOn=false,crashVisualOffset=0;
 let crashActiveRoundId=0;
-function crashBezierPoint(p,w,h){
- const x0=w*.13,y0=h-31,x3=w*.78,y3=h*.31;
+function crashBezierPoint(p,w,h,cardW=124,cardH=50){
+ // One path for the curve and the handle. Its box remains in the stage.
+ const margin=Math.max(8,Math.min(12,w*.025));
+ const x0=Math.max(w*.16,cardW/2+margin);
+ const x3=Math.max(x0+2,Math.min(w*.80,w-cardW/2-margin));
+ const y0=h-27;
+ const y3=Math.min(y0-3,Math.max(cardH+18,h*.45));
  const dx=x3-x0,dy=y0-y3;
- const a={x:x0,y:y0},b={x:x0+dx*.24,y:y0-dy*.055},c={x:x0+dx*.77,y:y0-dy*.88},d={x:x3,y:y3};
+ const a={x:x0,y:y0},b={x:x0+dx*.36,y:y0-dy*.04},c={x:x0+dx*.67,y:y3+dy*.24},d={x:x3,y:y3};
  const z=1-p,z2=z*z,p2=p*p;
  return {x:z2*z*a.x+3*z2*p*b.x+3*z*p2*c.x+p2*p*d.x,
          y:z2*z*a.y+3*z2*p*b.y+3*z*p2*c.y+p2*p*d.y};
@@ -498,23 +503,18 @@ function startCrashVisualLoop(){
    const status=document.querySelector('#crashStatus');
    if(status&&running&&status.textContent!=='Успей забрать')status.textContent='Успей забрать';
    const w=stage.clientWidth,h=stage.clientHeight;
-   // Ease path visibility for early rounds without changing the server factor.
+   // End of the SVG track is exactly the point under the floating handle.
    const raw=Math.min(1,Math.log(Math.max(1,mult))/Math.log(1000));
-   const progress=running?Math.pow(raw,.57):0;
-   const motion=motionEnabled()&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-   const p=motion?progress:Math.min(1,progress);
-   const point=crashBezierPoint(p,w,h),flight=document.querySelector('.crash-skyline');
+   const p=running?Math.pow(raw,.57):0;
+   const flight=document.querySelector('.crash-skyline');
+   const flightW=flight?.offsetWidth||124,flightH=flight?.offsetHeight||50;
+   const point=crashBezierPoint(p,w,h,flightW,flightH);
    if(flight){
-    const x=Math.min(w-flight.offsetWidth-8,Math.max(8,point.x-flight.offsetWidth/2));
-    const y=Math.min(h-flight.offsetHeight-7,Math.max(12,point.y-flight.offsetHeight*.68));
-    flight.style.setProperty('--crash-x',x.toFixed(1)+'px');
-    flight.style.setProperty('--crash-y',y.toFixed(1)+'px');
+    flight.style.setProperty('--crash-x',point.x.toFixed(1)+'px');
+    flight.style.setProperty('--crash-y',point.y.toFixed(1)+'px');
     const reward=d.myWin||crashRewardPreview(d.myRewardPlan,running?mult:1,d.myBet?.value);
     const name=document.querySelector('#crashFlyName'),price=document.querySelector('#crashFlyPrice');
-    if(reward&&name&&name.textContent!==reward.handle){
-     name.classList.remove('crash-name-switch');void name.offsetWidth;name.classList.add('crash-name-switch');
-     name.textContent=reward.handle;
-    }
+    if(reward&&name&&name.textContent!==reward.handle)name.textContent=reward.handle;
     const value=reward?fmt(reward.value):(d.myBet?fmt(d.myBet.value):'Выбери ставку');
     if(price&&price.textContent!==value)price.textContent=value;
    }
@@ -524,7 +524,7 @@ function startCrashVisualLoop(){
     const pathFor=(end)=>{
      let path='';const samples=Math.max(1,Math.ceil(44*end));
      for(let i=0;i<=samples;i++){
-      const pt=crashBezierPoint(end*i/samples,w,h);
+      const pt=crashBezierPoint(end*i/samples,w,h,flightW,flightH);
       path+=(i===0?'M':' L')+pt.x.toFixed(1)+' '+pt.y.toFixed(1);
      }
      return path;
@@ -1144,27 +1144,6 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
    el.disabled=true;const r=await api('/api/promocode',{method:'POST',body:JSON.stringify({code})});
    applyUserLocal(r.user);state.promo=await api('/api/promocode');sound('reward');haptic('medium');toast('+'+fmtPlain(r.rewardAmount)+' 💎');render();return
  }
- if(el.hasAttribute('data-crash-autostop-custom')){
-   state.crashCustomOpen=!state.crashCustomOpen;render();
-   if(state.crashCustomOpen)document.querySelector('#crashAutoInput')?.focus();
-   return;
- }
- if(el.hasAttribute('data-crash-autostop-save')||el.hasAttribute('data-crash-autostop')){
-   if(state.crashBusy)return;
-   const value=el.hasAttribute('data-crash-autostop-save')?
-     String(document.querySelector('#crashAutoInput')?.value||'').trim():el.dataset.crashAutostop;
-   if(el.hasAttribute('data-crash-autostop-save')&&!value){toast('Введи свой множитель');return}
-   state.crashBusy=true;el.disabled=true;
-   try{
-     const result=await api('/api/crash/autostop',{method:'POST',
-       body:JSON.stringify({value:value==='off'?null:value})});
-     state.crashCustomOpen=false;
-     crashSound('bet');
-     toast(result.autoStopX?'Автостоп ×'+Number(result.autoStopX).toFixed(2):'Автостоп выключен');
-     await load('crash',{force:true});
-   }finally{state.crashBusy=false;el.disabled=false}
-   return;
- }
  if(el.dataset.crashBet){
    if(state.crashBusy)return;
    state.crashBusy=true;el.disabled=true;
@@ -1317,6 +1296,40 @@ document.addEventListener('click',async e=>{if(e.target.matches('[data-drop-pick
  }
  if(el.hasAttribute('data-back')){if(state.page==='miniGame'){await load('games');return}await load(state.backPage||'collection');return}
 }catch(err){state.busy=false;toast(ERR[err.message]||'Что-то пошло не так');el.disabled=false}});
+// Single field: save when Enter is pressed or the user leaves the input.
+document.addEventListener('keydown',e=>{
+ if(e.target?.id==='crashAutoInput'&&e.key==='Enter'){e.preventDefault();e.target.blur()}
+});
+document.addEventListener('change',async e=>{
+ const input=e.target;if(input?.id!=='crashAutoInput'||input.dataset.saving)return;
+ const value=String(input.value||'').trim().replace(',','.');
+ const previous=state.crash?.autoStopX??null;
+ if(value&&(!/^(?:[1-9][0-9]{0,2}|1000)(?:[.][0-9]{1,2})?$/.test(value)||Number(value)<1.01||Number(value)>1000)){
+  toast('Введи множитель от 1.01 до 1000');
+  input.value=previous==null?'':Number(previous).toFixed(2);return;
+ }
+ if((!value&&previous==null)||(value&&Number(value)===Number(previous))){
+  input.value=previous==null?'':Number(previous).toFixed(2);return;
+ }
+ input.dataset.saving='1';input.readOnly=true;
+ try{
+  const updated=await api('/api/crash/autostop',{method:'POST',
+   body:JSON.stringify({value:value||null})});
+  const multiplier=updated.autoStopX;
+  if(state.crash){
+   state.crash.autoStopX=multiplier;
+   if(state.crash.myBet?.status==='staked'&&state.crash.round?.status==='waiting')
+    state.crash.myBet.autoStopX=multiplier;
+  }
+  input.value=multiplier==null?'':Number(multiplier).toFixed(2);
+  toast(multiplier==null?'Автостоп выключен':'Автостоп: ×'+Number(multiplier).toFixed(2));
+ }catch(err){
+  input.value=previous==null?'':Number(previous).toFixed(2);
+  toast(ERR[err.message]||'Не удалось сохранить автостоп');
+ }finally{
+  input.readOnly=false;delete input.dataset.saving;
+ }
+});
 let marketSearchTimer;
 document.addEventListener('input',e=>{
  if(e.target.id==='marketQuery'){clearTimeout(marketSearchTimer);const q=e.target.value||'';marketSearchTimer=setTimeout(async()=>{state.marketFilters.q=q;state.marketFilters.page=1;try{state.market=await api('/api/market?sort='+state.marketFilters.sort+'&digits='+state.marketFilters.digits+'&q='+encodeURIComponent(state.marketFilters.q)+'&page=1');render();requestAnimationFrame(()=>{const input=document.querySelector('#marketQuery');if(input){input.focus();input.setSelectionRange(q.length,q.length)}})}catch{}},320)}
