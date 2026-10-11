@@ -426,8 +426,13 @@ function startCrashVisualLoop(){
     // Move along a rising diagonal guide, keeping long names inside the stage.
     const startingX=stage.clientWidth*.10;
     const maxX=Math.max(0,stage.clientWidth-startingX-flying.offsetWidth-10);
-    const dx=Math.min(stage.clientWidth*.54,maxX)*progress;
-    const dy=-Math.min(stage.clientHeight*.43,100)*progress;
+    const maxDx=Math.min(stage.clientWidth*.54,maxX);
+    const maxDy=Math.min(stage.clientHeight*.43,100,
+      Math.max(0,stage.clientHeight-23-flying.offsetHeight-12));
+    const dx=maxDx*progress,dy=-maxDy*progress;
+    // The visual guide follows exactly the same diagonal on every viewport.
+    stage.style.setProperty('--crash-line-length',Math.hypot(maxDx,maxDy).toFixed(1)+'px');
+    stage.style.setProperty('--crash-line-angle',(-Math.atan2(maxDy,Math.max(1,maxDx))*180/Math.PI).toFixed(1)+'deg');
     flying.style.setProperty('--crash-x',dx.toFixed(1)+'px');
     flying.style.setProperty('--crash-y',dy.toFixed(1)+'px');
     const [name,value]=crashPreviewForMultiplier(mult);
