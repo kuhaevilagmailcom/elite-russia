@@ -873,6 +873,13 @@ html.is-desktop .tasks-v10{width:100%;max-width:760px;margin:0 auto;padding-left
 }
 .crash-cashout:hover:not(:disabled){filter:brightness(.95)}
 .crash-cashout b{font-size:18px;font-weight:850;color:inherit;font-variant-numeric:tabular-nums}
+.crash-dock{
+ flex:0 0 auto;width:100%;padding:10px 13px calc(10px + var(--safe-b));
+ border-top:1px solid var(--border);background:var(--bg);z-index:8;
+}
+.crash-dock .crash-cashout{max-width:674px;margin:0 auto}
+@media(max-width:420px){.crash-dock{padding:9px 11px calc(9px + var(--safe-b))}}
+
 .crash-cashed{
  width:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
  padding:10px 12px;background:var(--surface-subtle);border-radius:10px;
