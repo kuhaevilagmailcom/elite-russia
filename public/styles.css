@@ -1073,3 +1073,97 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
  .crash-bet-row{grid-template-columns:minmax(0,.85fr) minmax(0,1.05fr) auto;gap:4px}
  .crash-stake-summary small{display:none}
 }
+
+/* Crash 3: understated graphite/mint stage, exact graph-to-label anchoring. */
+.crash-stage,html.is-desktop .crash-stage{
+ border:1px solid #344940;
+ background:linear-gradient(155deg,#18231f 0%,#111b19 70%,#0f1716 100%);
+ box-shadow:0 6px 20px rgba(0,0,0,.08);
+}
+.crash-stage-grid{
+ opacity:.35;
+ background:
+  linear-gradient(rgba(150,190,169,.13) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(150,190,169,.13) 1px,transparent 1px);
+ background-size:32px 32px;
+}
+.crash-guide{opacity:0}
+.crash-track{stroke-width:3.2;filter:none}
+.crash-stage-header span{color:#a3c1b1}
+.crash-stage-header span b{color:#e1f3e9}
+.crash-skyline,.crash-stage.waiting .crash-skyline{
+ position:absolute;z-index:4;left:0;top:0;
+ width:clamp(102px,34vw,144px);
+ max-width:144px;min-width:0;gap:4px;
+ transform:translate3d(var(--crash-x,90px),var(--crash-y,130px),0) translate(-50%,-100%) translateY(-9px);
+ display:grid;justify-items:center;
+ pointer-events:none;will-change:transform;
+}
+.crash-skyline::after{
+ content:"";position:absolute;left:50%;bottom:-13px;
+ width:8px;height:8px;transform:translateX(-50%);
+ border-radius:50%;background:#b5f3d3;
+ border:1.5px solid #203d30;box-shadow:0 0 0 3px rgba(105,214,168,.13);
+}
+.crash-skyline>span:first-child,.crash-stage.waiting .crash-skyline>span:first-child{
+ display:block;width:100%;max-width:100%;
+ box-sizing:border-box;min-width:0;min-height:27px;
+ padding:7px 8px;border-radius:10px;
+ border:1px solid #628b77;background:#253b32;
+ color:#f7fff9;box-shadow:0 4px 10px rgba(0,0,0,.20);
+ font-size:clamp(11px,3.5vw,15px);line-height:1.1;letter-spacing:-.03em;font-weight:800;
+ text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#crashFlyPrice{
+ max-width:100%;border:1px solid #3c6250;border-radius:6px;
+ padding:2px 6px;background:#1b3027;color:#cfebdb;
+ font-size:10px;line-height:1.1;font-weight:750;box-shadow:none;
+}
+.crash-stage-foot{color:#748e81}
+.crash-explosion{background:radial-gradient(circle at 53% 48%,rgba(175,57,65,.20),#101617 74%)}
+.crash-explosion strong{color:#ffc5c5}
+.crash-explosion>span{background:#f09a9a;box-shadow:none}
+.crash-auto{gap:5px}
+.crash-auto-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.crash-auto-title b{font-size:12px;white-space:nowrap}
+.crash-auto-title>span{font-size:10px;line-height:1.2;text-align:right;color:var(--muted)}
+.crash-auto-field{
+ box-sizing:border-box;display:flex;align-items:center;gap:6px;
+ width:100%;height:41px;min-width:0;
+ background:var(--surface-subtle);border:1px solid var(--border);
+ border-radius:10px;padding:0 12px;
+ transition:border-color .15s,box-shadow .15s;
+}
+.crash-auto-field:focus-within{
+ border-color:#4b9b76;
+ box-shadow:0 0 0 2px rgba(75,155,118,.11);
+}
+.crash-auto-field>span{
+ font-size:19px;line-height:1;font-weight:780;color:#4b9b76;flex:none;
+}
+.crash-auto-field input{
+ display:block;box-sizing:border-box;flex:1 1 auto;min-width:0;width:100%;height:100%;
+ padding:0;border:0;outline:0!important;border-radius:0;
+ background:transparent;box-shadow:none;font:700 15px/1.2 inherit;
+ color:var(--text);font-variant-numeric:tabular-nums;
+}
+.crash-auto-field input::placeholder{color:var(--muted);font-size:12px;font-weight:500}
+.crash-auto-field input[readonly]{opacity:.65}
+.crash-auto-hint{
+ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ color:var(--muted);font-size:9px;line-height:1.35;
+}
+@media(max-width:460px){
+ .crash-auto-field{height:37px;padding:0 10px}
+ .crash-auto-title>span{font-size:9px}
+}
+@media(max-height:640px){
+ .crash-stage,html.is-desktop .crash-stage{height:clamp(134px,23dvh,160px)}
+ .crash-auto-field{height:34px}
+ .crash-auto-hint{font-size:8px}
+}
+@media(max-height:450px){
+ .crash-page,html.is-desktop .crash-page{overflow-y:auto}
+ .crash-stage,html.is-desktop .crash-stage{height:132px;flex:none}
+ .crash-participants{flex:0 0 112px}
+}
