@@ -1053,3 +1053,23 @@ html.is-desktop .crash-stage{height:clamp(132px,26dvh,220px)}
 @media(prefers-reduced-motion:reduce){
  .crash-name-switch,.crash-stage.exploded .crash-explosion{animation:none!important}
 }
+
+/* Crash participant outcomes: synchronized with server settlement results. */
+.crash-bet-row{
+ display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.2fr) auto;
+ align-items:center;gap:6px;
+}
+.crash-stake-summary{min-width:0;width:100%;justify-content:flex-end;gap:4px}
+.crash-bet-result{
+ display:inline-flex;align-items:center;justify-content:center;
+ justify-self:end;min-width:0;
+ padding:3px 6px;border-radius:5px;border:1px solid transparent;
+ font-size:9px;line-height:1;font-weight:750;white-space:nowrap;
+}
+.crash-bet-result.won{color:#149667;background:rgba(28,172,112,.12);border-color:rgba(28,172,112,.22)}
+.crash-bet-result.lost{color:#e45363;background:rgba(231,67,89,.12);border-color:rgba(231,67,89,.22)}
+.crash-bet-result.live{color:var(--muted);background:var(--surface-subtle);border-color:var(--border)}
+@media(max-width:370px){
+ .crash-bet-row{grid-template-columns:minmax(0,.85fr) minmax(0,1.05fr) auto;gap:4px}
+ .crash-stake-summary small{display:none}
+}
