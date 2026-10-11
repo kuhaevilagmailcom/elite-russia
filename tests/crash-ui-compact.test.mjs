@@ -27,7 +27,7 @@ test('Crash visibly lists at most ten recent bets in one compact row each',()=>{
 
 test('Crash header does not show shared crash or public round number',()=>{
   const screen=js.slice(js.indexOf('function crashView(){'),js.indexOf('let crashTickerBusy=',js.indexOf('function crashView(){')));
-  assert.match(screen,/>КРАШ<\/b>/);
+  assert.match(screen,/>Краш<\/b>/);
   assert.doesNotMatch(screen,/ОБЩИЙ КРАШ|Раунд #|Прошлый раунд|Первый раунд/);
   assert.ok(screen.includes("'Последние '+CRASH_VISIBLE_PLAYERS"));
 });
