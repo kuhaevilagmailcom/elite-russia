@@ -179,10 +179,17 @@ export function crashState(db,user,now=Date.now()){
       db.prepare("SELECT multiplier,handle FROM crash_reward_options WHERE bet_id=? ORDER BY stage").all(myAny.id)
         .map(x=>({multiplier:x.multiplier,handle:'@'+x.handle})):[];
     const myWin=myAny?rewardReceipt(db,myAny):null;
+    const lastWin=db.prepare(`SELECT w.instance_id,w.handle,w.value,w.multiplier,b.settlement_kind,b.round_id,b.settled_at
+      FROM crash_wins w JOIN crash_bets b ON b.id=w.bet_id
+      WHERE b.user_id=? ORDER BY b.settled_at DESC LIMIT 1`).get(user.id);
+    const recentWin=lastWin&&now-Number(lastWin.settled_at)<86400000?
+      {id:lastWin.instance_id,handle:'@'+lastWin.handle,value:lastWin.value,
+       multiplier:lastWin.multiplier,auto:lastWin.settlement_kind==='auto',
+       roundId:lastWin.round_id}:null;
     const available=db.prepare("SELECT id,handle,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id)
       .map(x=>({...x,handle:'@'+x.handle}));
     return {round:publicRound(round,now),last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,
-      bets,myBet:myAny,myRewardPlan,myWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
+      bets,myBet:myAny,myRewardPlan,myWin,recentWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
   })();
 }
 export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=null){
