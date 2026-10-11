@@ -70,6 +70,70 @@ test('100K drop can be retried immediately after an unsuccessful first attempt',
   assert.equal(replay.body.instance.id,good.body.instance.id);
 });
 
+test('HTTP Crash has one public round and idempotent bet and cashout across clients',async()=>{
+  const uid='34501',other='34502',admin='10001';
+  const home=await json('/api/home',{headers:headers(uid)});
+  assert.equal(home.r.status,200);
+  const add=await json('/api/admin/users/'+home.body.user.id+'/add-username',{
+    method:'POST',headers:headers(admin),
+    body:JSON.stringify({handle:'crash_http_777',value:6000})
+  });
+  assert.equal(add.r.status,200,JSON.stringify(add.body));
+  const conn=new Database(path.join(tmp,'username.sqlite'));
+  let instanceId;
+  try{
+    instanceId=conn.prepare("SELECT id FROM username_instances WHERE owner_id=? AND handle='crash_http_777'").get(home.body.user.id)?.id;
+    assert.ok(instanceId);
+    // Make a deterministic waiting round for the integration scenario.
+    const current=conn.prepare("SELECT id FROM crash_rounds WHERE status IN ('waiting','running') ORDER BY id DESC LIMIT 1").get();
+    assert.ok(current);
+    conn.prepare("UPDATE crash_rounds SET status='waiting',starts_at=?,crashes_at=?,crash_x=1000 WHERE id=?")
+      .run(Date.now()+10000,Date.now()+75000,current.id);
+  }finally{conn.close()}
+  const a=await json('/api/crash',{headers:headers(uid)});
+  const b=await json('/api/crash',{headers:headers(other)});
+  assert.equal(a.r.status,200);assert.equal(a.body.round.id,b.body.round.id);
+  assert.equal(a.body.round.status,'waiting');
+  assert.equal(a.body.round.crash_x,undefined);
+  assert.equal(a.body.round.seed,undefined);
+  assert.ok(a.body.available.some(x=>x.id===instanceId));
+  const roundId=a.body.round.id;
+  const bet=await json('/api/crash/bet',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId,instanceId})});
+  assert.equal(bet.r.status,200,JSON.stringify(bet.body));
+  const again=await json('/api/crash/bet',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId,instanceId})});
+  assert.equal(again.r.status,200);
+  assert.equal(again.body.replayed,true);
+  const stale=await json('/api/crash/bet',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId:roundId-1,instanceId})});
+  assert.equal(stale.r.status,409);
+  assert.equal(stale.body.error,'crash_round_changed');
+  const spectator=await json('/api/crash',{headers:headers(other)});
+  assert.ok(spectator.body.bets.some(x=>x.handle==='@crash_http_777'));
+
+  const db=new Database(path.join(tmp,'username.sqlite'));
+  try{
+    db.prepare("UPDATE crash_rounds SET status='running',starts_at=?,crashes_at=?,crash_x=1000 WHERE id=?")
+      .run(Date.now()-7000,Date.now()+75000,roundId);
+  }finally{db.close()}
+  const cash=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
+  assert.equal(cash.r.status,200,JSON.stringify(cash.body));
+  assert.ok(cash.body.multiplier>1);
+  assert.ok(cash.body.win>0);
+  const second=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
+  assert.equal(second.r.status,200);
+  assert.equal(second.body.replayed,true);
+  assert.equal(second.body.win,cash.body.win);
+  const db2=new Database(path.join(tmp,'username.sqlite'));
+  try{
+    assert.equal(db2.prepare('SELECT COUNT(*) n FROM balance_transactions WHERE user_id=? AND type=?').get(home.body.user.id,'crash_win').n,1);
+    assert.equal(db2.prepare('SELECT status FROM username_instances WHERE id=?').get(instanceId).status,'owned');
+    db2.prepare('UPDATE crash_rounds SET crashes_at=? WHERE id=?').run(Date.now()-2,roundId);
+  }finally{db2.close()}
+  // Even after rollover, replay must not mint a second reward.
+  const after=await json('/api/crash/cashout',{method:'POST',headers:headers(uid),body:JSON.stringify({roundId})});
+  assert.equal(after.r.status,200);
+  assert.equal(after.body.replayed,true);
+});
+
 test('HTTP story endpoint returns a public same-origin media path and JPEG without auth',async()=>{
   const home=await json('/api/home',{headers:headers()});const id=home.body.pending?.id;assert.ok(id);
   const bytes=Buffer.alloc(1200,1);bytes[0]=0xff;bytes[1]=0xd8;

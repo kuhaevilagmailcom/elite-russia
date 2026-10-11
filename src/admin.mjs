@@ -125,6 +125,7 @@ export function adminSetBlocked(db,admin,targetId,blocked){
 export function adminRemoveUsername(db,admin,instanceId){
   return db.transaction(()=>{
     const i=db.prepare('SELECT * FROM username_instances WHERE id=?').get(instanceId);if(!i)throw new Error('not_owned');
+    if(i.status==='crash_staked')throw new Error('crash_item_unavailable');
     db.prepare("UPDATE market_listings SET status='cancelled',closed_at=? WHERE instance_id=? AND status='active'").run(nowIso(),i.id);
     db.prepare('DELETE FROM inventory WHERE instance_id=?').run(i.id);db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(i.id);
     db.prepare("DELETE FROM upgrade_sessions WHERE used_at IS NULL AND source_ids LIKE ?").run('%'+i.id+'%');
@@ -180,7 +181,7 @@ export function adminSetUsernameValue(db,admin,instanceId,value){
   })();
 }
 function releaseActiveUsernames(db,userId){
-  const rows=db.prepare("SELECT id,template_id FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market')").all(userId);
+  const rows=db.prepare("SELECT id,template_id FROM username_instances WHERE owner_id=? AND status IN ('pending','owned','market','crash_staked')").all(userId);
   for(const r of rows){
     db.prepare('DELETE FROM inventory WHERE instance_id=?').run(r.id);db.prepare('DELETE FROM profile_showcase WHERE instance_id=?').run(r.id);
     db.prepare("UPDATE market_listings SET status='cancelled',closed_at=? WHERE instance_id=? AND status='active'").run(nowIso(),r.id);
@@ -191,6 +192,8 @@ function releaseActiveUsernames(db,userId){
 export function resetSingleUser(db,admin,targetId){
   return db.transaction(()=>{
     const u=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!u)throw new Error('user_not_found');
+    // Cancel this player's wager before deleting its reserved username.
+    db.prepare('DELETE FROM crash_bets WHERE user_id=?').run(u.id);
     releaseActiveUsernames(db,u.id);
     const deletes=[
       ['drop_requests','user_id'],['drop_history','user_id'],['task_progress','user_id'],['task_claims','user_id'],
@@ -216,7 +219,7 @@ export function resetAllUsers(db,admin,confirmation){
   if(String(confirmation||'')!=='RESET USERNAME')throw new Error('reset_confirmation_required');
   return db.transaction(()=>{
     const clearTables=[
-      'inventory','profile_showcase','market_listings','market_transactions','drop_requests','drop_history','balance_transactions',
+      'crash_bets','crash_rounds','inventory','profile_showcase','market_listings','market_transactions','drop_requests','drop_history','balance_transactions',
       'task_progress','task_claims','xp_history','level_reward_claims','achievement_unlocks','mini_game_sessions','mini_game_records',
       'mini_game_daily_earnings','username_lab_attempts','referrals','friends','referral_rewards','username_transfers','wheel_claims',
       'wheel_history','upgrade_sessions','upgrade_history','upgrade_progress','season_stats','season_rewards','season_history'
