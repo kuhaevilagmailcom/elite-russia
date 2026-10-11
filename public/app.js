@@ -266,9 +266,9 @@ function setMenuOpen(open){
 }
 function menuHtml(){
  const tiles=list=>list.map(([p,i,t])=>'<button class="menu-section-tile" data-page="'+p+'" aria-label="'+esc(t)+'"><span class="menu-tile-icon">'+icon(i)+'</span><span class="menu-tile-label">'+esc(t)+'</span></button>').join('');
- const groups=MENU_SECTIONS.map(s=>'<section class="menu-section"><b>'+esc(s.title)+'</b><div>'+tiles(s.items)+'</div></section>').join('');
+ const groups=MENU_SECTIONS.map(s=>'<section class="menu-section"><b>'+esc(s.title)+'</b><div>'+tiles(s.items.concat(s.title==='Аккаунт'&&state.user?.isAdmin?[['admin','admin','Админка']]:[]))+'</div></section>').join('');
  return '<div class="menu-backdrop '+(state.menu?'open':'')+'" data-menu-close><aside class="menu-sheet menu-sections-sheet" data-menu-sheet>'+
-  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin">'+icon('admin')+'<span>Админ</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
+  '<div class="menu-grid-top">'+(state.user?.isAdmin?'<button class="menu-admin-shortcut" data-page="admin">'+icon('admin')+'<span>Админка</span></button>':'<span></span>')+'<button class="menu-head-icon" data-menu-close aria-label="Закрыть">'+icon('close')+'</button></div>'+
   '<div class="menu-sections-scroll">'+groups+'</div>'+
  '</aside></div>'
 }
@@ -358,7 +358,7 @@ function homeView(){
  const h=state.home,u=h.user,p=h.pending,tiers=h.config?.dropTiers||{},tier=selectedDropTier(),free=u.freeDrops>0&&tier.key==='basic',payCost=free?0:Number(tier.cost||3000),cantAfford=!free&&u.balance<payCost;
  return '<div class="home-v7">'+
   '<section class="home-level-v7">'+xpBar(u)+'</section>'+
-  (!p?'<div class="home-stake-top"><button class="drop-price-v7" data-drop-picker-open aria-label="Выбрать стоимость дропа"><span>'+fmt(tier.cost)+'</span>'+icon('down')+'</button></div>':'')+
+  (!p?'<div class="home-stake-top"><button class="drop-price-v7" data-drop-picker-open aria-label="Выбрать стоимость дропа"><span>'+fmt(tier.cost)+'</span><span class="drop-price-chevron" aria-hidden="true"></span></button></div>':'')+
   '<section class="drop-zone home-drop-v7">'+
     (p?resultCard(p,true):'<button class="handle-stage drop-trigger" id="handleStage" data-drop-trigger '+(cantAfford?'disabled':'')+' aria-label="Получить username"><b data-fit-username data-max-size="58" data-min-size="25">@username</b><span>Нажми, чтобы получить</span></button>')+
   '</section>'+
@@ -718,7 +718,7 @@ async function fetchPage(page){
  if(page==='profile')state.profile=await api('/api/profile');
  if(page==='shop')state.shop=await api('/api/shop');
  if(page==='promo')state.promo=await api('/api/promocode');
- if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
+ if(page==='admin'){if(!state.user?.isAdmin)throw new Error('forbidden');state.adminDetail=null;await ensureAdminUi();if(!window.USERNAME_ADMIN?.refresh)throw new Error('network');await window.USERNAME_ADMIN.refresh()}
 }
 async function load(page,{force=false}={}){
  const seq=++routeSeq,initial=!window.__USERNAME_READY||!state.user;
@@ -805,7 +805,18 @@ async function animateUpgradeWheel(result){
  state.upgrader=await api('/api/upgrader');state.upgrader.available=shuffleUpgradeItems(state.upgrader.available);state.upgradeVisibleCount=Math.min(Math.max(30,state.upgradeVisibleCount||30),state.upgrader.available.length);state.upgradeScrollTop=0;render();
 }
 function applyUserLocal(user){
-  if(!user)return;state.user=user;if(state.home)state.home.user=user;applyPreferences();
+  if(!user)return;
+  // /api/home is the trusted source of the admin flag. Game mutation APIs
+  // return publicUser without isAdmin; preserve the verified flag only for
+  // the same user instead of accidentally hiding the admin menu.
+  const previous=state.user;
+  const sameAccount=previous&&String(previous.id)===String(user.id)&&String(previous.telegramId)===String(user.telegramId);
+  const next={...user};
+  if(sameAccount&&previous.isAdmin===true&&!Object.hasOwn(user,'isAdmin'))next.isAdmin=true;
+  if(sameAccount&&!Object.hasOwn(user,'unreadNotifications')&&previous.unreadNotifications!==undefined)next.unreadNotifications=previous.unreadNotifications;
+  state.user=next;
+  if(state.home)state.home.user=next;
+  applyPreferences();
 }
 function removeCollectionLocal(id){
   if(!state.collection)return;
@@ -1045,6 +1056,16 @@ document.addEventListener('scroll',e=>{
 },true);
 window.USERNAME_APP={state,api,render,icon,esc,fmt,metric,refreshUser,toast,ERR};
 applyPreferences();
-import('/admin-ui.js?v=7.5.0').catch(()=>{});
+let adminUiPromise;
+function ensureAdminUi(){
+  if(window.USERNAME_ADMIN?.refresh)return Promise.resolve(window.USERNAME_ADMIN);
+  if(!adminUiPromise){
+    adminUiPromise=import('/admin-ui.js?v=7.5.0-admin-fix1')
+      .catch(e=>{adminUiPromise=null;console.error('USERNAME admin module failed to load:',e);throw e});
+  }
+  return adminUiPromise;
+}
+// Eager for fast navigation, but retryable when the user opens Admin.
+void ensureAdminUi().catch(()=>{});
 const deepPage=(()=>{const m=startParam().match(/^page_(home|collection|market|top|tasks|levels|achievements|notifications|settings|wheel|friends|gift|upgrader|profile|shop|promo|games|admin)$/);return m?m[1]:'home'})();
 load(deepPage);
