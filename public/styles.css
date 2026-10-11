@@ -235,8 +235,13 @@ button.secondary,.secondary{min-height:46px;border-radius:13px;background:var(--
 .home-drop-v7 .handle-stage b{font-size:58px;line-height:.96;font-weight:820;letter-spacing:-.055em;max-width:100%}
 .home-drop-v7 .handle-stage>span{font-size:11px;font-weight:650;color:var(--muted);letter-spacing:0}
 .home-drop-v7 .handle-stage:disabled{opacity:.45}
-.drop-price-v7{pointer-events:auto;position:absolute;z-index:5;top:-8px;left:50%;right:auto;transform:translateX(-50%);height:36px;padding:0 11px 0 13px;border-radius:12px;background:var(--card);border:1px solid var(--border);color:var(--text);font-weight:780;font-size:12px;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:var(--shadow)}
-.drop-price-v7 .ico{width:15px;height:15px;color:var(--muted)}
+.drop-price-v7{pointer-events:auto;position:absolute;z-index:5;top:-8px;left:50%;right:auto;transform:translateX(-50%);height:36px;padding:0 11px 0 13px;border-radius:12px;background:var(--card);border:1px solid var(--border);color:var(--text);font-weight:780;font-size:12px;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:var(--shadow)}
+.drop-price-v7 .drop-price-chevron{
+  width:8px;height:8px;flex:0 0 8px;
+  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  border-radius:1px;
+  transform:translateY(-2px) rotate(45deg);
+}
 .home-quick-v7{position:absolute;z-index:2;left:13px;right:13px;bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .home-quick-action{min-width:0;height:66px;border-radius:15px;background:var(--card);border:1px solid var(--border);padding:0 10px;display:grid;grid-template-columns:34px minmax(0,1fr) 16px;align-items:center;gap:8px;text-align:left;color:var(--text)}
 .home-quick-action>div{min-width:0;display:grid;gap:2px}
