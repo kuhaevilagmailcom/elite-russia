@@ -121,6 +121,7 @@ test('after restart auto-stop catches up by target time, including if server wak
   const overdue=boom+22000;
   f.db.close();
   const reopened=createDatabase(f.dir);
+  f.db=reopened;
   const newRound=syncCrashRound(reopened,overdue);
   assert.notEqual(newRound.id,round.id);
   const prior=reopened.prepare('SELECT b.* FROM crash_bets b WHERE round_id=?').get(round.id);
@@ -132,9 +133,7 @@ test('after restart auto-stop catches up by target time, including if server wak
   assert.equal(win.value,250000);
   assert.equal(reopened.prepare('SELECT status FROM username_instances WHERE id=?').get(win.instance_id).status,'owned');
   assert.equal(reopened.prepare('PRAGMA foreign_key_check').all().length,0);
-  reopened.close();
-  // Prevent fixture.close() from closing a file handle already closed.
-  f.db.close=()=>{};
+  // fixture closes the reopened DB.
  }finally{f.close()}
 });
 
@@ -149,8 +148,9 @@ test('twenty consecutive rounds accept the previously won username as a fresh st
    const bet=placeCrashBet(f.db,f.user,item,now+1,round.id);
    const begins=now+CRASH_WAIT_MS;
    force(f.db,round.id,begins,1000,begins+150000);
+   const stakeValue=f.db.prepare('SELECT value FROM username_instances WHERE id=?').get(item).value;
    const cashed=cashoutCrash(f.db,f.user,crashAutoStopAt(begins,1.5),round.id);
-   assert.equal(cashed.reward.value,Math.floor(100000*1.5**(n+1))>1000000000?1000000000:Math.floor((n?f.db.prepare('SELECT value FROM username_instances WHERE id=?').get(item).value:100000)*cashed.multiplier));
+   assert.equal(cashed.reward.value,Math.min(1000000000,Math.floor(stakeValue*cashed.multiplier)));
    item=cashed.reward.id;
    assert.equal(f.db.prepare('SELECT status FROM username_instances WHERE id=?').get(item).status,'owned');
    assert.equal(cashoutCrash(f.db,f.user,begins+60000,round.id).reward.id,item);
