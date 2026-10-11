@@ -186,10 +186,18 @@ export function crashState(db,user,now=Date.now()){
       {id:lastWin.instance_id,handle:'@'+lastWin.handle,value:lastWin.value,
        multiplier:lastWin.multiplier,auto:lastWin.settlement_kind==='auto',
        roundId:lastWin.round_id}:null;
+    // Keep settled outcomes visible during the next round's waiting period
+    // until new participants place their bets. Outcomes are read from SQLite,
+    // never inferred by the client.
+    const lastBets=(!bets.length&&last?.id)?
+      db.prepare(`SELECT b.*,i.handle,i.value,u.first_name,u.username
+        FROM crash_bets b JOIN username_instances i ON i.id=b.instance_id JOIN users u ON u.id=b.user_id
+        WHERE b.round_id=? ORDER BY b.created_at DESC,b.id DESC LIMIT 10`)
+        .all(last.id).reverse().map(shapeBet):[];
     const available=db.prepare("SELECT id,handle,value FROM username_instances WHERE owner_id=? AND status='owned' ORDER BY value DESC LIMIT 100").all(user.id)
       .map(x=>({...x,handle:'@'+x.handle}));
     return {round:publicRound(round,now),last:last?{id:last.id,multiplier:last.crash_x,commitment:last.commitment,seed:last.seed,endedAt:last.ended_at}:null,
-      bets,myBet:myAny,myRewardPlan,myWin,recentWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
+      bets,lastBets,myBet:myAny,myRewardPlan,myWin,recentWin,available,autoStopX:getAutoStop(db,user.id),payoutCap:CRASH_MAX_PAYOUT};
   })();
 }
 export function placeCrashBet(db,user,instanceId,now=Date.now(),expectedRoundId=null){
