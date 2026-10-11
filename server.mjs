@@ -500,12 +500,12 @@ async function api(req,res,url){
     if(req.method==='POST'&&url.pathname==='/api/crash/bet'){
       if(!rateLimit(user.id,'crash_bet',10,60000))return json(res,429,{error:'rate_limited'});
       const b=await readBody(req);
-      const result=placeCrashBet(db,user,String(b.instanceId||''));
+      const result=placeCrashBet(db,user,String(b.instanceId||''),Date.now(),b.roundId);
       invalidateLeaderboard();return json(res,200,result);
     }
     if(req.method==='POST'&&url.pathname==='/api/crash/cashout'){
       if(!rateLimit(user.id,'crash_cashout',10,60000))return json(res,429,{error:'rate_limited'});
-      const result=cashoutCrash(db,user);
+      const b=await readBody(req),result=cashoutCrash(db,user,Date.now(),b.roundId);
       invalidateLeaderboard();return json(res,200,result);
     }
     if(req.method==='GET'&&url.pathname==='/api/wheel')return json(res,200,wheelStatus(db,user));
@@ -617,7 +617,7 @@ async function api(req,res,url){
     return json(res,404,{error:'not_found'});
   }catch(e){
     console.error(e);
-    const code={crash_betting_closed:409,crash_already_bet:409,crash_item_unavailable:409,crash_no_bet:409,crash_too_late:409,insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,no_username_available:503,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
+    const code={crash_round_changed:409,crash_betting_closed:409,crash_already_bet:409,crash_item_unavailable:409,crash_no_bet:409,crash_too_late:409,insufficient_funds:409,promo_not_found:404,promo_expired:409,promo_limit:409,promo_used:409,promo_exists:409,bad_promo_code:400,bad_promo_reward:400,bad_promo_expiry:400,bad_gems:400,pending_drop:409,collection_full:409,recipient_full:409,sold_out:409,already_claimed:409,task_not_done:409,task_not_found:404,not_owned:404,pending_not_found:404,listing_not_found:404,own_listing:409,already_listed:409,bad_price:400,not_friend:403,wheel_cooldown:409,bad_upgrade:400,upgrade_invalid_items:409,upgrade_bad_recipe:409,upgrade_unavailable:409,upgrade_session_expired:409,upgrade_session_mismatch:409,bad_story_image:400,story_https_required:503,body_too_large:413,bad_json:400,bad_request_id:400,no_username_available:503,premium_unavailable:503,insufficient_gems:409,bad_product:400,bad_cosmetic:400,cosmetic_locked:403,rate_limited:429,recipient_blocked:409,user_not_found:404,bad_username:400,username_exists:409,gift_self:400,game_stale_answer:409,self_admin_block:409,reset_confirmation_required:400,bad_message:400,channel_task_unavailable:503,channel_subscription_required:409,sqlite_integrity_check_failed:500,wheel_username_unavailable:409}[e.message]||500;
     return json(res,code,{error:e.message||'server_error'});
   }
 }
