@@ -477,7 +477,6 @@ function crashView(){
    (available||'<div class="crash-empty">Нет usernames</div>')+'</div></div>';
  }
  return '<div class="crash-page" data-crash-round="'+r.id+'">'+
-  '<div class="crash-caption"><span class="crash-round-badge"><i></i>'+(waiting?'Приём ставок':'Раунд идёт')+'</span></div>'+
   crashHistory(d)+
   '<section class="crash-stage '+(waiting?'waiting':'running')+'" aria-label="График множителя">'+
    '<div class="crash-stage-grid"></div>'+
