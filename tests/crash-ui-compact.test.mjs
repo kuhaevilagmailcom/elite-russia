@@ -52,8 +52,10 @@ test('Crash has diagonal x/y movement and stays on one screen',()=>{
   assert.match(js,/flying\.style\.setProperty\('--crash-y',/);
   assert.match(js,/stage\.clientWidth\*\.54/);
   assert.match(js,/stage\.clientHeight\*\.43/);
+  assert.match(js,/--crash-line-length/);
+  assert.match(js,/--crash-line-angle/);
   assert.match(css,/\.crash-page\{\s*height:100%;max-height:100%;min-height:0;overflow:hidden/);
-  assert.match(css,/\.crash-flight-rail\{[\s\S]*?rotate\(-23deg\)/);
+  assert.match(css,/\.crash-flight-rail\{[\s\S]*?rotate\(var\(--crash-line-angle,-23deg\)\)/);
   assert.match(css,/\.crash-skyline\{[\s\S]*?translate\(var\(--crash-x,0px\),var\(--crash-y,0px\)\)/);
   assert.match(css,/\.crash-available\{\s*display:flex;gap:5px;height:42px;max-height:42px;overflow-x:auto;overflow-y:hidden/);
   assert.match(html,/\/styles\.css\?v=7\.5\.0-crash-ui2/);
