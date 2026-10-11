@@ -149,7 +149,7 @@ export function adminTransferUsername(db,admin,instanceId,targetId){
 }
 export function adminAddUsername(db,admin,targetId,handle,value){
   const raw=String(handle||'').toLowerCase().replace(/^@/,'').trim();if(!isValidHandle(raw))throw new Error('bad_username');
-  if(db.prepare('SELECT 1 FROM username_instances WHERE handle=?').get(raw))throw new Error('username_exists');
+  if(db.prepare('SELECT 1 FROM username_instances WHERE handle=?').get(raw)||db.prepare('SELECT 1 FROM crash_reward_options WHERE handle=?').get(raw))throw new Error('username_exists');
   const target=db.prepare('SELECT * FROM users WHERE id=?').get(targetId);if(!target)throw new Error('user_not_found');
   if(activeCollectionCount(db,target.id)>=collectionLimit(target))throw new Error('recipient_full');
   const v=normalizeUsernameValue(value,stableScoreHandle(raw)),rarity=rarityFromValue(v),ts=nowIso();
