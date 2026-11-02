@@ -1,0 +1,26 @@
+name: Import clean Telegram NFT bot
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    if: contains(github.event.head_commit.message, '[import-nft-bot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and validate bot source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .source-parts/part-*.txt > /tmp/nft-bot.tar.xz.b64
+          base64 --decode /tmp/nft-bot.tar.xz.b64 > /tmp/nft-bot.tar.xz
+          echo "c7c822140d5096745b1092d395d3687f67ef396623ae15422e30bb47aec87266  /tmp/nft-bot.tar.xz" | sha256sum -c -
+          tar -tJf /tmp/nft-bot.tar.xz
+          tar -xJf /tmp/nft-bot.tar.xz
+          rm -rf .source-parts
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Unpack Telegram NFT bot source files"
+          git push origin HEAD:main
