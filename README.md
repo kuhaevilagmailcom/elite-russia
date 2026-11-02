@@ -1,3 +1,89 @@
-# Telegram NFT Offer Bot
+# Telegram Business NFT offer bot
 
-The sanitized Python sources will be unpacked into this repository by the **Import clean Telegram NFT bot** GitHub Actions workflow. The bot token and production database are intentionally excluded.
+Бот обрабатывает объявления и предложения в Telegram Business-чатах.
+
+## Что умеет
+
+### Команда владельца
+
+Отправляешь в бота
+
+```text
+/info https://t.me/nft/HomemadeCake-166832 ru 100 star
+```
+
+Поддерживаемые валюты: `star` и `gra`.
+
+### Команда покупателя
+Получаешь ссылку на офер 
+
+```text
+/offer https://t.me/nft/HomemadeCake-166832
+```
+
+Бот показывает предложение в текущем чате с кнопками `Отклонить` / `Принять`. После первого `/offer` объявление сразу становится недоступным для повторного использования.
+
+После команды `/info` бот:
+
+1. проверяет ссылку, язык, цену и валюту;
+2. сохраняет данные объявления в SQLite;
+3. удаляет исходное Business-сообщение.
+
+После команды `/offer` бот:
+
+1. находит объявление по ссылке;
+2. создаёт предложение от отправителя;
+3. удаляет исходное Business-сообщение, если команда пришла из Business-чата;
+4. отправляет предложение в текущий чат;
+5. автоматически считает предложение истёкшим через 8 часов.
+
+## Настройка
+
+1. Создай бота через BotFather и скопируй токен.
+2. Установи Python 3.11 или новее.
+3. Создай окружение и установи зависимости:
+
+```powershell
+py -3 -m venv .venv
+.\\.venv\\Scripts\\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+4. Скопируй `.env.example` в `.env` и вставь новый токен (получи его через @BotFather). Не публикуй `.env` в GitHub:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+```env
+BOT_TOKEN=токен_бота
+NFT_IMAGE_URL=https://example.com/nft-image.jpg
+DATABASE_PATH=offers.sqlite3
+OFFER_TTL_HOURS=8
+```
+
+5. Запусти:
+
+```powershell
+python bot.py
+```
+
+## Подключение Business Mode
+
+В Telegram открой настройки бизнес-аккаунта, раздел «Чат-боты», подключи этого бота и выдай ему доступ к сообщениям, которые он должен обрабатывать. Команду `/info` владелец пишет в доступном Business-чате. `/offer` можно отправить в любом чате, где бот принимает сообщения.
+
+## Проверка команд
+
+```text
+/info https://t.me/nft/HomemadeCake-166832 ru 100 star
+/info https://t.me/nft/AnotherGift-42 en 2.5 gra
+/offer https://t.me/nft/HomemadeCake-166832
+```
+
+Формат `/info`: ссылка, язык, цена и валюта разделяются пробелами. Пробелы вокруг полей обязательны, цена должна быть положительным числом, ссылка — в формате `https://t.me/nft/<название>-<номер>`, валюта — только `star` или `gra`.
+
+
+## Безопасность
+
+Токен бота хранится только в `.env` или переменных окружения. Без установленного `BOT_TOKEN` бот не запустится.
+База данных `offers.sqlite3` и файлы журнала SQLite исключены из Git, чтобы не публиковать личные и операционные данные.
