@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7ff">
+  <title>Limuzinov Scope — поиск Telegram Gifts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Limuzinov Scope">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Limuzinov Scope</span>
+      </a>
+      <button class="icon-button" id="openImport" aria-label="Добавить подарок" title="Добавить подарок">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="heroTitle">
+        <div class="hero-copy">
+          <p class="live"><span></span> Collectible gifts</p>
+          <h1 id="heroTitle">Найди именно<br>тот подарок.</h1>
+          <p class="hero-text">Модель, фон, узор или владелец — всё в одном поиске.</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <div class="orbit-ring"></div>
+          <div class="gift-gem">
+            <div class="gem-pattern">✦　◌<br>　✦　<br>◌　　✦</div>
+            <div class="gem-object">🎁</div>
+          </div>
+          <span class="orbit-chip chip-one">1.5%</span>
+          <span class="orbit-chip chip-two">Rare</span>
+        </div>
+      </section>
+
+      <section class="finder" aria-label="Поиск подарков">
+        <label class="searchbox">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+          <input id="search" type="search" placeholder="Подарок, владелец, #номер…" autocomplete="off">
+          <kbd id="searchClear" hidden>×</kbd>
+        </label>
+        <div class="filter-row" id="filterRow">
+          <button class="filter active" data-filter="all">Все</button>
+          <button class="filter" data-filter="collection">Подарок</button>
+          <button class="filter" data-filter="model">Модель</button>
+          <button class="filter" data-filter="backdrop">Фон</button>
+          <button class="filter" data-filter="symbol">Узор</button>
+        </div>
+        <div class="facet-panel" id="facetPanel" hidden></div>
+      </section>
+
+      <section class="results" aria-live="polite">
+        <div class="section-head">
+          <h2 id="resultTitle">Подборка</h2>
+          <span id="resultCount">0 подарков</span>
+        </div>
+        <div class="gift-grid" id="giftGrid"></div>
+        <div class="empty" id="emptyState" hidden>
+          <div class="empty-mark">⌁</div>
+          <h3>Такого подарка пока нет</h3>
+          <p>Пришли ссылку t.me/nft — добавим его в индекс.</p>
+          <button class="primary-button" data-import>Добавить по ссылке</button>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Основная навигация">
+      <button class="nav-item active"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span>Поиск</span></button>
+      <button class="nav-item" id="favoritesNav"><svg viewBox="0 0 24 24"><path d="m12 19-7-7a4.4 4.4 0 0 1 6.2-6.2L12 6.6l.8-.8A4.4 4.4 0 0 1 19 12Z"/></svg><span>Избранное</span></button>
+      <button class="nav-item" data-import><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Добавить</span></button>
+    </nav>
+  </div>
+
+  <dialog class="sheet" id="detailDialog">
+    <div class="sheet-handle"></div>
+    <button class="close-button" data-close aria-label="Закрыть">×</button>
+    <div id="detailContent"></div>
+  </dialog>
+
+  <dialog class="sheet import-sheet" id="importDialog">
+    <div class="sheet-handle"></div>
+    <button class="close-button" data-close aria-label="Закрыть">×</button>
+    <div class="import-content">
+      <div class="import-icon">↗</div>
+      <h2>Добавить подарок</h2>
+      <p>Вставь публичную ссылку Telegram. Мы сами найдём владельца и атрибуты.</p>
+      <label class="url-field"><span>Ссылка на подарок</span><input id="importUrl" placeholder="https://t.me/nft/…" inputmode="url"></label>
+      <p class="form-error" id="importError" role="alert"></p>
+      <button class="primary-button wide" id="importSubmit">Найти и добавить</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+

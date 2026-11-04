@@ -1,89 +1,105 @@
-# Telegram Business NFT offer bot
+# LIM NFT Parser — Telegram Mini App
 
-Бот обрабатывает объявления и предложения в Telegram Business-чатах.
+Telegram-парсер подарков и Mini App на базе исходного проекта [Limuzinov Scope](https://github.com/kuhaevilagmailcom/-telegram-nft-business-offer-bot).
+
+## Хостинг BotHost
+
+- GitHub: `kuhaevilagmailcom/elite-russia` (ветка `main`).
+- Команда запуска: `python main.py`.
+- Переменная `BOT_TOKEN`: токен бота из @BotFather — **только в настройках хостинга**, не в GitHub.
+- `PUBLIC_URL=https://bot-1790259314-9532-furadev.bothost.tech`: адрес Mini App, который открывает кнопка.
+- `ALLOW_DEMO_DATA=false`: отключение демонстрационных подарков.
+- `DATABASE_PATH=data/gifts.db`: подключите постоянное хранение, чтобы не терять данные после перезапуска контейнера.
+- Для HTTP-прокси используется `PORT` от хостинга (по умолчанию 8000).
+
+После установки переменных перезапустите сервис. Для запуска через `https://t.me/TelegraGiftsOff_bot/limyzinovParser` настройте Mini App на этот HTTPS-адрес в @BotFather. Токен в `BOT_TOKEN` должен принадлежать `@TelegraGiftsOff_bot`, если нужен именно этот бот.
+
+## Команда /start
+
+Бот пишет: «Салам, @ник, ёпта! Это мой парсер NFT.» и показывает кнопку **«Открыть апп»**, запускающую Mini App. При отсутствии username использует имя пользователя.
+
+## Запуск локально
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python main.py
+```
+
+Без `BOT_TOKEN` веб-приложение доступно локально и бот не запускается.
+
+## Тесты
+
+```powershell
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+## Функциональность
+
+
+Telegram-бот «Лимузинов Скоп» и Mini App для поиска collectible gifts по подарку, владельцу, модели, фону и узору. Публичная карточка `t.me/nft/...` парсится напрямую; цена хранится как отдельная ориентировочная оценка с источником.
+
+## Быстрый запуск
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+uvicorn app.main:app --reload
+```
+
+Откройте `http://localhost:8000`. Без токена работает Mini App и демо-каталог. Чтобы запустить бота, добавьте в `.env`:
+
+```env
+BOT_TOKEN=123456:ABC...
+PUBLIC_URL=https://your-https-domain.example
+```
+
+Если нужны именно premium emoji в сообщениях, укажите `custom_emoji_id` в полях `EMOJI_GIFT_ID`, `EMOJI_OWNER_ID`, `EMOJI_MODEL_ID`, `EMOJI_PRICE_ID`. Без них бот использует аккуратные обычные emoji.
+
+Для Telegram Mini App нужен публичный HTTPS URL. Укажите его у @BotFather через `/newapp`, а inline-поиск включите через `/setinline`.
 
 ## Что умеет
 
-### Команда владельца
+- поиск по коллекции, владельцу, номеру, модели, фону и узору;
+- фильтры по всем трём collectible-атрибутам;
+- импорт и обновление подарка по ссылке `t.me/nft/...`;
+- короткая карточка в боте, `/find` и inline mode;
+- локальное избранное в Mini App;
+- SQLite-индекс без внешней инфраструктуры;
+- отдельные поля для Stars, TON, USD, источника и даты оценки.
+- фоновая синхронизация всех подарков, выставленных на перепродажу в Telegram.
 
-Отправляешь в бота
+## Полный рынок перепродажи
 
-```text
-/info https://t.me/nft/HomemadeCake-166832 ru 100 star
-```
-
-Поддерживаемые валюты: `star` и `gra`.
-
-### Команда покупателя
-Получаешь ссылку на офер 
-
-```text
-/offer https://t.me/nft/HomemadeCake-166832
-```
-
-Бот показывает предложение в текущем чате с кнопками `Отклонить` / `Принять`. После первого `/offer` объявление сразу становится недоступным для повторного использования.
-
-После команды `/info` бот:
-
-1. проверяет ссылку, язык, цену и валюту;
-2. сохраняет данные объявления в SQLite;
-3. удаляет исходное Business-сообщение.
-
-После команды `/offer` бот:
-
-1. находит объявление по ссылке;
-2. создаёт предложение от отправителя;
-3. удаляет исходное Business-сообщение, если команда пришла из Business-чата;
-4. отправляет предложение в текущий чат;
-5. автоматически считает предложение истёкшим через 8 часов.
-
-## Настройка
-
-1. Создай бота через BotFather и скопируй токен.
-2. Установи Python 3.11 или новее.
-3. Создай окружение и установи зависимости:
+Официальный `payments.getResaleStarGifts` доступен только пользовательской MTProto-сессии. Добавьте `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` и заранее созданную `TELEGRAM_SESSION` в `.env`. После этого приложение каждые 15 минут получает все страницы доступных к покупке подарков, владельцев, цены и атрибуты. Разовый запуск:
 
 ```powershell
-py -3 -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
-python -m pip install -r requirements.txt
+python -m app.resale_sync
 ```
 
-4. Скопируй `.env.example` в `.env` и вставь новый токен (получи его через @BotFather). Не публикуй `.env` в GitHub:
+Если у владельца есть публичный username, карточка показывает «Написать владельцу». При скрытом username интерфейс честно оставляет только ссылку на сам подарок.
+
+## Важно о ценах
+
+Данные владельца и атрибуты берутся из публичной Telegram-карточки. Демо-цены в стартовом каталоге специально отмечены как `Демо-оценка` и не являются рыночной котировкой. Для продакшена подключите официальный MTProto `payments.getUniqueStarGiftValueInfo` или проверенный marketplace feed и обновляйте `price_source`/`price_updated_at`.
+
+## Проверка
+
+```powershell
+python -m pytest -q
+```
+
+## Docker
 
 ```powershell
 Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
-```env
-BOT_TOKEN=токен_бота
-NFT_IMAGE_URL=https://example.com/nft-image.jpg
-DATABASE_PATH=offers.sqlite3
-OFFER_TTL_HOURS=8
-```
+После публикации на HTTPS-домене укажите адрес Mini App в @BotFather и тот же адрес в `PUBLIC_URL`. Команда `/start` отвечает приветствием с кнопкой «Открыть апп».
 
-5. Запусти:
-
-```powershell
-python bot.py
-```
-
-## Подключение Business Mode
-
-В Telegram открой настройки бизнес-аккаунта, раздел «Чат-боты», подключи этого бота и выдай ему доступ к сообщениям, которые он должен обрабатывать. Команду `/info` владелец пишет в доступном Business-чате. `/offer` можно отправить в любом чате, где бот принимает сообщения.
-
-## Проверка команд
-
-```text
-/info https://t.me/nft/HomemadeCake-166832 ru 100 star
-/info https://t.me/nft/AnotherGift-42 en 2.5 gra
-/offer https://t.me/nft/HomemadeCake-166832
-```
-
-Формат `/info`: ссылка, язык, цена и валюта разделяются пробелами. Пробелы вокруг полей обязательны, цена должна быть положительным числом, ссылка — в формате `https://t.me/nft/<название>-<номер>`, валюта — только `star` или `gra`.
-
-
-## Безопасность
-
-Токен бота хранится только в `.env` или переменных окружения. Без установленного `BOT_TOKEN` бот не запустится.
-База данных `offers.sqlite3` и файлы журнала SQLite исключены из Git, чтобы не публиковать личные и операционные данные.
