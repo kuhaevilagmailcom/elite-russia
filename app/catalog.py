@@ -104,6 +104,14 @@ class CollectionCatalog:
         return bool(row and (not row["media_kind"] or
                   not (self.media_dir / f"{key}.{row['media_kind']}").exists()))
 
+    def names(self) -> list[str]:
+        with self.db.connect() as conn:
+            return [
+                row["title"] for row in conn.execute(
+                    "SELECT title FROM gift_collections ORDER BY title COLLATE NOCASE"
+                )
+            ]
+
     def get(self, key: str) -> dict[str, Any] | None:
         if not KEY_RE.fullmatch(key):
             return None
