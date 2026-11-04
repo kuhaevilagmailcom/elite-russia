@@ -119,6 +119,13 @@ class Database:
     def init(self, demo: bool = True) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(gifts)")}
+            if "is_listed" not in columns:
+                conn.execute("ALTER TABLE gifts ADD COLUMN is_listed INTEGER NOT NULL DEFAULT 0")
+                # Retain the previously indexed marketplace during a seamless migration.
+                conn.execute("UPDATE gifts SET is_listed=1 WHERE price_source='Telegram resale'")
+            if "market_seen" not in columns:
+                conn.execute("ALTER TABLE gifts ADD COLUMN market_seen TEXT")
             if not demo:
                 conn.execute("DELETE FROM gifts WHERE price_source = ?", ("Демо-оценка",))
             if demo and conn.execute("SELECT COUNT(*) FROM gifts").fetchone()[0] == 0:
@@ -131,6 +138,7 @@ class Database:
             "owner_url": None, "image_url": None, "issued": None, "total": None,
             "price_stars": None, "price_ton": None, "price_usd": None,
             "price_source": None, "price_updated_at": now,
+            "is_listed": 0, "market_seen": None,
             "source_url": f"https://t.me/nft/{gift['slug']}", "indexed_at": now,
             **gift,
         }
@@ -144,7 +152,7 @@ class Database:
 
     def upsert(self, gift: ParsedGift) -> dict[str, Any]:
         with self.connect() as conn:
-            existing = conn.execute("SELECT price_stars,price_ton,price_usd,price_source,price_updated_at FROM gifts WHERE slug=?", (gift.slug,)).fetchone()
+            existing = conn.execute("SELECT price_stars,price_ton,price_usd,price_source,price_updated_at,is_listed,market_seen FROM gifts WHERE slug=?", (gift.slug,)).fetchone()
             data = asdict(gift)
             if existing:
                 data.update(dict(existing))
@@ -162,10 +170,19 @@ class Database:
             row = conn.execute("SELECT * FROM gifts WHERE slug=?", (slug,)).fetchone()
         return dict(row) if row else None
 
+    def mark_unlisted_after_sync(self, run_id: str) -> None:
+        """Only call after all resale pages were fetched without errors."""
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE gifts SET is_listed=0 WHERE is_listed=1 AND "
+                "(market_seen IS NULL OR market_seen != ?)",
+                (run_id,),
+            )
+
     @staticmethod
-    def _where(query: str, filters: dict[str, str] | None) -> tuple[str, list[str]]:
+    def _where(query: str, filters: dict[str, str] | None, market: bool = False) -> tuple[str, list[str]]:
         filters = filters or {}
-        clauses: list[str] = []
+        clauses: list[str] = ["is_listed=1"] if market else []
         params: list[str] = []
         normalized = query.strip().removeprefix("#")
         if normalized:
@@ -184,9 +201,9 @@ class Database:
 
     def search(
         self, query: str = "", filters: dict[str, str] | None = None,
-        limit: int = 48, offset: int = 0,
+        limit: int = 48, offset: int = 0, market: bool = False,
     ) -> list[dict[str, Any]]:
-        where, params = self._where(query, filters)
+        where, params = self._where(query, filters, market)
         with self.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM gifts" + where
@@ -195,8 +212,8 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def count(self, query: str = "", filters: dict[str, str] | None = None) -> int:
-        where, params = self._where(query, filters)
+    def count(self, query: str = "", filters: dict[str, str] | None = None, market: bool = False) -> int:
+        where, params = self._where(query, filters, market)
         with self.connect() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM gifts" + where, params).fetchone()[0])
 
