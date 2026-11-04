@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.db import Database
 from app.parser import GiftParseError, fetch_gift
 from app.animation import AnimationUnavailable, get_gift_animation
+from app.artwork import ArtworkUnavailable, get_artwork
 
 
 settings = get_settings()
@@ -52,12 +53,12 @@ class FavoriteBody(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(static_dir / "index.html")
+    return FileResponse(static_dir / "index.html", headers={"Cache-Control": "no-store, max-age=0"})
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "bot": bool(settings.bot_token)}
+    return {"status": "ok", "bot": bool(settings.bot_token), "build": "media-proxy-v5"}
 
 
 @app.get("/api/gifts")
@@ -86,6 +87,18 @@ def gift_detail(slug: str):
     if not gift:
         raise HTTPException(404, "Подарок не найден")
     return gift
+
+
+@app.get("/api/artwork/{slug}")
+async def gift_artwork(slug: str):
+    if not db.get(slug.lower()):
+        raise HTTPException(404, "Подарок не найден в каталоге")
+    try:
+        media = await get_artwork(slug, settings.database_path)
+    except ArtworkUnavailable as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return Response(content=media.content, media_type=media.mime,
+                    headers={"Cache-Control": "public, max-age=604800, immutable"})
 
 
 @app.get("/api/animation/{slug}")

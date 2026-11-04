@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  const APP_BUILD = 'media-proxy-v5';
   const tg = window.Telegram?.WebApp;
   tg?.ready();
   tg?.expand();
@@ -91,20 +92,19 @@
   }
 
   function art(g, isDetail = false) {
-    // Telegram resale data has image_url=null: fetch this exact NFT's artwork.
-    const preview = fragmentPreview(g.slug, isDetail ? 'large.jpg' : 'medium.jpg');
+    const preview = '/api/artwork/' + encodeURIComponent(g.slug);
     const secondary = g.image_url && /^https:\/\//i.test(g.image_url)
-      ? g.image_url : fragmentPreview(g.slug, 'webp');
-    const image = preview
-      ? '<img class="gift-preview" alt="" src="' + esc(preview) + '" data-secondary="' +
-        esc(secondary) + '" loading="' + (isDetail ? 'eager' : 'lazy') +
-        '" referrerpolicy="no-referrer">'
-      : '';
+      ? g.image_url : fragmentPreview(g.slug, 'medium.jpg');
+    const last = fragmentPreview(g.slug, 'webp');
+    const image = '<img class="gift-preview" alt="' + esc(giftTitle(g)) +
+      '" src="' + esc(preview) + '" data-secondary="' + esc(secondary) +
+      '" data-tertiary="' + esc(last) +
+      '" loading="' + (isDetail ? 'eager' : 'lazy') + '" referrerpolicy="no-referrer">';
     return '<div class="gift-art ' + (isDetail ? 'large-art' : '') +
       '" style="' + gradient(g) + '" data-animation="' + esc(g.slug) + '">' +
       '<div class="gift-pattern" aria-hidden="true"></div>' +
       '<div class="gift-fallback"><div class="gift-placeholder" aria-hidden="true">' +
-        '<span class="media-loader"></span><span class="media-state">Загрузка</span></div>' +
+        '<span class="media-loader"></span><span class="media-state">Загрузка NFT</span></div>' +
         image + '</div>' +
       '<div class="gift-lottie" aria-hidden="true"></div></div>';
   }
@@ -112,20 +112,25 @@
   document.addEventListener('error', event => {
     const img = event.target;
     if (!(img instanceof HTMLImageElement) || !img.classList.contains('gift-preview')) return;
-    if (!img.dataset.retry && img.dataset.secondary && img.src !== img.dataset.secondary) {
-      img.dataset.retry = '1';
-      img.src = img.dataset.secondary;
+    const attempt = Number(img.dataset.retry || 0);
+    const next = [img.dataset.secondary, img.dataset.tertiary][attempt];
+    if (next && img.src !== next) {
+      img.dataset.retry = String(attempt + 1);
+      img.src = next;
       return;
     }
     img.hidden = true;
     const status = img.parentElement?.querySelector('.media-state');
     if (status) status.textContent = 'Медиа недоступно';
+    const spinner = img.parentElement?.querySelector('.media-loader');
+    if (spinner) spinner.hidden = true;
   }, true);
 
   document.addEventListener('load', event => {
     const img = event.target;
-    if (img instanceof HTMLImageElement && img.classList.contains('gift-preview'))
+    if (img instanceof HTMLImageElement && img.classList.contains('gift-preview')) {
       img.parentElement?.classList.add('image-ready');
+    }
   }, true);
 
   function card(g) {
