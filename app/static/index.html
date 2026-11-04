@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#f5f6fa">
   <meta name="color-scheme" content="light dark">
   <title>LIM Gifts — коллекционные подарки Telegram</title>
-  <meta name="lim-app-build" content="media-proxy-v5">
+  <meta name="lim-app-build" content="catalog-market-v6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=6">
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
-  <script defer src="/static/app.js?v=5"></script>
+  <script defer src="/static/app.js?v=6"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -33,10 +33,10 @@
       <section class="intro">
         <div class="intro-copy">
           <div class="intro-kicker"><i data-lucide="sparkles"></i> Коллекционные подарки</div>
-          <h1>Найди свой <span>идеальный подарок.</span></h1>
-          <p>Все параметры в одном поиске. Коллекция, модель, фон, узор и владелец.</p>
+          <h1>Все подарки <span>в одном месте.</span></h1>
+          <p>От коллекций Telegram до конкретных NFT с моделями, фонами и узорами.</p>
         </div>
-        <div class="intro-stat"><strong id="catalogCount">—</strong><span>в каталоге</span></div>
+        <div class="intro-stat"><strong id="catalogCount">—</strong><span>коллекций</span></div>
       </section>
 
       <section class="discovery" aria-label="Поиск и фильтры">
@@ -54,8 +54,9 @@
       </section>
 
       <section class="results" aria-labelledby="resultTitle">
+        <button id="backToCollections" type="button" class="back-to-collections" hidden><i data-lucide="arrow-left"></i> Все коллекции</button>
         <div class="section-head">
-          <div><h2 id="resultTitle">Все подарки</h2><p id="resultSubtitle">Настоящие Telegram Gifts</p></div>
+          <div><h2 id="resultTitle">Все коллекции</h2><p id="resultSubtitle">Не только подарки на продаже</p></div>
           <div class="section-meta" id="resultCount">Загрузка…</div>
         </div>
         <div class="gift-grid" id="giftGrid"></div>
@@ -73,10 +74,10 @@
     </main>
 
     <nav class="tabbar" aria-label="Основная навигация">
-      <button class="tab active" type="button" data-tab="catalog"><i data-lucide="layout-grid"></i><span>Каталог</span></button>
+      <button class="tab active" type="button" data-tab="catalog"><i data-lucide="grid-2x2"></i><span>Каталог</span></button>
+      <button class="tab" type="button" data-tab="market"><i data-lucide="store"></i><span>Маркет</span></button>
       <button class="tab" type="button" data-tab="favorites"><i data-lucide="heart"></i><span>Избранное</span></button>
       <button class="tab" type="button" data-tab="saved"><i data-lucide="bookmark"></i><span>Подборки</span></button>
-      <button class="tab" type="button" data-import><i data-lucide="plus-circle"></i><span>Добавить</span></button>
     </nav>
   </div>
 
