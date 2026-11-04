@@ -81,7 +81,7 @@ def test_server_build_metadata():
     with TestClient(main.app) as client:
         response = client.get("/api/health")
         assert response.status_code == 200
-        assert response.json()["build"] == "media-proxy-v5"
+        assert response.json()["build"] == "catalog-market-v6"
         index = client.get("/")
         assert index.headers["cache-control"].startswith("no-store")
-        assert b"app.js?v=5" in index.content
+        assert b"app.js?v=6" in index.content
