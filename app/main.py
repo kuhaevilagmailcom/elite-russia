@@ -14,15 +14,19 @@ from app.db import Database
 from app.parser import GiftParseError, fetch_gift
 from app.animation import AnimationUnavailable, get_gift_animation
 from app.artwork import ArtworkUnavailable, get_artwork
+from app.catalog import CollectionCatalog
+from app.animation import decode_tgs
 
 
 settings = get_settings()
 db = Database(settings.database_path)
+collections = CollectionCatalog(db)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.init(settings.allow_demo_data)
+    collections.init()
     bot_task = None
     if settings.bot_token:
         from app.bot import run_bot
@@ -58,7 +62,65 @@ def index():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "bot": bool(settings.bot_token), "build": "media-proxy-v5"}
+    return {"status": "ok", "bot": bool(settings.bot_token), "build": "catalog-market-v6"}
+
+
+@app.get("/api/collections")
+def list_collections(
+    q: str = "",
+    collection: str = "",
+    model: str = "",
+    backdrop: str = "",
+    symbol: str = "",
+    limit: int = Query(48, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    filters = {"collection": collection, "model": model, "backdrop": backdrop, "symbol": symbol}
+    return collections.list(q, filters, limit=limit, offset=offset)
+
+
+@app.get("/api/collection-animation/{key}")
+def collection_animation(key: str):
+    media = collections.get_media_path(key)
+    if not media or media[1] != "tgs":
+        raise HTTPException(404, "Анимация коллекции пока недоступна")
+    try:
+        animation = decode_tgs(media[0].read_bytes())
+    except (AnimationUnavailable, OSError):
+        raise HTTPException(404, "Анимация коллекции повреждена")
+    return JSONResponse(animation, headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/collection-file/{key}")
+def collection_file(key: str):
+    media = collections.get_media_path(key)
+    types = {"webm": "video/webm", "webp": "image/webp", "png": "image/png"}
+    if not media or media[1] not in types:
+        raise HTTPException(404, "Медиа коллекции пока недоступно")
+    return FileResponse(
+        media[0], media_type=types[media[1]],
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/api/market")
+def list_market(
+    q: str = "",
+    collection: str = "",
+    model: str = "",
+    backdrop: str = "",
+    symbol: str = "",
+    limit: int = Query(48, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    filters = {"collection": collection, "model": model, "backdrop": backdrop, "symbol": symbol}
+    total = db.count(q, filters, market=True)
+    items = db.search(q, filters, limit=limit, offset=offset, market=True)
+    return {
+        "items": items,
+        "total": total,
+        "next_offset": offset + len(items) if offset + len(items) < total else None,
+    }
 
 
 @app.get("/api/gifts")
@@ -114,12 +176,14 @@ async def gift_animation(slug: str):
 
 @app.get("/api/stats")
 def stats():
-    return {"total": db.count()}
+    return {"total": db.count(), "market": db.count(market=True), "collections": collections.list(limit=1)["total"]}
 
 
 @app.get("/api/facets")
 def facets():
-    return db.facets()
+    result = db.facets()
+    result["collection"] = collections.names()
+    return result
 
 
 @app.post("/api/import")
@@ -130,7 +194,9 @@ async def import_gift(body: ImportBody):
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, "Telegram временно не отдал карточку") from exc
-    return db.upsert(parsed)
+    item = db.upsert(parsed)
+    collections.ensure_observed()
+    return item
 
 
 @app.post("/api/gifts/{slug}/favorite")
