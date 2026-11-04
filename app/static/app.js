@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const APP_BUILD = 'media-proxy-v5';
+  const APP_BUILD = 'catalog-market-v6';
   const tg = window.Telegram?.WebApp;
   tg?.ready();
   tg?.expand();
@@ -36,8 +36,8 @@
     ['symbol', 'Узор', 'flower-2'],
   ];
   const state = {
-    gifts: [], facetValues: {}, filters: {}, q: '', tab: 'catalog',
-    total: 0, catalogTotal: 0, nextOffset: null, loading: false, request: 0,
+    gifts: [], collections: [], catalogCollection: null, facetValues: {}, filters: {}, q: '', tab: 'catalog',
+    total: 0, catalogTotal: 0, marketTotal: 0, nextOffset: null, loading: false, request: 0,
     favorites: new Set(readSaved(favoriteKey, [])),
     presets: readSaved(presetsKey, []),
   };
@@ -147,6 +147,38 @@
       '<span class="card-arrow">' + icon('arrow-up-right') + '</span></div></div></article>';
   }
 
+  function collectionArt(collection) {
+    const key = String(collection.key || '').replace(/[^a-z0-9-]/g, '');
+    const sample = collection.sample_slug || '';
+    const kind = collection.media_kind || '';
+    const img = kind === 'png' || kind === 'webp'
+      ? '/api/collection-file/' + encodeURIComponent(key)
+      : sample ? '/api/artwork/' + encodeURIComponent(sample)
+      : 'https://fragment.com/file/gifts/' + encodeURIComponent(key) + '/thumb.webp';
+    const backup = 'https://fragment.com/file/gifts/' + encodeURIComponent(key) + '/thumb.webp';
+    const media = kind === 'webm'
+      ? '<video class="collection-video" muted loop autoplay playsinline preload="metadata" src="/api/collection-file/' + encodeURIComponent(key) + '"></video>'
+      : '';
+    const animation = kind === 'tgs'
+      ? ' data-collection-animation="' + esc(key) + '"'
+      : sample ? ' data-animation="' + esc(sample) + '"' : '';
+    return '<div class="gift-art collection-art" ' + animation + '>' +
+      '<div class="gift-fallback"><img class="gift-preview" alt="" src="' + esc(img) +
+      '" data-secondary="' + esc(backup) + '" loading="lazy" referrerpolicy="no-referrer">' +
+      '<div class="gift-placeholder"><span class="media-loader"></span><span class="media-state">Загрузка</span></div></div>' +
+      media + '<div class="gift-lottie" aria-hidden="true"></div></div>';
+  }
+
+  function collectionCard(c) {
+    return '<article class="gift-card collection-card" tabindex="0" data-collection-key="' +
+      esc(c.key) + '" aria-label="Открыть коллекцию ' + esc(c.title) + '">' +
+      '<div class="card-art">' + collectionArt(c) + '</div>' +
+      '<div class="card-copy"><div class="card-name">' + esc(c.title) + '</div>' +
+      '<div class="card-attrs">' + (c.official ? 'Коллекция Telegram' : 'Найдена в NFT') + '</div>' +
+      '<div class="card-foot"><strong>' + number(c.indexed_count) + ' NFT в базе</strong>' +
+      '<span class="card-arrow">' + icon('chevron-right') + '</span></div></div></article>';
+  }
+
   const animationObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
     for (const entry of entries) {
       const el = entry.target;
@@ -162,11 +194,11 @@
       animationObserver?.unobserve(el);
     }
     stagePlayers.clear();
-    $$('.gift-art[data-animation]').forEach(el => animationObserver?.unobserve(el));
+    $('.gift-art[data-animation], .gift-art[data-collection-animation]').forEach(el => animationObserver?.unobserve(el));
   }
 
   function connectAnimations(root = document) {
-    $$('.gift-art[data-animation]', root).forEach(el => {
+    $('.gift-art[data-animation], .gift-art[data-collection-animation]', root).forEach(el => {
       if (animationObserver) animationObserver.observe(el);
       else startAnimation(el);
     });
@@ -175,13 +207,18 @@
   function startAnimation(el) {
     if (!el.isConnected || !window.lottie || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const slug = el.dataset.animation;
-    if (failedAnimations.has(slug)) return;
+    const collectionKey = el.dataset.collectionAnimation;
+    const mediaId = collectionKey ? 'collection-' + collectionKey : slug;
+    if (!mediaId || failedAnimations.has(mediaId)) return;
+    const mediaPath = collectionKey
+      ? '/api/collection-animation/' + encodeURIComponent(collectionKey)
+      : slugUrl(slug);
     if (stagePlayers.has(el)) { stagePlayers.get(el).play?.(); return; }
     const container = $('.gift-lottie', el);
     if (!container) return;
     try {
       const player = window.lottie.loadAnimation({
-        container, renderer: 'svg', loop: true, autoplay: false, path: slugUrl(slug),
+        container, renderer: 'svg', loop: true, autoplay: false, path: mediaPath,
         rendererSettings: {preserveAspectRatio: 'xMidYMid meet', progressiveLoad: true},
       });
       stagePlayers.set(el, player);
@@ -191,7 +228,7 @@
         player.play();
       });
       player.addEventListener('data_failed', () => {
-        failedAnimations.add(slug);
+        failedAnimations.add(mediaId);
         el.classList.remove('has-animation');
         try { player.destroy(); } catch (_) {}
         stagePlayers.delete(el);
@@ -263,9 +300,9 @@
     icons();
   }
 
-  function renderGiftCards(items) {
+  function renderGiftCards(items, types = false) {
     stopAnimations();
-    grid.innerHTML = items.map(card).join('');
+    grid.innerHTML = items.map(types ? collectionCard : card).join('');
     grid.hidden = !items.length;
     $('#skeletonGrid').hidden = true;
     $('#emptyState').hidden = !!items.length;
@@ -273,23 +310,45 @@
     connectAnimations(grid);
   }
 
+  function isCatalogTypes() {
+    return state.tab === 'catalog' && !state.catalogCollection;
+  }
+
   function updateLoadMore() {
-    $('#loadMore').hidden = state.tab !== 'catalog' || state.nextOffset == null || !state.gifts.length;
+    const size = isCatalogTypes() ? state.collections.length : state.gifts.length;
+    $('#loadMore').hidden = !['catalog', 'market'].includes(state.tab) ||
+      state.nextOffset == null || !size;
     $('#loadMore').disabled = state.loading;
   }
 
   function syncHead() {
-    $('#resultTitle').textContent = state.tab === 'favorites' ? 'Избранные' :
-      state.tab === 'saved' ? 'Мои подборки' : 'Все подарки';
-    $('#resultSubtitle').textContent = state.tab === 'favorites' ? 'Сохранённые конкретные NFT' :
-      state.tab === 'saved' ? 'Твои фильтры и параметры' : 'Коллекционные подарки из Telegram';
-    $('#resultCount').textContent = state.tab === 'catalog' ? number(state.total) + ' найдено' :
-      state.tab === 'favorites' ? String(state.favorites.size) + ' сохранено' : String(state.presets.length) + ' подборок';
+    const title = state.tab === 'catalog'
+      ? (state.catalogCollection ? state.catalogCollection + ' — NFT' : 'Все коллекции')
+      : state.tab === 'market' ? 'Маркет NFT'
+      : state.tab === 'favorites' ? 'Избранное' : 'Мои подборки';
+    const subtitle = state.tab === 'catalog'
+      ? (state.catalogCollection
+        ? 'Известные экземпляры, включая невыставленные'
+        : 'Подарки Telegram — не только на продаже')
+      : state.tab === 'market' ? 'Только NFT с объявлениями о перепродаже'
+      : state.tab === 'favorites' ? 'Сохранённые конкретные NFT'
+      : 'Твои настройки поиска';
+    $('#resultTitle').textContent = title;
+    $('#resultSubtitle').textContent = subtitle;
+    $('#resultCount').textContent = ['catalog', 'market'].includes(state.tab)
+      ? number(state.total) + (isCatalogTypes() ? ' коллекций' : ' NFT')
+      : state.tab === 'favorites' ? state.favorites.size + ' сохранено'
+      : state.presets.length + ' подборок';
     $('#catalogCount').textContent = number(state.catalogTotal);
+    $('#backToCollections').hidden = !state.catalogCollection;
   }
 
   async function fetchCatalog(append = false) {
+    if (!['catalog', 'market'].includes(state.tab)) return;
     const request = ++state.request;
+    const tab = state.tab;
+    const collectionOpen = state.catalogCollection;
+    const types = isCatalogTypes();
     state.loading = true;
     if (!append) {
       stopAnimations(); grid.innerHTML = ''; grid.hidden = true;
@@ -298,20 +357,29 @@
     updateLoadMore();
     const params = new URLSearchParams({q: search.value.trim(), limit: String(pageSize)});
     for (const [key, value] of Object.entries(state.filters)) if (value) params.set(key, value);
+    if (collectionOpen) params.set('collection', collectionOpen);
     if (append && state.nextOffset != null) params.set('offset', String(state.nextOffset));
+    const path = types ? '/api/collections'
+      : tab === 'market' ? '/api/market' : '/api/gifts';
     try {
-      const data = await api('/api/gifts?' + params.toString());
-      if (request !== state.request || state.tab !== 'catalog') return;
-      state.gifts = append ? [...state.gifts, ...data.items] : data.items;
+      const data = await api(path + '?' + params.toString());
+      if (request !== state.request || tab !== state.tab ||
+          collectionOpen !== state.catalogCollection) return;
+      if (types) state.collections = append
+        ? [...state.collections, ...data.items] : data.items;
+      else state.gifts = append ? [...state.gifts, ...data.items] : data.items;
       state.total = data.total;
-      if (!search.value.trim() && !Object.values(state.filters).some(Boolean)) state.catalogTotal = data.total;
       state.nextOffset = data.next_offset;
-      renderGiftCards(state.gifts);
-      if (!state.gifts.length) {
-        emptyMessage(
-          state.total ? 'Подарки не загрузились' : 'Подарков пока нет',
-          'В каталоге показываются только реальные NFT. Добавь ссылку или подключи синхронизацию Telegram.',
-        );
+      const items = types ? state.collections : state.gifts;
+      renderGiftCards(items, types);
+      if (!items.length) {
+        if (collectionOpen) emptyMessage('Экземпляры не найдены',
+          'Коллекция существует, но её конкретные NFT ещё не добавлены в базу. ' +
+          'Невыставленные подарки можно добавить по публичной ссылке.');
+        else if (tab === 'market') emptyMessage('На маркете пусто',
+          'Сейчас нет индексированных объявлений. Проверь синхронизацию MTProto.');
+        else emptyMessage('Коллекций пока нет',
+          'Каталог пополняется через Telegram API. Добавь NFT по ссылке или включи синхронизацию.');
       }
       syncHead();
     } catch (error) {
@@ -323,6 +391,28 @@
         state.loading = false; $('#skeletonGrid').hidden = true; updateLoadMore();
       }
     }
+  }
+
+  function openCollection(c) {
+    state.catalogCollection = c.title;
+    state.filters.collection = c.title;
+    state.tab = 'catalog';
+    search.value = '';
+    $('#searchClear').hidden = true;
+    renderCollections();
+    renderActiveFilters();
+    setActiveNav();
+    fetchCatalog();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  function backToCollections() {
+    state.catalogCollection = null;
+    delete state.filters.collection;
+    search.value = '';
+    renderCollections();
+    renderActiveFilters();
+    fetchCatalog();
   }
 
   function renderPresets() {
@@ -372,13 +462,15 @@
   function setTab(tab) {
     state.tab = tab;
     state.request++;
-    search.placeholder = tab === 'favorites' ? 'Искать в избранном…' :
-      'Название, модель, фон, узор, @ник…';
+    state.catalogCollection = null;
     if (tab === 'saved') search.value = '';
     savedView.hidden = true;
     $('.discovery').classList.toggle('hidden-discovery', tab === 'saved');
+    search.placeholder = tab === 'catalog' ? 'Найти коллекцию или модель…'
+      : tab === 'favorites' ? 'Искать в избранном…'
+      : 'Название, модель, фон, узор, @ник…';
     setActiveNav(); syncHead();
-    if (tab === 'catalog') fetchCatalog();
+    if (tab === 'catalog' || tab === 'market') fetchCatalog();
     else if (tab === 'favorites') renderFavorites();
     else renderPresets();
     window.scrollTo({top: 0, behavior: 'smooth'});
@@ -388,9 +480,12 @@
     renderCollections();
     renderActiveFilters();
     renderFilterGroups();
-    if (state.tab !== 'catalog') state.tab = 'catalog';
+    if (state.tab !== 'catalog' && state.tab !== 'market') state.tab = 'market';
+    if (state.catalogCollection && state.filters.collection !== state.catalogCollection)
+      state.catalogCollection = null;
     setActiveNav();
-    savedView.hidden = true; $('.discovery').classList.remove('hidden-discovery');
+    savedView.hidden = true;
+    $('.discovery').classList.remove('hidden-discovery');
     fetchCatalog();
   }
 
@@ -417,8 +512,8 @@
       '<div class="specs">' + attrib('Модель', 'shapes', g.model, g.model_rarity) +
       attrib('Фон', 'palette', g.backdrop, g.backdrop_rarity) +
       attrib('Узор', 'flower-2', g.symbol, g.symbol_rarity) + '</div>' +
-      '<div class="detail-price"><span>Цена / оценка</span><strong>' + money(g.price_stars) +
-      '</strong><small>' + esc(g.price_source || 'Точная рыночная цена неизвестна') + '</small></div>' +
+      '<div class="detail-price"><span>' + (g.is_listed ? 'Цена объявления' : 'Статус') + '</span><strong>' + (g.is_listed ? money(g.price_stars) : 'Нет на маркете') +
+      '</strong><small>' + esc(g.is_listed ? (g.price_source || 'Цена не подтверждена') : 'Подарок сохранён в каталоге') + '</small></div>' +
       '<div class="detail-links"><a class="primary-button" href="' + esc(source) +
       '" target="_blank" rel="noopener noreferrer">' + icon('external-link') + ' Открыть в Telegram</a>' +
       (owner ? '<a class="secondary-button" href="' + esc(owner) +
@@ -443,8 +538,8 @@
     const g = state.gifts.find(x => x.slug === slug);
     if ($('#detailDialog').open && g) renderDetail(g);
     else if (state.tab === 'favorites') renderFavorites();
-    else if (state.tab === 'catalog') {
-      $$('.favorite-button[data-heart="' + CSS.escape(slug) + '"]').forEach(el => {
+    else if (state.tab === 'catalog' || state.tab === 'market') {
+      $('.favorite-button[data-heart="' + CSS.escape(slug) + '"]').forEach(el => {
         el.classList.toggle('active', state.favorites.has(slug));
         el.setAttribute('aria-label', state.favorites.has(slug) ? 'Убрать из избранного' : 'В избранное');
       });
@@ -501,6 +596,13 @@
       state.presets.splice(Number(deleted.dataset.deletePreset), 1);
       persist(presetsKey, state.presets); renderPresets(); syncHead(); return;
     }
+    const collectionCardEl = target.closest('.collection-card');
+    if (collectionCardEl) {
+      const c = state.collections.find(x => x.key === collectionCardEl.dataset.collectionKey);
+      if (c) openCollection(c);
+      return;
+    }
+    if (target.closest('#backToCollections')) { backToCollections(); return; }
     const cardEl = target.closest('.gift-card');
     if (cardEl) {
       const gift = state.gifts.find(g => g.slug === cardEl.dataset.slug);
@@ -550,17 +652,18 @@
     $('#searchClear').hidden = !search.value;
     clearTimeout(search._timer);
     search._timer = setTimeout(() => {
-      if (state.tab === 'catalog') fetchCatalog();
+      if (state.tab === 'catalog' || state.tab === 'market') fetchCatalog();
       else if (state.tab === 'favorites') renderFavorites();
     }, 280);
   });
   $('#searchClear').addEventListener('click', () => {
     search.value = ''; $('#searchClear').hidden = true;
-    if (state.tab === 'favorites') renderFavorites(); else fetchCatalog();
+    if (state.tab === 'favorites') renderFavorites();
+    else if (state.tab === 'catalog' || state.tab === 'market') fetchCatalog();
     search.focus();
   });
   $('#detailDialog').addEventListener('close', () => {
-    $('.gift-art[data-animation]', grid).forEach(el => {
+    $('.gift-art[data-animation], .gift-art[data-collection-animation]', grid).forEach(el => {
       if (animationObserver) animationObserver.observe(el);
     });
   });
@@ -609,7 +712,11 @@
       } catch (_) {}
     }
     renderActiveFilters();
-    api('/api/stats').then(stats => {state.catalogTotal = stats.total; syncHead();}).catch(() => {});
+    api('/api/stats').then(stats => {
+      state.catalogTotal = stats.collections;
+      state.marketTotal = stats.market;
+      syncHead();
+    }).catch(() => {});
     fetchCatalog();
   }
   init();
