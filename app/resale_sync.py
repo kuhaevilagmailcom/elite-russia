@@ -19,6 +19,7 @@ from telethon.tl.types import (
 
 from app.config import Settings, get_settings
 from app.db import Database
+from app.catalog import CollectionCatalog
 
 
 def _rarity(value: Any) -> float | None:
@@ -99,10 +100,45 @@ async def sync_resale_market(db: Database, settings: Settings) -> int:
     if not (settings.telegram_api_id and settings.telegram_api_hash and settings.telegram_session):
         return 0
     count = 0
+    run_id = datetime.now(UTC).isoformat()
+    collections = CollectionCatalog(db)
+    collections.init()
     client = TelegramClient(StringSession(settings.telegram_session), settings.telegram_api_id, settings.telegram_api_hash)
     async with client:
         catalog = await client(GetStarGiftsRequest(hash=0))
-        for base in catalog.gifts:
+        gift_types = list(getattr(catalog, "gifts", []) or [])
+        # Index ALL base gift types returned by Telegram, including those without resale.
+        for base in gift_types:
+            title = str(getattr(base, "title", None) or "").strip()
+            collections.upsert_official(int(base.id), title)
+        print(f"Gift catalog: {len(gift_types)} official types", flush=True)
+
+        # Fetch a bounded number of original sticker animations each cycle.
+        # The catalog remains responsive while the rest are filled in over time.
+        media_attempts = 0
+        for base in gift_types:
+            if media_attempts >= 30:
+                break
+            key = collections.upsert_official(
+                int(base.id), str(getattr(base, "title", None) or "")
+            )
+            if not collections.needs_media(key):
+                continue
+            sticker = getattr(base, "sticker", None)
+            if not sticker:
+                continue
+            media_attempts += 1
+            try:
+                mime = str(getattr(sticker, "mime_type", "") or "")
+                if mime not in ("application/x-tgsticker", "video/webm", "image/webp", "image/png"):
+                    continue
+                payload = await client.download_media(sticker, file=bytes)
+                if isinstance(payload, bytes):
+                    collections.record_media(key, payload, mime)
+            except Exception as exc:
+                print(f"Gift catalog media {key}: {type(exc).__name__}", flush=True)
+
+        for base in gift_types:
             if not getattr(base, "availability_resale", None):
                 continue
             offset = ""
@@ -112,13 +148,19 @@ async def sync_resale_market(db: Database, settings: Settings) -> int:
                 ))
                 for gift in page.gifts:
                     try:
-                        db.upsert_data(normalize_market_gift(gift, page))
+                        normalized = normalize_market_gift(gift, page)
+                        normalized["is_listed"] = 1
+                        normalized["market_seen"] = run_id
+                        db.upsert_data(normalized)
                         count += 1
                     except ValueError:
                         continue
                 offset = getattr(page, "next_offset", None) or ""
                 if not offset:
                     break
+    db.mark_unlisted_after_sync(run_id)
+    collections.ensure_observed()
+    print(f"Marketplace synced: {count} listed NFTs", flush=True)
     return count
 
 
