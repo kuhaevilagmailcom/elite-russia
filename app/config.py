@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     bot_token: str = ""
-    public_url: str = "http://localhost:8000"
+    public_url: str = "https://bot-1790259314-9532-furadev.bothost.tech"
     database_path: str = "data/gifts.db"
     admin_ids: str = ""
     allow_demo_data: bool = True
