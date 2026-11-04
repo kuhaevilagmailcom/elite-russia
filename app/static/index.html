@@ -3,104 +3,106 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f4f7ff">
-  <title>Limuzinov Scope — поиск Telegram Gifts</title>
+  <meta name="theme-color" content="#f5f6fa">
+  <meta name="color-scheme" content="light dark">
+  <title>LIM Gifts — коллекционные подарки Telegram</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=3">
+  <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+  <script defer src="/static/app.js?v=3"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
   <div class="app-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="Limuzinov Scope">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span>Limuzinov Scope</span>
-      </a>
-      <button class="icon-button" id="openImport" aria-label="Добавить подарок" title="Добавить подарок">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
+      <div class="wordmark">
+        <span class="logo" aria-hidden="true"><i data-lucide="gem"></i></span>
+        <span>LIM <b>Gifts</b></span>
+      </div>
+      <div class="top-actions">
+        <span class="online-label"><span class="online-dot"></span>Telegram Gifts</span>
+        <button class="icon-button" id="openImport" type="button" aria-label="Добавить подарок"><i data-lucide="plus"></i></button>
+      </div>
     </header>
 
     <main>
-      <section class="hero" aria-labelledby="heroTitle">
-        <div class="hero-copy">
-          <p class="live"><span></span> Collectible gifts</p>
-          <h1 id="heroTitle">Найди именно<br>тот подарок.</h1>
-          <p class="hero-text">Модель, фон, узор или владелец — всё в одном поиске.</p>
+      <section class="intro">
+        <div class="intro-copy">
+          <div class="intro-kicker"><i data-lucide="sparkles"></i> Коллекционные подарки</div>
+          <h1>Найди свой <span>идеальный подарок.</span></h1>
+          <p>Все параметры в одном поиске. Коллекция, модель, фон, узор и владелец.</p>
         </div>
-        <div class="hero-orbit" aria-hidden="true">
-          <div class="orbit-ring"></div>
-          <div class="gift-gem">
-            <div class="gem-pattern">✦　◌<br>　✦　<br>◌　　✦</div>
-            <div class="gem-object">🎁</div>
-          </div>
-          <span class="orbit-chip chip-one">1.5%</span>
-          <span class="orbit-chip chip-two">Rare</span>
-        </div>
+        <div class="intro-stat"><strong id="catalogCount">—</strong><span>в каталоге</span></div>
       </section>
 
-      <section class="finder" aria-label="Поиск подарков">
-        <label class="searchbox">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
-          <input id="search" type="search" placeholder="Подарок, владелец, #номер…" autocomplete="off">
-          <kbd id="searchClear" hidden>×</kbd>
-        </label>
-        <div class="filter-row" id="filterRow">
-          <button class="filter active" data-filter="all">Все</button>
-          <button class="filter" data-filter="collection">Подарок</button>
-          <button class="filter" data-filter="model">Модель</button>
-          <button class="filter" data-filter="backdrop">Фон</button>
-          <button class="filter" data-filter="symbol">Узор</button>
+      <section class="discovery" aria-label="Поиск и фильтры">
+        <div class="search-row">
+          <label class="searchbox" for="search">
+            <i data-lucide="search"></i>
+            <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Название, модель, фон, узор, @ник…">
+            <button type="button" id="searchClear" class="search-clear" aria-label="Очистить поиск" hidden><i data-lucide="x"></i></button>
+          </label>
+          <button type="button" class="filter-launch" id="openFilters" aria-label="Фильтры"><i data-lucide="sliders-horizontal"></i><span>Фильтры</span><b id="activeFilterCount" hidden>0</b></button>
         </div>
-        <div class="facet-panel" id="facetPanel" hidden></div>
+        <div class="rail-heading"><span>Коллекции</span><button type="button" id="resetCollection">Все коллекции <i data-lucide="arrow-right"></i></button></div>
+        <div class="collection-rail" id="collectionRail" role="list" aria-label="Коллекции подарков"></div>
+        <div class="active-filters" id="activeFilters" aria-label="Выбранные фильтры" hidden></div>
       </section>
 
-      <section class="results" aria-live="polite">
+      <section class="results" aria-labelledby="resultTitle">
         <div class="section-head">
-          <h2 id="resultTitle">Подборка</h2>
-          <span id="resultCount">0 подарков</span>
+          <div><h2 id="resultTitle">Все подарки</h2><p id="resultSubtitle">Настоящие Telegram Gifts</p></div>
+          <div class="section-meta" id="resultCount">Загрузка…</div>
         </div>
         <div class="gift-grid" id="giftGrid"></div>
-        <div class="empty" id="emptyState" hidden>
-          <div class="empty-mark">⌁</div>
-          <h3>Такого подарка пока нет</h3>
-          <p>Пришли ссылку t.me/nft — добавим его в индекс.</p>
-          <button class="primary-button" data-import>Добавить по ссылке</button>
+        <div id="skeletonGrid" class="gift-grid skeleton-grid" aria-hidden="true">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
         </div>
+        <div class="empty" id="emptyState" hidden>
+          <div class="empty-icon"><i data-lucide="package-search"></i></div>
+          <h3 id="emptyTitle">Пока ничего не найдено</h3>
+          <p id="emptyText">Попробуй изменить фильтры или добавь подарок по ссылке.</p>
+          <button class="soft-button" type="button" id="emptyAction">Добавить подарок <i data-lucide="arrow-up-right"></i></button>
+        </div>
+        <button type="button" class="load-more" id="loadMore" hidden>Показать ещё <i data-lucide="chevron-down"></i></button>
       </section>
     </main>
 
-    <nav class="bottom-nav" aria-label="Основная навигация">
-      <button class="nav-item active"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span>Поиск</span></button>
-      <button class="nav-item" id="favoritesNav"><svg viewBox="0 0 24 24"><path d="m12 19-7-7a4.4 4.4 0 0 1 6.2-6.2L12 6.6l.8-.8A4.4 4.4 0 0 1 19 12Z"/></svg><span>Избранное</span></button>
-      <button class="nav-item" data-import><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Добавить</span></button>
+    <nav class="tabbar" aria-label="Основная навигация">
+      <button class="tab active" type="button" data-tab="catalog"><i data-lucide="layout-grid"></i><span>Каталог</span></button>
+      <button class="tab" type="button" data-tab="favorites"><i data-lucide="heart"></i><span>Избранное</span></button>
+      <button class="tab" type="button" data-tab="saved"><i data-lucide="bookmark"></i><span>Подборки</span></button>
+      <button class="tab" type="button" data-import><i data-lucide="plus-circle"></i><span>Добавить</span></button>
     </nav>
   </div>
 
-  <dialog class="sheet" id="detailDialog">
+  <dialog class="sheet detail-sheet" id="detailDialog" aria-label="Карточка подарка">
     <div class="sheet-handle"></div>
-    <button class="close-button" data-close aria-label="Закрыть">×</button>
+    <button class="sheet-close" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button>
     <div id="detailContent"></div>
   </dialog>
 
-  <dialog class="sheet import-sheet" id="importDialog">
+  <dialog class="sheet filter-sheet" id="filterDialog" aria-label="Фильтры подарков">
     <div class="sheet-handle"></div>
-    <button class="close-button" data-close aria-label="Закрыть">×</button>
-    <div class="import-content">
-      <div class="import-icon">↗</div>
-      <h2>Добавить подарок</h2>
-      <p>Вставь публичную ссылку Telegram. Мы сами найдём владельца и атрибуты.</p>
-      <label class="url-field"><span>Ссылка на подарок</span><input id="importUrl" placeholder="https://t.me/nft/…" inputmode="url"></label>
-      <p class="form-error" id="importError" role="alert"></p>
-      <button class="primary-button wide" id="importSubmit">Найти и добавить</button>
-    </div>
+    <div class="sheet-header"><div><p class="eyebrow">Поиск по параметрам</p><h2>Фильтры</h2></div><button class="sheet-close static-close" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+    <div class="filter-groups" id="filterGroups"></div>
+    <div class="sheet-footer"><button type="button" class="secondary-button" id="resetFilters">Сбросить</button><button type="button" class="primary-button" id="applyFilters">Показать подарки</button></div>
+    <button type="button" class="save-query" id="saveSearch"><i data-lucide="bookmark-plus"></i> Сохранить эту подборку</button>
   </dialog>
 
-  <div class="toast" id="toast" role="status"></div>
-  <script src="/static/app.js"></script>
+  <dialog class="sheet import-sheet" id="importDialog" aria-label="Добавить подарок">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header"><div><p class="eyebrow">Импорт из Telegram</p><h2>Добавить подарок</h2></div><button class="sheet-close static-close" type="button" data-close aria-label="Закрыть"><i data-lucide="x"></i></button></div>
+    <p class="import-hint">Вставь ссылку на настоящий коллекционный подарок. Мы получим модель, фон, узор и владельца из Telegram.</p>
+    <label class="input-caption" for="importUrl">Ссылка t.me/nft/…</label>
+    <input class="link-input" id="importUrl" type="url" inputmode="url" placeholder="https://t.me/nft/PlushPepe-1">
+    <p class="form-error" id="importError" role="alert"></p>
+    <button class="primary-button full" type="button" id="importSubmit">Найти и добавить <i data-lucide="arrow-right"></i></button>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
-
