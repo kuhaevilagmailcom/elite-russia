@@ -16,7 +16,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 
-SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*-\\d+$", re.I)
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*-\d+$", re.I)
 _ALLOWED_HOSTS = ("telegram.org", "telesco.pe", "telegram-cdn.org", "t.me")
 _lock = asyncio.Semaphore(5)
 
