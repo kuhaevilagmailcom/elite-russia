@@ -5,13 +5,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.db import Database
 from app.parser import GiftParseError, fetch_gift
+from app.animation import AnimationUnavailable, get_gift_animation
 
 
 settings = get_settings()
@@ -66,9 +67,17 @@ def list_gifts(
     model: str = "",
     backdrop: str = "",
     symbol: str = "",
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(48, ge=1, le=100),
+    offset: int = Query(0, ge=0),
 ):
-    return {"items": db.search(q, {"collection": collection, "model": model, "backdrop": backdrop, "symbol": symbol}, limit)}
+    filters = {"collection": collection, "model": model, "backdrop": backdrop, "symbol": symbol}
+    total = db.count(q, filters)
+    items = db.search(q, filters, limit=limit, offset=offset)
+    return {
+        "items": items,
+        "total": total,
+        "next_offset": offset + len(items) if offset + len(items) < total else None,
+    }
 
 
 @app.get("/api/gifts/{slug}")
@@ -77,6 +86,15 @@ def gift_detail(slug: str):
     if not gift:
         raise HTTPException(404, "Подарок не найден")
     return gift
+
+
+@app.get("/api/animation/{slug}")
+async def gift_animation(slug: str):
+    try:
+        animation = await get_gift_animation(slug, settings.database_path)
+    except AnimationUnavailable as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return JSONResponse(animation, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/facets")

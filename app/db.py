@@ -160,24 +160,43 @@ class Database:
             row = conn.execute("SELECT * FROM gifts WHERE slug=?", (slug,)).fetchone()
         return dict(row) if row else None
 
-    def search(self, query: str = "", filters: dict[str, str] | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    @staticmethod
+    def _where(query: str, filters: dict[str, str] | None) -> tuple[str, list[str]]:
         filters = filters or {}
-        clauses, params = [], []
-        if query.strip():
-            q = f"%{query.strip()}%"
-            clauses.append("(collection LIKE ? OR owner_name LIKE ? OR model LIKE ? OR backdrop LIKE ? OR symbol LIKE ? OR slug LIKE ?)")
-            params.extend([q] * 6)
+        clauses: list[str] = []
+        params: list[str] = []
+        normalized = query.strip().removeprefix("#")
+        if normalized:
+            q = f"%{normalized}%"
+            clauses.append(
+                "(collection LIKE ? OR owner_name LIKE ? OR model LIKE ? "
+                "OR backdrop LIKE ? OR symbol LIKE ? OR slug LIKE ? "
+                "OR CAST(number AS TEXT) LIKE ?)"
+            )
+            params.extend([q] * 7)
         for key in ("collection", "model", "backdrop", "symbol"):
             if filters.get(key):
                 clauses.append(f"{key} = ?")
                 params.append(filters[key])
-        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        return (" WHERE " + " AND ".join(clauses) if clauses else "", params)
+
+    def search(
+        self, query: str = "", filters: dict[str, str] | None = None,
+        limit: int = 48, offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        where, params = self._where(query, filters)
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM gifts" + where + " ORDER BY COALESCE(price_stars, 999999999), collection, number LIMIT ?",
-                [*params, min(limit, 100)],
+                "SELECT * FROM gifts" + where
+                + " ORDER BY collection COLLATE NOCASE, number LIMIT ? OFFSET ?",
+                [*params, max(1, min(limit, 100)), max(0, offset)],
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def count(self, query: str = "", filters: dict[str, str] | None = None) -> int:
+        where, params = self._where(query, filters)
+        with self.connect() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM gifts" + where, params).fetchone()[0])
 
     def facets(self) -> dict[str, list[str]]:
         result: dict[str, list[str]] = {}

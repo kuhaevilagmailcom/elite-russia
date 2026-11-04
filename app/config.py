@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     public_url: str = "https://bot-1790259314-9532-furadev.bothost.tech"
     database_path: str = "data/gifts.db"
     admin_ids: str = ""
-    allow_demo_data: bool = True
+    allow_demo_data: bool = False
     emoji_gift_id: str = ""
     emoji_owner_id: str = ""
     emoji_model_id: str = ""

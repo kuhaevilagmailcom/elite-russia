@@ -1,24 +1,5 @@
 # LIM NFT Parser — Telegram Mini App
 
-## Исправление ошибки `ReferenceError: window is not defined` на BotHost
-
-Эта ошибка означает, что Node.js пытается запустить браузерный файл `app/static/app.js`.
-**Это не точка входа сервера. Не меняйте `app/static/app.js` и не запускайте его через Node.**
-
-При деплое из GitHub установите в панели BotHost:
-
-1. **Язык / шаблон** — `Python` (или `aiogram`), НЕ `Node.js`.
-2. **Главный файл / точка входа** — `main.py` в корне репозитория (без `app/`, `static/`).
-3. **Ветка** — `main`.
-4. **Использовать Dockerfile из репозитория** — можно включить: он использует Python 3.12 и команду `python main.py`. Альтернативно оставьте выключенным, но укажите Python + `main.py`.
-5. **Порт** — используйте значение переменной `PORT` от хостинга; приложение прослушивает `0.0.0.0` и этот порт.
-6. В переменных окружения задайте `BOT_TOKEN`, `PUBLIC_URL` и `ALLOW_DEMO_DATA=false`.
-
-В корне есть `bothost.json` с `language: python` и `main: main.py` для поддерживаемого автоматического определения. **Ручные настройки хостинга могут его перекрыть.**
-
-Сохраните настройки и сделайте **новый деплой / пересборку из GitHub**, а не только «Перезапустить» старый Node-контейнер. После успешного запуска откройте `/api/health`: должен вернуться JSON со `status: ok`. Для действующего Telegram-бота `bot` также должен быть `true`.
-
-
 Telegram-парсер подарков и Mini App на базе исходного проекта [Limuzinov Scope](https://github.com/kuhaevilagmailcom/-telegram-nft-business-offer-bot).
 
 ## Хостинг BotHost
