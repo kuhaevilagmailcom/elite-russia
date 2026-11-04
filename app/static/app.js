@@ -85,16 +85,48 @@
     tg?.HapticFeedback?.impactOccurred?.('light');
   }
 
+  function fragmentPreview(slug, extension = 'medium.jpg') {
+    if (!/^[a-z0-9][a-z0-9_-]*-\d+$/i.test(String(slug || ''))) return '';
+    return 'https://nft.fragment.com/gift/' + slug.toLowerCase() + '.' + extension;
+  }
+
   function art(g, isDetail = false) {
-    const img = g.image_url
-      ? '<img class="gift-preview" alt="" src="' + esc(g.image_url) + '" loading="lazy" referrerpolicy="no-referrer">'
-      : '<div class="gift-placeholder" aria-hidden="true">' + icon('gem') + '</div>';
+    // Telegram resale data has image_url=null: fetch this exact NFT's artwork.
+    const preview = fragmentPreview(g.slug, isDetail ? 'large.jpg' : 'medium.jpg');
+    const secondary = g.image_url && /^https:\/\//i.test(g.image_url)
+      ? g.image_url : fragmentPreview(g.slug, 'webp');
+    const image = preview
+      ? '<img class="gift-preview" alt="" src="' + esc(preview) + '" data-secondary="' +
+        esc(secondary) + '" loading="' + (isDetail ? 'eager' : 'lazy') +
+        '" referrerpolicy="no-referrer">'
+      : '';
     return '<div class="gift-art ' + (isDetail ? 'large-art' : '') +
       '" style="' + gradient(g) + '" data-animation="' + esc(g.slug) + '">' +
       '<div class="gift-pattern" aria-hidden="true"></div>' +
-      '<div class="gift-fallback">' + img + '</div>' +
+      '<div class="gift-fallback"><div class="gift-placeholder" aria-hidden="true">' +
+        '<span class="media-loader"></span><span class="media-state">Загрузка</span></div>' +
+        image + '</div>' +
       '<div class="gift-lottie" aria-hidden="true"></div></div>';
   }
+
+  document.addEventListener('error', event => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains('gift-preview')) return;
+    if (!img.dataset.retry && img.dataset.secondary && img.src !== img.dataset.secondary) {
+      img.dataset.retry = '1';
+      img.src = img.dataset.secondary;
+      return;
+    }
+    img.hidden = true;
+    const status = img.parentElement?.querySelector('.media-state');
+    if (status) status.textContent = 'Медиа недоступно';
+  }, true);
+
+  document.addEventListener('load', event => {
+    const img = event.target;
+    if (img instanceof HTMLImageElement && img.classList.contains('gift-preview'))
+      img.parentElement?.classList.add('image-ready');
+  }, true);
 
   function card(g) {
     const saved = state.favorites.has(g.slug);

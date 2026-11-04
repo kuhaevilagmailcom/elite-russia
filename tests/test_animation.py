@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from app.animation import AnimationUnavailable, decode_tgs, find_tgs_url
+from app.animation import AnimationUnavailable, decode_tgs, decode_lottie_json, download_animation, find_tgs_url
 from app.db import Database
 
 
@@ -18,7 +18,7 @@ def test_rejects_untrusted_host():
 
 
 def test_decodes_real_tgs_structure():
-    document = {"v": "5.5", "layers": [], "w": 512, "h": 512}
+    document = {"v": "5.5", "layers": [], "w": 512, "h": 512, "fr": 60}
     assert decode_tgs(gzip.compress(json.dumps(document).encode())) == document
 
 
@@ -43,3 +43,27 @@ def test_pagination_and_filters_cover_all_indexed_gifts(tmp_path):
     assert len(db.search(limit=48, offset=96)) == 19
     assert db.count("", {"model": "Model A"}) == 57
     assert db.count("#115") == 1
+
+
+def test_fragment_animation_resolves_for_correct_gift():
+    import asyncio
+    import httpx
+
+    doc = {"v": "5.5", "layers": [{"ty": 4}], "w": 512, "h": 512, "fr": 60}
+    requested = []
+
+    def handler(request):
+        requested.append(str(request.url))
+        return httpx.Response(200, json=doc)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await download_animation(client, "chillflame-2199")
+
+    assert asyncio.run(run()) == doc
+    assert requested == ["https://nft.fragment.com/gift/chillflame-2199.lottie.json"]
+
+
+def test_invalid_fragment_lottie_fails_safely():
+    with pytest.raises(AnimationUnavailable):
+        decode_lottie_json(b"<html>not lottie</html>")

@@ -273,3 +273,22 @@ dialog::backdrop {background:rgba(14,19,37,.48);backdrop-filter:blur(8px);-webki
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after {animation:none!important;scroll-behavior:auto!important;transition:none!important}
 }
+
+/* Genuine Telegram NFT imagery replaces the generic diamond placeholder. */
+.gift-fallback {overflow:hidden}
+.gift-placeholder {
+  position:absolute;inset:0;width:100%;height:100%;transform:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;
+  background:none;border:0;border-radius:0;box-shadow:none;
+}
+.gift-preview {position:relative;z-index:2;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;filter:none}
+.gift-placeholder .media-loader {
+  display:block;width:25px;height:25px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.2);border-top-color:rgba(255,255,255,.78);
+  animation:spin 1.1s linear infinite;
+}
+.gift-placeholder .media-state {font-size:10px;font-weight:650;color:rgba(255,255,255,.7)}
+.image-ready .gift-placeholder {display:none}
+.large-art .gift-preview {width:100%;height:100%}
+@keyframes spin {to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.gift-placeholder .media-loader{animation:none}}
