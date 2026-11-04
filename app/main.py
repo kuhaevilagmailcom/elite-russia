@@ -90,11 +90,18 @@ def gift_detail(slug: str):
 
 @app.get("/api/animation/{slug}")
 async def gift_animation(slug: str):
+    if not db.get(slug.lower()):
+        raise HTTPException(404, "Подарок не найден в каталоге")
     try:
         animation = await get_gift_animation(slug, settings.database_path)
     except AnimationUnavailable as exc:
         raise HTTPException(404, str(exc)) from exc
     return JSONResponse(animation, headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/stats")
+def stats():
+    return {"total": db.count()}
 
 
 @app.get("/api/facets")

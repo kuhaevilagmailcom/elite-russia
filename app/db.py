@@ -119,6 +119,8 @@ class Database:
     def init(self, demo: bool = True) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            if not demo:
+                conn.execute("DELETE FROM gifts WHERE price_source = ?", ("Демо-оценка",))
             if demo and conn.execute("SELECT COUNT(*) FROM gifts").fetchone()[0] == 0:
                 for gift in DEMO_GIFTS:
                     self._upsert_dict(conn, gift)

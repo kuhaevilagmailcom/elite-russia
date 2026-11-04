@@ -36,7 +36,7 @@
   ];
   const state = {
     gifts: [], facetValues: {}, filters: {}, q: '', tab: 'catalog',
-    total: 0, nextOffset: null, loading: false, request: 0,
+    total: 0, catalogTotal: 0, nextOffset: null, loading: false, request: 0,
     favorites: new Set(readSaved(favoriteKey, [])),
     presets: readSaved(presetsKey, []),
   };
@@ -248,7 +248,7 @@
       state.tab === 'saved' ? 'Твои фильтры и параметры' : 'Коллекционные подарки из Telegram';
     $('#resultCount').textContent = state.tab === 'catalog' ? number(state.total) + ' найдено' :
       state.tab === 'favorites' ? String(state.favorites.size) + ' сохранено' : String(state.presets.length) + ' подборок';
-    $('#catalogCount').textContent = state.tab === 'catalog' ? number(state.total) : number(state.total);
+    $('#catalogCount').textContent = number(state.catalogTotal);
   }
 
   async function fetchCatalog(append = false) {
@@ -267,6 +267,7 @@
       if (request !== state.request || state.tab !== 'catalog') return;
       state.gifts = append ? [...state.gifts, ...data.items] : data.items;
       state.total = data.total;
+      if (!search.value.trim() && !Object.values(state.filters).some(Boolean)) state.catalogTotal = data.total;
       state.nextOffset = data.next_offset;
       renderGiftCards(state.gifts);
       if (!state.gifts.length) {
@@ -521,7 +522,12 @@
     if (state.tab === 'favorites') renderFavorites(); else fetchCatalog();
     search.focus();
   });
-  $('#importSubmit').addEventListener('click', async () => {
+  $('#detailDialog').addEventListener('close', () => {
+    $('.gift-art[data-animation]', grid).forEach(el => {
+      if (animationObserver) animationObserver.observe(el);
+    });
+  });
+    $('#importSubmit').addEventListener('click', async () => {
     const button = $('#importSubmit');
     const error = $('#importError');
     error.textContent = '';
@@ -565,6 +571,7 @@
       } catch (_) {}
     }
     renderActiveFilters();
+    api('/api/stats').then(stats => {state.catalogTotal = stats.total; syncHead();}).catch(() => {});
     fetchCatalog();
   }
   init();
