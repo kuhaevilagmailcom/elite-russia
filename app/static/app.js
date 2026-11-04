@@ -136,7 +136,7 @@
   }
 
   function startAnimation(el) {
-    if (!el.isConnected || !window.lottie) return;
+    if (!el.isConnected || !window.lottie || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const slug = el.dataset.animation;
     if (failedAnimations.has(slug)) return;
     if (stagePlayers.has(el)) { stagePlayers.get(el).play?.(); return; }
@@ -539,6 +539,7 @@
       $('#importDialog').close();
       $('#importUrl').value = '';
       state.filters = {};
+      renderCollections(); renderActiveFilters();
       search.value = gift.collection;
       await setTab('catalog');
       openDetail(gift);

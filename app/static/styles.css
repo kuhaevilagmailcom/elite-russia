@@ -267,7 +267,7 @@ dialog::backdrop {background:rgba(14,19,37,.48);backdrop-filter:blur(8px);-webki
 }
 @media(min-width:720px) {
   .gift-grid {grid-template-columns:repeat(4,minmax(0,1fr))}
-  .sheet {bottom:50%;top:50%;transform:translateY(50%);margin:auto;border-radius:27px;max-height:min(88vh,850px)}
+  .sheet {bottom:auto;top:50%;transform:translateY(-50%);margin:0 auto;border-radius:27px;max-height:min(88vh,850px)}
   .sheet[open] {animation:none}
 }
 @media(prefers-reduced-motion:reduce) {
