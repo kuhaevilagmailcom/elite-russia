@@ -1,14 +1,13 @@
 (() => {
   'use strict';
-  const APP_BUILD = 'catalog-market-v6';
+  const APP_BUILD = 'acid-market-v7';
   const tg = window.Telegram?.WebApp;
   tg?.ready();
   tg?.expand();
   try {
-    tg?.setHeaderColor?.('#f5f6fa');
-    tg?.setBackgroundColor?.('#f5f6fa');
+    tg?.setHeaderColor?.('#050705');
+    tg?.setBackgroundColor?.('#050705');
   } catch (_) {}
-  if (tg?.colorScheme === 'dark') document.documentElement.classList.add('dark');
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -49,6 +48,8 @@
   savedView.hidden = true;
   grid.before(savedView);
   const money = n => n != null ? Number(n).toLocaleString('ru-RU') + ' ⭐' : 'Цена не указана';
+  const tonMoney = n => n != null ? Number(n).toLocaleString('ru-RU', {maximumFractionDigits: 4}) + ' TON' : '';
+  const price = g => g.price_ton != null ? tonMoney(g.price_ton) : money(g.price_stars);
   const number = n => Number(n || 0).toLocaleString('ru-RU');
   const cleanUrl = value => {
     try {
@@ -60,6 +61,55 @@
   const giftTitle = g => g.collection + ' #' + g.number;
   const gradient = g => '--gift-center:' + esc(g.center_color || '#8678cd') + ';--gift-edge:' + esc(g.edge_color || '#404b8e') + ';';
   let toastTimer = null;
+  let tonConnectUI = null;
+
+  function shortAddress(address) {
+    const value = String(address || '');
+    return value.length > 13 ? value.slice(0, 7) + '…' + value.slice(-5) : value;
+  }
+
+  function updateWalletState(wallet) {
+    const status = $('#walletStatus');
+    const label = $('#walletLabel');
+    if (!status || !label) return;
+    const address = wallet?.account?.address || '';
+    status.classList.toggle('connected', Boolean(address));
+    label.textContent = address ? 'Подключён · ' + shortAddress(address) : 'Кошелёк не подключён';
+  }
+
+  function initWallet() {
+    if (!window.TON_CONNECT_UI?.TonConnectUI) {
+      const root = $('#ton-connect');
+      if (root) root.innerHTML = '<span class="wallet-unavailable">TonConnect недоступен</span>';
+      return;
+    }
+    try {
+      tonConnectUI = new window.TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: location.origin + '/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect',
+        language: 'ru',
+        analytics: {mode: 'off'},
+        uiPreferences: {
+          theme: window.TON_CONNECT_UI.THEME.DARK,
+          borderRadius: 's',
+          colorsSet: {
+            [window.TON_CONNECT_UI.THEME.DARK]: {
+              connectButton: {background: '#63ff36', foreground: '#050705'},
+              accent: '#63ff36'
+            }
+          }
+        }
+      });
+      tonConnectUI.onStatusChange(wallet => {
+        updateWalletState(wallet);
+        if (wallet) tg?.HapticFeedback?.notificationOccurred?.('success');
+      });
+      updateWalletState(tonConnectUI.wallet);
+    } catch (_) {
+      const root = $('#ton-connect');
+      if (root) root.innerHTML = '<span class="wallet-unavailable">TON</span>';
+    }
+  }
 
   function toast(text) {
     const el = $('#toast');
@@ -143,7 +193,7 @@
       icon('heart') + '</button></div>' +
       '<div class="card-copy"><div class="card-name">' + esc(giftTitle(g)) + '</div>' +
       '<div class="card-attrs">' + esc(g.model) + ' <span>·</span> ' + esc(g.backdrop) + '</div>' +
-      '<div class="card-foot"><strong>' + money(g.price_stars) + '</strong>' +
+      '<div class="card-foot"><strong>' + price(g) + '</strong>' +
       '<span class="card-arrow">' + icon('arrow-up-right') + '</span></div></div></article>';
   }
 
@@ -194,11 +244,11 @@
       animationObserver?.unobserve(el);
     }
     stagePlayers.clear();
-    $('.gift-art[data-animation], .gift-art[data-collection-animation]').forEach(el => animationObserver?.unobserve(el));
+    $$('.gift-art[data-animation], .gift-art[data-collection-animation]').forEach(el => animationObserver?.unobserve(el));
   }
 
   function connectAnimations(root = document) {
-    $('.gift-art[data-animation], .gift-art[data-collection-animation]', root).forEach(el => {
+    $$('.gift-art[data-animation], .gift-art[data-collection-animation]', root).forEach(el => {
       if (animationObserver) animationObserver.observe(el);
       else startAnimation(el);
     });
@@ -512,10 +562,10 @@
       '<div class="specs">' + attrib('Модель', 'shapes', g.model, g.model_rarity) +
       attrib('Фон', 'palette', g.backdrop, g.backdrop_rarity) +
       attrib('Узор', 'flower-2', g.symbol, g.symbol_rarity) + '</div>' +
-      '<div class="detail-price"><span>' + (g.is_listed ? 'Цена объявления' : 'Статус') + '</span><strong>' + (g.is_listed ? money(g.price_stars) : 'Нет на маркете') +
+      '<div class="detail-price"><span>' + (g.is_listed ? 'Цена объявления' : 'Статус') + '</span><strong>' + (g.is_listed ? price(g) : 'Нет на маркете') +
       '</strong><small>' + esc(g.is_listed ? (g.price_source || 'Цена не подтверждена') : 'Подарок сохранён в каталоге') + '</small></div>' +
       '<div class="detail-links"><a class="primary-button" href="' + esc(source) +
-      '" target="_blank" rel="noopener noreferrer">' + icon('external-link') + ' Открыть в Telegram</a>' +
+      '" target="_blank" rel="noopener noreferrer">' + icon('shopping-bag') + (g.is_listed ? ' Купить в Telegram' : ' Открыть в Telegram') + '</a>' +
       (owner ? '<a class="secondary-button" href="' + esc(owner) +
         '" target="_blank" rel="noopener noreferrer">' + icon('user-round') + ' Профиль владельца</a>' : '') +
       '</div>';
@@ -539,7 +589,7 @@
     if ($('#detailDialog').open && g) renderDetail(g);
     else if (state.tab === 'favorites') renderFavorites();
     else if (state.tab === 'catalog' || state.tab === 'market') {
-      $('.favorite-button[data-heart="' + CSS.escape(slug) + '"]').forEach(el => {
+      $$('.favorite-button[data-heart="' + CSS.escape(slug) + '"]').forEach(el => {
         el.classList.toggle('active', state.favorites.has(slug));
         el.setAttribute('aria-label', state.favorites.has(slug) ? 'Убрать из избранного' : 'В избранное');
       });
@@ -663,7 +713,7 @@
     search.focus();
   });
   $('#detailDialog').addEventListener('close', () => {
-    $('.gift-art[data-animation], .gift-art[data-collection-animation]', grid).forEach(el => {
+    $$('.gift-art[data-animation], .gift-art[data-collection-animation]', grid).forEach(el => {
       if (animationObserver) animationObserver.observe(el);
     });
   });
@@ -695,6 +745,7 @@
   });
 
   async function init() {
+    initWallet();
     icons();
     renderCollections();
     renderActiveFilters();

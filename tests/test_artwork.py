@@ -81,7 +81,22 @@ def test_server_build_metadata():
     with TestClient(main.app) as client:
         response = client.get("/api/health")
         assert response.status_code == 200
-        assert response.json()["build"] == "catalog-market-v6"
+        assert response.json()["build"] == "acid-market-v7"
         index = client.get("/")
         assert index.headers["cache-control"].startswith("no-store")
-        assert b"app.js?v=6" in index.content
+        assert b"app.js?v=7" in index.content
+        assert b"@tonconnect/ui@5.0.3" in index.content
+
+
+def test_tonconnect_manifest_is_public_and_points_to_png():
+    with TestClient(main.app) as client:
+        response = client.get("/tonconnect-manifest.json")
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "*"
+        manifest = response.json()
+        assert manifest["name"] == "LIM Drop"
+        assert manifest["url"] == "http://testserver"
+        assert manifest["iconUrl"] == "http://testserver/static/lim-drop-icon.png"
+        icon = client.get("/static/lim-drop-icon.png")
+        assert icon.status_code == 200
+        assert icon.headers["content-type"] == "image/png"

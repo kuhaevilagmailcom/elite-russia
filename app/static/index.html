@@ -3,28 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f5f6fa">
-  <meta name="color-scheme" content="light dark">
-  <title>LIM Gifts — коллекционные подарки Telegram</title>
-  <meta name="lim-app-build" content="catalog-market-v6">
+  <meta name="theme-color" content="#050705">
+  <meta name="color-scheme" content="dark">
+  <title>LIM Drop — маркет подарков Telegram</title>
+  <meta name="description" content="Каталог и маркет коллекционных подарков Telegram с подключением TON-кошелька.">
+  <meta name="lim-app-build" content="acid-market-v7">
+  <link rel="icon" type="image/png" href="/static/lim-drop-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=6">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=7">
   <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
-  <script defer src="/static/app.js?v=6"></script>
+  <script defer src="https://unpkg.com/@tonconnect/ui@5.0.3/dist/tonconnect-ui.min.js"></script>
+  <script defer src="/static/app.js?v=7"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="wordmark">
-        <span class="logo" aria-hidden="true"><i data-lucide="gem"></i></span>
-        <span>LIM <b>Gifts</b></span>
-      </div>
+      <a class="wordmark" href="/" aria-label="LIM Drop — на главную">
+        <span class="logo" aria-hidden="true"><i data-lucide="gift"></i></span>
+        <span>LIM<b>DROP</b></span>
+      </a>
       <div class="top-actions">
-        <span class="online-label"><span class="online-dot"></span>Telegram Gifts</span>
+        <div id="ton-connect" aria-label="Подключение TON-кошелька"></div>
         <button class="icon-button" id="openImport" type="button" aria-label="Добавить подарок"><i data-lucide="plus"></i></button>
       </div>
     </header>
@@ -32,11 +35,21 @@
     <main>
       <section class="intro">
         <div class="intro-copy">
-          <div class="intro-kicker"><i data-lucide="sparkles"></i> Коллекционные подарки</div>
-          <h1>Все подарки <span>в одном месте.</span></h1>
-          <p>От коллекций Telegram до конкретных NFT с моделями, фонами и узорами.</p>
+          <div class="intro-kicker"><span class="live-pulse"></span> live telegram market</div>
+          <h1><span class="hero-line">GIFT</span><span class="hero-line outline">MARKET</span></h1>
+          <p class="hero-script" aria-hidden="true">drop!</p>
+          <p class="intro-lead">Ищи редкие подарки, проверяй атрибуты и открывай сделку прямо в Telegram.</p>
+          <div class="wallet-status" id="walletStatus">
+            <span class="wallet-status-icon"><i data-lucide="wallet-cards"></i></span>
+            <span><b id="walletLabel">Кошелёк не подключён</b><small>TON · GRAM · Jettons</small></span>
+          </div>
         </div>
-        <div class="intro-stat"><strong id="catalogCount">—</strong><span>коллекций</span></div>
+        <div class="intro-stage" aria-hidden="true">
+          <div class="stage-orbit orbit-one"></div>
+          <div class="stage-orbit orbit-two"></div>
+          <div class="stage-card"><i data-lucide="gift"></i><span>NFT</span></div>
+          <div class="stage-tag"><strong id="catalogCount">—</strong><span>коллекций</span></div>
+        </div>
       </section>
 
       <section class="discovery" aria-label="Поиск и фильтры">
@@ -48,7 +61,7 @@
           </label>
           <button type="button" class="filter-launch" id="openFilters" aria-label="Фильтры"><i data-lucide="sliders-horizontal"></i><span>Фильтры</span><b id="activeFilterCount" hidden>0</b></button>
         </div>
-        <div class="rail-heading"><span>Коллекции</span><button type="button" id="resetCollection">Все коллекции <i data-lucide="arrow-right"></i></button></div>
+        <div class="rail-heading"><span>Горячие коллекции</span><button type="button" id="resetCollection">Смотреть все <i data-lucide="arrow-right"></i></button></div>
         <div class="collection-rail" id="collectionRail" role="list" aria-label="Коллекции подарков"></div>
         <div class="active-filters" id="activeFilters" aria-label="Выбранные фильтры" hidden></div>
       </section>
@@ -56,7 +69,7 @@
       <section class="results" aria-labelledby="resultTitle">
         <button id="backToCollections" type="button" class="back-to-collections" hidden><i data-lucide="arrow-left"></i> Все коллекции</button>
         <div class="section-head">
-          <div><h2 id="resultTitle">Все коллекции</h2><p id="resultSubtitle">Не только подарки на продаже</p></div>
+          <div><h2 id="resultTitle">Все коллекции</h2><p id="resultSubtitle">Оригинальные подарки Telegram и NFT</p></div>
           <div class="section-meta" id="resultCount">Загрузка…</div>
         </div>
         <div class="gift-grid" id="giftGrid"></div>

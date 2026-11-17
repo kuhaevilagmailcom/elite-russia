@@ -1,4 +1,10 @@
-# LIM NFT Parser — Telegram Mini App
+# LIM Drop — Telegram Gifts Market
+
+Кислотно-зелёная Telegram Mini App-витрина коллекционных подарков с настоящим
+TonConnect-подключением кошельков (Tonkeeper, Wallet, MyTonWallet и других
+совместимых приложений). Подключение работает через публичный
+`/tonconnect-manifest.json`; покупка конкретного подарка открывается в его
+официальной карточке Telegram, без поддельной оплаты внутри интерфейса.
 
 Telegram-парсер подарков и Mini App на базе исходного проекта [Limuzinov Scope](https://github.com/kuhaevilagmailcom/-telegram-nft-business-offer-bot).
 
@@ -9,7 +15,7 @@ Telegram-парсер подарков и Mini App на базе исходно�
 - **Маркет** — только конкретные NFT с объявлениями, полученными через `payments.getResaleStarGifts`. После успешной полной синхронизации устаревшие объявления помечаются как недоступные, но запись NFT остаётся в каталоге.
 - **Избранное** и **Подборки** работают как раньше. Кнопка «Добавить» находится в верхней панели.
 - SQLite мигрируется на месте: новая таблица `gift_collections` и поля `is_listed`/`market_seen`; существующая таблица `gifts` и её данные сохраняются.
-- API: `GET /api/collections`, `GET /api/market`, `GET /api/gifts`, `GET /api/facets`, `GET /api/collection-animation/{key}`, `GET /api/collection-file/{key}`. `GET /api/health` показывает `build: catalog-market-v6`.
+- API: `GET /api/collections`, `GET /api/market`, `GET /api/gifts`, `GET /api/facets`, `GET /api/collection-animation/{key}`, `GET /api/collection-file/{key}`. `GET /api/health` показывает `build: acid-market-v7`.
 - Пересоберите BotHost из `main`, а не просто перезапустите старый контейнер. Для загрузки базового каталога и оригинальных анимаций нужны корректные `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` и `TELEGRAM_SESSION`.
 
 ## Каталог, анимации и источники

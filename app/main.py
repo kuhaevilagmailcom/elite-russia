@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -60,9 +60,29 @@ def index():
     return FileResponse(static_dir / "index.html", headers={"Cache-Control": "no-store, max-age=0"})
 
 
+@app.get("/tonconnect-manifest.json")
+def tonconnect_manifest(request: Request):
+    """Public dApp identity consumed by TON wallets during TonConnect."""
+    request_base = str(request.base_url).rstrip("/")
+    public_base = settings.webapp_url or request_base
+    if request.url.hostname in {"127.0.0.1", "localhost", "testserver"}:
+        public_base = request_base
+    return JSONResponse(
+        {
+            "url": public_base,
+            "name": "LIM Drop",
+            "iconUrl": f"{public_base}/static/lim-drop-icon.png",
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "bot": bool(settings.bot_token), "build": "catalog-market-v6"}
+    return {"status": "ok", "bot": bool(settings.bot_token), "build": "acid-market-v7"}
 
 
 @app.get("/api/collections")
