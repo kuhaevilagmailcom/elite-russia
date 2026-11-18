@@ -12,6 +12,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-dev.txt
+      - name: Check FastAPI import
+        run: python -c "from app.main import app; print(app.title)"
       - run: python -m pytest -q
       - name: Check browser JavaScript syntax
         run: node --check app/static/app.js
+      - name: Build Docker image and check ASGI import
+        run: docker build -t elite-russia:ci .
