@@ -1,115 +1,156 @@
+"""MRKT giveaway broadcast bot; replaces the old NFT search commands."""
 from __future__ import annotations
 
-import hashlib
+import asyncio
+import logging
 from html import escape
 
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.filters import Command, CommandStart
-from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup, InlineQuery, InlineQueryResultArticle,
-    InputTextMessageContent, Message, User, WebAppInfo,
-)
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, User
 
 from app.config import Settings
 from app.db import Database
-from app.parser import GiftParseError, fetch_gift
+from app.mrkt_notifier import BroadcastStore, MRKTFeed, format_giveaway
 
-
-def _emoji(fallback: str, custom_id: str) -> str:
-    return f'<tg-emoji emoji-id="{custom_id}">{fallback}</tg-emoji>' if custom_id else fallback
-
-
-def gift_text(gift: dict, settings: Settings | None = None) -> str:
-    settings = settings or Settings()
-    price = f"≈ {gift['price_stars']:,} ⭐".replace(",", " ") if gift.get("price_stars") else "Цена уточняется"
-    return (
-        f"{_emoji('🎁', settings.emoji_gift_id)} <b>{escape(gift['collection'])} #{gift['number']}</b>\n"
-        f"{_emoji('👤', settings.emoji_owner_id)} {escape(gift['owner_name'])}\n"
-        f"{_emoji('✨', settings.emoji_model_id)} {escape(gift['model'])} · 🎨 {escape(gift['backdrop'])} · ◌ {escape(gift['symbol'])}\n"
-        f"{_emoji('💎', settings.emoji_price_id)} {price}"
-    )
-
-
-def gift_keyboard(gift: dict, webapp_url: str) -> InlineKeyboardMarkup:
-    first_row = []
-    if gift.get("owner_url"):
-        first_row.append(InlineKeyboardButton(text="Написать владельцу", url=gift["owner_url"]))
-    first_row.append(InlineKeyboardButton(text="Открыть подарок", url=gift["source_url"]))
-    return InlineKeyboardMarkup(inline_keyboard=[
-        first_row,
-        [InlineKeyboardButton(text="Найти похожие", web_app=WebAppInfo(url=f"{webapp_url}/?similar={gift['slug']}"))],
-    ])
+LOG = logging.getLogger(__name__)
 
 
 def start_text(user: User | None) -> str:
-    nick = (f"@{user.username}" if user and user.username
-            else user.full_name if user else "друг")
-    return f"Салам, <b>{escape(nick)}</b>, ёпта! Это мой парсер NFT."
+    nick = f'@{user.username}' if user and user.username else user.full_name if user else 'друг'
+    return (
+        f'Привет, <b>{escape(nick)}</b>! 🎁\n\n'
+        'Ты подписан на уведомления о новых <b>бесплатных и платных розыгрышах MRKT</b>.\n'
+        'Присылаю подарок, цену билета, участников, количество билетов, срок и ссылки.\n\n'
+        'Команды: /latest — последние; /status — статус; /stop — отключить уведомления.'
+    )
+
+
+def giveaway_keyboard(item: dict) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text='Открыть розыгрыши MRKT', url=item['url'])]]
+    if item.get('nft'):
+        rows.insert(0, [InlineKeyboardButton(text='Посмотреть NFT', url=item['nft'])])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def notify_pending(bot: Bot, store: BroadcastStore) -> None:
+    for chat_id, item in store.pending(40):
+        try:
+            await bot.send_message(
+                chat_id, format_giveaway(item),
+                parse_mode=ParseMode.HTML,
+                reply_markup=giveaway_keyboard(item),
+                disable_web_page_preview=True,
+            )
+        except TelegramRetryAfter as exc:
+            store.retry(chat_id, item['key'], int(exc.retry_after) + 2)
+            break
+        except TelegramForbiddenError:
+            store.unsubscribe(chat_id)
+        except TelegramBadRequest as exc:
+            message = str(exc).lower()
+            if 'chat not found' in message or 'user is deactivated' in message:
+                store.unsubscribe(chat_id)
+            else:
+                LOG.warning('Telegram rejected notification for %s: %s', chat_id, exc)
+                store.retry(chat_id, item['key'], 300)
+        except Exception as exc:
+            LOG.warning('Delivery failed for %s: %s', chat_id, type(exc).__name__)
+            store.retry(chat_id, item['key'], 90)
+        else:
+            store.mark_delivered(chat_id, item['key'])
+        await asyncio.sleep(0.08)
+
+
+async def monitor_loop(bot: Bot, store: BroadcastStore, settings: Settings) -> None:
+    interval = max(60, min(3600, settings.mrkt_poll_seconds))
+    while True:
+        try:
+            feed = MRKTFeed(settings.mrkt_token, settings.mrkt_auth_mode, pages=settings.mrkt_pages)
+            items = await feed.fetch_all()
+            if settings.mrkt_watch_types in {'paid', 'free'}:
+                wanted = settings.mrkt_watch_types.title()
+                items = [item for item in items if item['type'] == wanted]
+            if settings.mrkt_max_paid_ton > 0:
+                items = [item for item in items if item['type'] == 'Free' or item['price_ton'] is not None and item['price_ton'] <= settings.mrkt_max_paid_ton]
+            new = store.insert_feed(items)
+            LOG.info('MRKT feed: received %d items, new %d, subscribed %d', len(items), new, store.count_subscribers())
+        except Exception as exc:
+            LOG.warning('MRKT scan failed: %s', exc)
+        await asyncio.sleep(interval)
+
+
+async def delivery_loop(bot: Bot, store: BroadcastStore) -> None:
+    """Drain pending notifications independently from the feed polling interval."""
+    while True:
+        try:
+            await notify_pending(bot, store)
+        except Exception as exc:
+            LOG.warning('Notifier cycle failed: %s', exc)
+        await asyncio.sleep(2)
 
 
 async def run_bot(db: Database, settings: Settings) -> None:
+    del db  # The legacy NFT Mini App uses its own catalog.
     bot = Bot(settings.bot_token)
+    store = BroadcastStore(settings.database_path)
     router = Router()
 
     @router.message(CommandStart())
     async def start(message: Message):
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Открыть апп", web_app=WebAppInfo(url=settings.webapp_url))],
-        ])
+        if not message.chat or message.chat.type != 'private':
+            await message.answer('Для личных уведомлений открой бота в личных сообщениях и нажми /start.')
+            return
+        store.subscribe(message.chat.id)
+        await message.answer(start_text(message.from_user), parse_mode=ParseMode.HTML)
+
+    @router.message(Command('stop'))
+    async def stop(message: Message):
+        if not message.chat or message.chat.type != 'private':
+            return
+        store.unsubscribe(message.chat.id)
+        await message.answer('Уведомления отключены. Чтобы включить снова, отправь /start.')
+
+    @router.message(Command('status'))
+    async def status(message: Message):
+        if not message.chat or message.chat.type != 'private':
+            return
+        subscribed = store.is_active(message.chat.id)
         await message.answer(
-            start_text(message.from_user),
-            reply_markup=keyboard,
-            parse_mode=ParseMode.HTML,
+            ('✅ Уведомления включены.' if subscribed else '⏸ Уведомления выключены. Нажми /start.')
+            + f'\n👥 Подписчиков бота: {store.count_subscribers()}'
+            + '\n🔎 MRKT проверяется автоматически на сервере.'
         )
 
-    @router.message(Command("find"))
-    async def find(message: Message):
-        query = (message.text or "").partition(" ")[2]
-        items = db.search(query, limit=5)
+    @router.message(Command('latest'))
+    async def latest(message: Message):
+        if not message.chat or message.chat.type != 'private':
+            return
+        items = store.latest(5)
         if not items:
-            await message.answer("Ничего не нашёл. Попробуй владельца, название модели или ссылку на подарок.")
+            await message.answer('Пока нет доступных розыгрышей. Если MRKT API недоступен, подожди следующей проверки.')
             return
-        for gift in items:
-            await message.answer(gift_text(gift, settings), reply_markup=gift_keyboard(gift, settings.webapp_url), parse_mode=ParseMode.HTML)
+        for item in items:
+            await message.answer(
+                format_giveaway(item), parse_mode=ParseMode.HTML,
+                reply_markup=giveaway_keyboard(item), disable_web_page_preview=True,
+            )
 
-    @router.message(F.text.regexp(r"(?:t\.me|telegram\.me)/(?:nft/)?[\w-]+-\d+"))
-    async def import_link(message: Message):
-        status = await message.answer("⏳ Проверяю подарок…")
-        try:
-            gift = db.upsert(await fetch_gift(message.text or ""))
-        except GiftParseError as exc:
-            await status.edit_text(str(exc))
-            return
-        except Exception:
-            await status.edit_text("Telegram не отдал карточку. Попробуй ещё раз чуть позже.")
-            return
-        await status.edit_text(gift_text(gift, settings), reply_markup=gift_keyboard(gift, settings.webapp_url), parse_mode=ParseMode.HTML)
-
-    @router.message(F.text)
-    async def plain_search(message: Message):
-        items = db.search(message.text or "", limit=3)
-        if not items:
-            await message.answer("Ничего не нашёл. Пришли ссылку t.me/nft/... — добавлю подарок в индекс.")
-            return
-        for gift in items:
-            await message.answer(gift_text(gift, settings), reply_markup=gift_keyboard(gift, settings.webapp_url), parse_mode=ParseMode.HTML)
-
-    @router.inline_query()
-    async def inline_search(query: InlineQuery):
-        results = []
-        for gift in db.search(query.query, limit=20):
-            result_id = hashlib.sha1(gift["slug"].encode()).hexdigest()
-            results.append(InlineQueryResultArticle(
-                id=result_id, title=f"{gift['collection']} #{gift['number']}",
-                description=f"{gift['model']} · {gift['backdrop']} · {gift['symbol']}",
-                input_message_content=InputTextMessageContent(message_text=gift_text(gift, settings), parse_mode=ParseMode.HTML),
-                reply_markup=gift_keyboard(gift, settings.webapp_url),
-            ))
-        await query.answer(results, cache_time=10, is_personal=True)
+    @router.message(Command('help'))
+    async def help_command(message: Message):
+        await message.answer('🎁 /start — подписаться\n🔕 /stop — отключить\n🔎 /latest — последние 5\n📊 /status — состояние подписки')
 
     dp = Dispatcher()
     dp.include_router(router)
-    await bot.delete_webhook(drop_pending_updates=False)
-    await dp.start_polling(bot)
-
+    monitor_task = asyncio.create_task(monitor_loop(bot, store, settings))
+    delivery_task = asyncio.create_task(delivery_loop(bot, store))
+    try:
+        await bot.delete_webhook(drop_pending_updates=False)
+        await dp.start_polling(bot, handle_signals=False)
+    finally:
+        monitor_task.cancel()
+        delivery_task.cancel()
+        await asyncio.gather(monitor_task, delivery_task, return_exceptions=True)
+        await bot.session.close()
