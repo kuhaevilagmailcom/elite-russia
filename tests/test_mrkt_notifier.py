@@ -49,3 +49,12 @@ def test_only_subscribers_receive_future_events(tmp_path):
     item = gift_item(identifier="demo125")
     store.insert_feed([item])
     assert [u for u, _ in store.pending()] == [1]
+
+
+def test_first_empty_scan_sets_baseline(tmp_path):
+    store = BroadcastStore(str(tmp_path / "empty.sqlite"))
+    store.subscribe(88)
+    assert store.insert_feed([]) == 0
+    item = gift_item(identifier="demo999")
+    assert store.insert_feed([item]) == 1
+    assert [(chat, gift["key"]) for chat, gift in store.pending()] == [(88, item["key"])]
