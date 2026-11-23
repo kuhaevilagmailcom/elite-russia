@@ -79,11 +79,17 @@ async def monitor_loop(bot: Bot, store: BroadcastStore, settings: Settings) -> N
             LOG.info('MRKT feed: received %d items, new %d, subscribed %d', len(items), new, store.count_subscribers())
         except Exception as exc:
             LOG.warning('MRKT scan failed: %s', exc)
+        await asyncio.sleep(interval)
+
+
+async def delivery_loop(bot: Bot, store: BroadcastStore) -> None:
+    """Drain pending notifications independently from the feed polling interval."""
+    while True:
         try:
             await notify_pending(bot, store)
         except Exception as exc:
             LOG.warning('Notifier cycle failed: %s', exc)
-        await asyncio.sleep(interval)
+        await asyncio.sleep(2)
 
 
 async def run_bot(db: Database, settings: Settings) -> None:
@@ -139,13 +145,12 @@ async def run_bot(db: Database, settings: Settings) -> None:
     dp = Dispatcher()
     dp.include_router(router)
     monitor_task = asyncio.create_task(monitor_loop(bot, store, settings))
+    delivery_task = asyncio.create_task(delivery_loop(bot, store))
     try:
         await bot.delete_webhook(drop_pending_updates=False)
         await dp.start_polling(bot, handle_signals=False)
     finally:
         monitor_task.cancel()
-        try:
-            await monitor_task
-        except asyncio.CancelledError:
-            pass
+        delivery_task.cancel()
+        await asyncio.gather(monitor_task, delivery_task, return_exceptions=True)
         await bot.session.close()
