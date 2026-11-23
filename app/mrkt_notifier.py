@@ -112,10 +112,20 @@ class MRKTFeed:
         self.pages = min(5, max(1, pages))
 
     async def fetch_all(self) -> list[dict]:
+        # Retry only read-only GETs with Bearer if a raw token was rejected.
+        mode = "bearer" if self.auth_mode == "bearer" else "raw"
+        try:
+            return await self._fetch_with_mode(mode)
+        except RuntimeError as exc:
+            if self.token and self.auth_mode == "auto" and ("HTTP 401" in str(exc) or "HTTP 403" in str(exc)):
+                return await self._fetch_with_mode("bearer")
+            raise
+
+    async def _fetch_with_mode(self, mode: str) -> list[dict]:
         # Only reads. This notifier never purchases tickets or joins channels.
         headers = {"Accept": "application/json", "Origin": "https://cdn.tgmrkt.io", "Referer": "https://cdn.tgmrkt.io/"}
         if self.token:
-            if self.auth_mode == "bearer":
+            if mode == "bearer":
                 headers["Authorization"] = "Bearer " + self.token.removeprefix("Bearer ")
             else:
                 headers["Authorization"] = self.token
