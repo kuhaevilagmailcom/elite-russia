@@ -166,6 +166,9 @@ class BroadcastStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             db.executescript("""
+                CREATE TABLE IF NOT EXISTS mrkt_meta (
+                    key TEXT PRIMARY KEY, value TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS mrkt_subscribers (
                     chat_id INTEGER PRIMARY KEY, active INTEGER NOT NULL DEFAULT 1,
                     joined_at TEXT NOT NULL
@@ -211,7 +214,7 @@ class BroadcastStore:
         """Persist listings before enqueueing; first successful scan creates a quiet baseline."""
         now = datetime.now(timezone.utc).isoformat()
         with self.connect() as db:
-            baseline = db.execute("SELECT EXISTS(SELECT 1 FROM mrkt_giveaways)").fetchone()[0] == 0
+            baseline = db.execute("SELECT 1 FROM mrkt_meta WHERE key='baseline'").fetchone() is None
             inserted = 0
             for item in items:
                 payload = json.dumps(item, ensure_ascii=False, separators=(",", ":"))
@@ -225,6 +228,7 @@ class BroadcastStore:
                             (item["key"],))
                 else:
                     db.execute("UPDATE mrkt_giveaways SET content=? WHERE key=?", (payload, item["key"]))
+            db.execute("INSERT OR IGNORE INTO mrkt_meta(key,value) VALUES('baseline',?)", (now,))
             return inserted
 
     def pending(self, limit: int = 50) -> list[tuple[int, dict]]:
