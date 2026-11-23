@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     telegram_session: str = ""
     resale_sync_minutes: int = 15
 
+    # MRKT notifier settings; secrets belong in BotHost environment.
+    mrkt_token: str = ""
+    mrkt_auth_mode: str = "auto"
+    mrkt_poll_seconds: int = 120
+    mrkt_pages: int = 3
+    mrkt_watch_types: str = "both"
+    mrkt_max_paid_ton: float = 0.0
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -28,4 +36,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
