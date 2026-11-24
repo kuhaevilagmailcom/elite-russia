@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     telegram_api_hash: str = ""
     telegram_session: str = ""
     resale_sync_minutes: int = 15
+    resale_sync_enabled: bool = False
 
     # MRKT notifier settings; secrets belong in BotHost environment.
     mrkt_token: str = Field(

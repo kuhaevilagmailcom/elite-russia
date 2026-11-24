@@ -32,7 +32,7 @@ async def lifespan(_: FastAPI):
         from app.bot import run_bot
         bot_task = asyncio.create_task(run_bot(db, settings))
     sync_task = None
-    if settings.telegram_api_id and settings.telegram_api_hash and settings.telegram_session:
+    if settings.resale_sync_enabled and settings.telegram_api_id and settings.telegram_api_hash and settings.telegram_session:
         from app.resale_sync import sync_loop
         sync_task = asyncio.create_task(sync_loop(db, settings))
     yield

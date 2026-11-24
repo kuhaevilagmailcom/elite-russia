@@ -104,7 +104,10 @@ async def sync_resale_market(db: Database, settings: Settings) -> int:
     collections = CollectionCatalog(db)
     collections.init()
     client = TelegramClient(StringSession(settings.telegram_session), settings.telegram_api_id, settings.telegram_api_hash)
-    async with client:
+    await client.connect()
+    try:
+        if not await client.is_user_authorized():
+            raise RuntimeError('Telegram resale sync requires a valid pre-authorized session; interactive login is disabled')
         catalog = await client(GetStarGiftsRequest(hash=0))
         gift_types = list(getattr(catalog, "gifts", []) or [])
         # Index ALL base gift types returned by Telegram, including those without resale.
@@ -158,6 +161,8 @@ async def sync_resale_market(db: Database, settings: Settings) -> int:
                 offset = getattr(page, "next_offset", None) or ""
                 if not offset:
                     break
+    finally:
+        await client.disconnect()
     db.mark_unlisted_after_sync(run_id)
     collections.ensure_observed()
     print(f"Marketplace synced: {count} listed NFTs", flush=True)

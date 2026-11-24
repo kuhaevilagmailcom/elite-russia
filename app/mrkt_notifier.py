@@ -152,6 +152,8 @@ class MRKTFeed:
                     })
                     if r.status_code in (401, 403):
                         raise RuntimeError(f"MRKT API HTTP {r.status_code}: авторизация или доступ запрещены. Проверь MRKT_API_TOKEN и доступ сервера.")
+                    if r.status_code == 404:
+                        raise RuntimeError('MRKT API HTTP 404: giveaway endpoint unavailable; confirm the supported read-only API route with MRKT support. No successful scan recorded.')
                     r.raise_for_status()
                     data = r.json()
                     if isinstance(data, list):
