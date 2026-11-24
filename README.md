@@ -32,7 +32,13 @@ node --test tests/ton-sdk.integration.mjs
 
 Build with the repository `Dockerfile`; no separate start command is required. The container listens on `0.0.0.0:$PORT`, installs production dependencies and exposes a readiness healthcheck. The same Node process serves the Mini App and handles Telegram webhook updates, so polling/webhook duplicates are not created.
 
-Required restricted preview variables:
+BotHost restricted preview needs no separate database service. The platform's
+injected `BOT_TOKEN`, `DOMAIN`, `BOT_ID`, `PORT` and `DATA_DIR=/app/data` are
+detected automatically. The app selects restricted mode, stores SQLite at
+`/app/data/minion.sqlite`, derives a private webhook secret and registers the
+HTTPS webhook. Data therefore survives Git updates and container rebuilds.
+
+Optional explicit overrides:
 
 ```text
 APP_ENV=restricted
@@ -42,14 +48,14 @@ BIND_HOST=0.0.0.0
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_WEBHOOK_SECRET=...
 TON_NETWORK=testnet
-DATABASE_DRIVER=postgres
-DATABASE_URL=postgresql://...
+DATABASE_DRIVER=sqlite
+DATABASE_PATH=/app/data/minion.sqlite
 MARKET_CURRENCY=GRAM
 LIVE_FINANCE_ENABLED=false
 LIVE_CUSTODY_ENABLED=false
 ```
 
-`BOT_TOKEN` is accepted as an alias for `TELEGRAM_BOT_TOKEN`; conflicting values fail startup without logging either secret. See `.env.example` for the complete list.
+`BOT_TOKEN` is accepted as an alias for `TELEGRAM_BOT_TOKEN`; conflicting values fail startup without logging either secret. PostgreSQL remains available through `DATABASE_DRIVER=postgres` and `DATABASE_URL` when an external production cluster is provisioned. See `.env.example` for the complete list.
 
 On startup with a valid bot token and HTTPS `APP_URL`, the service verifies `getMe`, registers `/start`, `/market`, `/inventory`, `/wallet`, `/offers`, `/giveaways`, `/profile`, `/support`, `/help`, installs the `Маркет` menu button and configures the webhook at `/telegram/webhook`.
 

@@ -25,3 +25,32 @@ test("conflicting secret aliases fail closed without exposing values", () => {
       !error.message.includes("second-secret"),
   );
 });
+
+test("BotHost config uses its HTTPS domain and persistent SQLite storage", () => {
+  const env = normalizedEnv({
+    BOT_ID: "bot_123",
+    BOT_TOKEN: "123:secret",
+    DOMAIN: "market.example.bothost.tech",
+    DATA_DIR: "/app/data/",
+    PORT: "3000",
+  });
+  assert.equal(env.APP_ENV, "restricted");
+  assert.equal(env.APP_URL, "https://market.example.bothost.tech");
+  assert.equal(env.BIND_HOST, "0.0.0.0");
+  assert.equal(env.DATABASE_DRIVER, "sqlite");
+  assert.equal(env.DB_PATH, "/app/data/minion.sqlite");
+  assert.match(env.TELEGRAM_WEBHOOK_SECRET, /^[a-f0-9]{64}$/);
+});
+
+test("explicit BotHost configuration remains authoritative", () => {
+  const env = normalizedEnv({
+    BOT_ID: "bot_123",
+    APP_ENV: "test",
+    APP_URL: "https://custom.example",
+    DATABASE_DRIVER: "postgres",
+    DATABASE_URL: "postgresql://example",
+  });
+  assert.equal(env.APP_ENV, "test");
+  assert.equal(env.APP_URL, "https://custom.example");
+  assert.equal(env.DATABASE_DRIVER, "postgres");
+});
