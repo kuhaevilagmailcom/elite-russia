@@ -1,0 +1,59 @@
+name: MINION Market checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: minion
+          POSTGRES_PASSWORD: sandbox-only
+          POSTGRES_DB: minion_demo
+        ports: ["5432:5432"]
+        options: --health-cmd 'pg_isready -U minion' --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci && npm run check && npm test
+      - run: node --test tests/ton-sdk.integration.mjs
+      - run: |
+          PGPASSWORD=sandbox-only psql -h localhost -U minion -d minion_demo -c "CREATE DATABASE minion_runtime"
+          APP_ENV=test DATABASE_URL=postgresql://minion:sandbox-only@localhost:5432/minion_runtime node --test tests/postgres.integration.mjs
+          APP_ENV=test DATABASE_DRIVER=postgres DATABASE_URL=postgresql://minion:sandbox-only@localhost:5432/minion_runtime PORT=3011 node server-async.mjs > /tmp/minion-pg.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:3011/health && exit 0; sleep 1; done
+          cat /tmp/minion-pg.log; exit 1
+      - run: |
+          node --experimental-sqlite --input-type=module -e "import {Market} from './core.mjs'; new Market('/tmp/ci-demo.sqlite',true)"
+          node --experimental-sqlite scripts/migrate-sqlite-to-postgres.mjs /tmp/ci-demo.sqlite /tmp/ci-import.sql --demo-sandbox
+          psql -v ON_ERROR_STOP=1 -h localhost -U minion -d minion_demo -f migrations/001_market.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -U minion -d minion_demo -f /tmp/ci-import.sql
+        env:
+          PGPASSWORD: sandbox-only
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: |
+          node --experimental-sqlite server-async.mjs > /tmp/minion.log 2>&1 &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/health && break; sleep 1; done
+          python scripts/browser_test.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-screenshots
+          path: artifacts/screenshots/
+      - run: docker build -t minion-sandbox .
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

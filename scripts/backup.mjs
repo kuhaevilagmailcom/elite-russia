@@ -1,0 +1,2 @@
+import {DatabaseSync,backup} from 'node:sqlite';import {mkdirSync,existsSync} from 'node:fs';
+const file=process.argv[2]||'./data/minion.sqlite';if(!existsSync(file))throw Error('Database not found: '+file);mkdirSync('backups',{recursive:true});const target='backups/dev-'+Date.now()+'.sqlite';const db=new DatabaseSync(file,{readOnly:true});await backup(db,target);db.close();const copy=new DatabaseSync(target,{readOnly:true});if(copy.prepare('PRAGMA integrity_check').get().integrity_check!=='ok')throw Error('Backup integrity failed');copy.close();console.log(target);

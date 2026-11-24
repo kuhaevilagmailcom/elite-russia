@@ -1,43 +1,78 @@
-# MRKT Scout — Telegram-бот уведомлений о розыгрышах
+# MINION MARKET 1.0 RC
 
-В репозитории старый Telegram-бот поиска NFT заменён ботом уведомлений MRKT. Он автоматически проверяет бесплатные и платные розыгрыши и отправляет сообщения всем пользователям, которые подписались через команду /start.
+Telegram Mini App marketplace release candidate for collectible gifts. It combines a compact black/yellow storefront, Telegram Web App authentication, Telegram collectible metadata, TON Proof, a transactional TEST GRAM trading engine, free giveaways, PostgreSQL support, an embedded Telegram webhook bot and BotHost-compatible Docker runtime.
 
-Старые команды /find, inline-поиск и импорт подарков удалены из Telegram-бота. Веб-каталог NFT и Mini App оставлены в HTTP-приложении, чтобы не повредить существующую базу и ссылки.
+This repository is deliberately fail-closed. Real deposits, withdrawals and gift transfers remain disabled until custody reconciliation, signer/ledger audit, legal/platform review and external Telegram/TON verification are complete. Development mode contains clearly labelled TEST gifts and TEST GRAM only.
 
-## Содержание уведомлений
+## Run locally
 
-- Название подарка и тип розыгрыша (бесплатный или платный).
-- Стоимость билета в TON (либо «не указана»), число участников и билетов.
-- Время завершения, организатор (когда MRKT его отдаёт) и связанные Telegram-каналы.
-- Кнопка «Открыть розыгрыши MRKT» с официальным адресом https://t.me/mrkt/app.
-- Ссылка на конкретный NFT только при наличии действительной ссылки или уникального slug; бот не выдумывает NFT-номера и прямые ссылки на отдельный розыгрыш.
+Requirements: Node.js 22.13 or newer.
 
-Команды: /start — подписка, /stop — отписка, /status — статус, /latest — пять последних находок, /help — справка.
+```powershell
+Copy-Item .env.example .env
+npm ci
+node --env-file=.env --experimental-sqlite server-async.mjs
+```
 
-После `/start` бот сразу присылает до пяти последних активных розыгрышей. Первое успешное сканирование также может отправить ограниченную стартовую подборку, затем рассылаются все новые лоты. SQLite хранит подписчиков, лоты и статусы доставок между перезапусками. Ошибки MRKT не отключают бота.
+- Market: `http://localhost:3000/`
+- Admin: `http://localhost:3000/admin`
+- Liveness: `http://localhost:3000/health`
+- Readiness: `http://localhost:3000/ready`
+- TON Connect manifest: `http://localhost:3000/tonconnect-manifest.json`
 
-Важно: Telegram разрешает писать в личные сообщения лишь пользователям, которые самостоятельно запустили этого бота. Старый бот не сохранял список подписчиков. После обновления каждому пользователю нужно один раз отправить /start. После /stop рассылка прекращается.
+Checks:
 
-## Запуск на BotHost без ПК
+```powershell
+npm run check
+npm test
+node --test tests/ton-sdk.integration.mjs
+```
 
-Остаются прежние команда python main.py, FastAPI, Dockerfile и порт PORT. Сервер работает независимо от компьютера, пока его хостинг активен.
+## BotHost
 
-1. Обнови исходники на BotHost из ветки main и пересобери контейнер.
-2. В секретах BotHost укажи BOT_TOKEN от существующего бота @BotFather.
-3. В секретах BotHost задай `MRKT_API_TOKEN` — токен своей MRKT-сессии. Старое имя `MRKT_TOKEN` тоже поддерживается. Не публикуй ключ в GitHub, чате или логах.
-4. Укажи DATABASE_PATH=data/gifts.db и используй постоянный том data/, чтобы база подписчиков сохранилась.
-5. Настройки: MRKT_POLL_SECONDS=120, MRKT_PAGES=3, MRKT_WATCH_TYPES=both (или free/paid), MRKT_AUTH_MODE=auto. MRKT_MAX_PAID_TON=0 отключает ограничение по цене. MRKT_NOTIFY_EXISTING=true и MRKT_INITIAL_LIMIT=5 включают стартовую подборку без массового спама.
-6. Открой того же бота в Telegram и отправь /start, затем /latest.
+Build with the repository `Dockerfile`; no separate start command is required. The container listens on `0.0.0.0:$PORT`, installs production dependencies and exposes a readiness healthcheck. The same Node process serves the Mini App and handles Telegram webhook updates, so polling/webhook duplicates are not created.
 
-## Ограничения MRKT
+Required restricted preview variables:
 
-Старая синхронизация Telegram resale выключена по умолчанию (`RESALE_SYNC_ENABLED=false`). Для бота уведомлений Telegram API ID, API hash и пользовательская сессия не нужны. При HTTP 404 актуальный маршрут списка розыгрышей нужно подтвердить через официальную поддержку MRKT (@mrkt_help_service_bot); смена токена не гарантирует устранение 404.
+```text
+APP_ENV=restricted
+APP_URL=https://YOUR-BOTHOST-DOMAIN
+PORT=3000
+BIND_HOST=0.0.0.0
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_WEBHOOK_SECRET=...
+TON_NETWORK=testnet
+DATABASE_DRIVER=postgres
+DATABASE_URL=postgresql://...
+MARKET_CURRENCY=GRAM
+LIVE_FINANCE_ENABLED=false
+LIVE_CUSTODY_ENABLED=false
+```
 
-MRKT использует неофициальные HTTP-маршруты, которые могут изменяться. При ответе 401/403 проверь `MRKT_API_TOKEN`, доступность API с сервера и формат Authorization; при необходимости установи MRKT_AUTH_MODE=bearer. Обход CAPTCHA и блокировок не предусмотрен. Пока API не читается, реальные рассылки невозможны.
+`BOT_TOKEN` is accepted as an alias for `TELEGRAM_BOT_TOKEN`; conflicting values fail startup without logging either secret. See `.env.example` for the complete list.
 
-Бот только читает розыгрыши. Он не покупает билеты, не подписывает людей на каналы и не использует чужие Telegram-аккаунты.
+On startup with a valid bot token and HTTPS `APP_URL`, the service verifies `getMe`, registers `/start`, `/market`, `/inventory`, `/wallet`, `/offers`, `/giveaways`, `/profile`, `/support`, `/help`, installs the `Маркет` menu button and configures the webhook at `/telegram/webhook`.
 
-## Тесты
+## Implemented and verified locally
 
-pip install -r requirements-dev.txt
-python -m pytest -q
+- Telegram initData HMAC, expiry and replay protection.
+- Hashed bearer sessions and role-separated admin APIs.
+- Atomic quotes, purchases, listings, offers, collection offers, bundles, swaps and ledger reconciliation in the sandbox.
+- Free giveaways with atomic prize locking, unique entries, server-side winner selection and immutable ownership transfer.
+- Official Telegram Bot API metadata import for unique gifts; metadata import never grants ownership.
+- Server-side Telegram media proxy with validation, size cap and bounded cache; the bot token is never exposed to the browser.
+- TON Proof nonce/session/domain/network/signature verification for supported fixed-key V3R2/V4 wallets.
+- Responsive 320/375/390/430 px mobile and 1440 px desktop layouts, safe areas and bottom sheets.
+- SQLite sandbox and explicit PostgreSQL adapter/migrations.
+
+## Not production-verified
+
+- Real Telegram Business custody deposit/withdraw transfer.
+- GRAM blockchain scanner, confirmations, treasury signer and withdrawal pipeline.
+- Production PostgreSQL concurrency and backup/restore on the target host.
+- External Telegram client `/start`, deployed HTTPS Mini App and real-wallet TON Proof.
+- Independent financial/security audit and legal/platform approval.
+
+Never enable live finance or custody from an unreviewed deployment. Never commit `.env`, bot tokens, Telegram sessions, private keys, database files or seed phrases.
+
+The previous Python/BotHost implementation is preserved in `legacy-python/` for rollback and reference. It is excluded from the release container.

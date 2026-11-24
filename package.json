@@ -1,0 +1,26 @@
+{
+  "name": "minion-market",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite server-async.mjs",
+    "dev": "node --experimental-sqlite server-async.mjs",
+    "test": "node --experimental-sqlite --test tests/*.test.mjs",
+    "bot": "node bot.mjs",
+    "custody:scan": "node custody.mjs",
+    "check": "node --check server.mjs && node --check core.mjs && node --check public/app.js && node --check server-async.mjs && node --check core-async.mjs",
+    "generate:async": "node scripts/generate-async.cjs",
+    "db:migrate": "node scripts/pg-migrate.mjs"
+  },
+  "optionalDependencies": {
+    "@ton/ton": "^16.3.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
