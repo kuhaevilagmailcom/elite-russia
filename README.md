@@ -82,3 +82,6 @@ On startup with a valid bot token and HTTPS `APP_URL`, the service verifies `get
 Never enable live finance or custody from an unreviewed deployment. Never commit `.env`, bot tokens, Telegram sessions, private keys, database files or seed phrases.
 
 The previous Python/BotHost implementation is preserved in `legacy-python/` for rollback and reference. It is excluded from the release container.
+
+## Personal gifts and real wallet connection (restricted preview)
+In Gifts → Add, paste `https://t.me/nft/PlushPepe-123`. The bot verifies the gift in the authenticated user’s visible Telegram gifts using `getUserGifts`. Imported entries are private references, not deposits; refresh checks visibility again. Hidden or on-chain gifts are not supported by this flow. No trading credit is created. Use `TON_NETWORK=mainnet` (BotHost default when unset) to connect a real supported V3R2/V4 TON wallet via signed proof on HTTPS; `testnet` remains available. The trading balance is not a blockchain balance, and deposits, withdrawals and real trades remain disabled. No keys are collected.

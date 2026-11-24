@@ -18,3 +18,6 @@ Date: 2026-11-25. Release candidate; not approved for mainnet or real custody.
 | Gift custody movement | DISABLED | Observation-only adapter; no ownership credit or transfer worker |
 
 Residual dependency note: `npm audit --omit=dev` reports the current upstream Zod collection-memory advisory through `@ton/ton`; npm provides no compatible automated fix. The only untrusted StateInit accepted by this service is capped at 24 KB before TON SDK parsing. Re-check before deployment.
+
+## Proposed personal gift import and mainnet wallet connection
+User-scoped read-only Telegram gift references are stored separately from tradable inventory; ownership visibility is checked on import/refresh, not continuously. Mainnet TON Proof connection is supported as a read-only configuration; supported fixed-key wallet contracts only. No live transfer, sale or balance credit. New tests added; CI and live Telegram/mainnet verification pending.
