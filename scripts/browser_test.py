@@ -20,7 +20,7 @@ with sync_playwright() as p:
                 click(action);page.locator('dialog[open]').wait_for();shot(name);click('close')
             for tab in ['collections','offers','bundles']:
                 page.locator(f'.tabs [data-action="tab"][data-id="{tab}"]').click();shot(tab)
-            for section in ['activity','inventory','events','profile']:
+            for section in ['activity','inventory','giveaways','profile']:
                 page.locator(f'[data-action="nav"][data-id="{section}"]').click();shot(section)
             page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')
         page.close()
