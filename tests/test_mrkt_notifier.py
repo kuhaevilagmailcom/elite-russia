@@ -5,6 +5,7 @@ def gift_item(name="Test", identifier="demo123"):
     return normalize({"id": identifier, "ticketPriceNanoTons": 200000000,
                       "participantsCount": 18, "totalTickets": 24,
                       "previewGift": {"collectionName": name},
+                      "creator": {"username": "gift_owner"},
                       "chanels": ["samplechannel"]}, "Paid")
 
 
@@ -14,10 +15,12 @@ def test_normalize_and_no_invented_nft():
     assert item["tickets"] == 24
     assert item["price_ton"] == .2
     assert item["channels"] == ["samplechannel"]
+    assert item["organizer"] == "gift_owner"
     assert item["nft"] is None
     assert nft_url({"previewGift": {"slug": "PlushPepe-12345"}}) == "https://t.me/nft/PlushPepe-12345"
     assert nft_url({"nftUrl": "https://attacker.test/nft/PlushPepe-12345"}) is None
     assert "18" in format_giveaway(item)
+    assert "@gift_owner" in format_giveaway(item)
 
 
 def test_durable_delivery_to_opted_in_subscribers(tmp_path):
@@ -58,3 +61,13 @@ def test_first_empty_scan_sets_baseline(tmp_path):
     item = gift_item(identifier="demo999")
     assert store.insert_feed([item]) == 1
     assert [(chat, gift["key"]) for chat, gift in store.pending()] == [(88, item["key"])]
+
+
+def test_first_scan_can_notify_existing_active_giveaways(tmp_path):
+    store = BroadcastStore(str(tmp_path / "existing.sqlite"))
+    store.subscribe(99)
+    items = [gift_item(identifier=f"existing{i}") for i in range(8)]
+    assert store.insert_feed(items, notify_existing=True, initial_limit=3) == 8
+    pending = store.pending()
+    assert [chat for chat, _ in pending] == [99, 99, 99]
+    assert [item["key"] for _, item in pending] == [x["key"] for x in items[:3]]

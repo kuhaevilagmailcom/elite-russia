@@ -56,6 +56,14 @@ def normalize(raw: dict, giveaway_type: str) -> dict | None:
     title = as_text(gift.get("title") or gift.get("name") or gift.get("collectionName") or raw.get("title") or "Подарок Telegram")
     if not title:
         title = "Подарок Telegram"
+    creator = raw.get("creator") or raw.get("owner") or raw.get("createdBy") or {}
+    if not isinstance(creator, dict):
+        creator = {}
+    organizer = as_text(
+        creator.get("username") or creator.get("name") or creator.get("title")
+        or raw.get("creatorUsername") or raw.get("ownerUsername") or "не указан",
+        80,
+    ).removeprefix("@")
     chans = raw.get("chanels") or raw.get("channels") or []
     channels = []
     if isinstance(chans, list):
@@ -84,7 +92,7 @@ def normalize(raw: dict, giveaway_type: str) -> dict | None:
         "participants": safe_count(raw.get("participantsCount")),
         "tickets": safe_count(raw.get("totalTickets")),
         "ends": as_text(raw.get("endAt") or raw.get("finishAt"), 50),
-        "channels": channels, "nft": nft_url(raw), "url": MRKT_APP,
+        "channels": channels, "organizer": organizer, "nft": nft_url(raw), "url": MRKT_APP,
     }
 
 
@@ -93,6 +101,9 @@ def format_giveaway(item: dict) -> str:
     price = "не указана" if item["price_ton"] is None else f'{item["price_ton"]:g} TON'
     ends = item.get("ends") or "не указано"
     channel_names = ", ".join("@" + x for x in item.get("channels", [])) or "не указаны"
+    organizer = item.get("organizer") or "не указан"
+    if organizer != "не указан" and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{4,31}", organizer):
+        organizer = "@" + organizer
     lines = [
         f'{"💎 ПЛАТНЫЙ" if paid else "🎁 БЕСПЛАТНЫЙ"} РОЗЫГРЫШ MRKT',
         f'<b>{escape(item["title"])}</b>', "",
@@ -100,6 +111,7 @@ def format_giveaway(item: dict) -> str:
         f'👥 Участников: <b>{item["participants"]}</b>',
         f'🎫 Всего билетов: <b>{item["tickets"]}</b>',
         f'⏰ Завершение: {escape(ends)}',
+        f'👤 Организатор: {escape(organizer)}',
         f'📢 Каналы: {escape(channel_names)}',
     ]
     return "\n".join(lines)
@@ -139,7 +151,7 @@ class MRKTFeed:
                         "isActive": "true", "ordering": "EndingTimeWithoutBadge",
                     })
                     if r.status_code in (401, 403):
-                        raise RuntimeError(f"MRKT API HTTP {r.status_code}: авторизация или доступ запрещены. Проверь MRKT_TOKEN и доступ сервера.")
+                        raise RuntimeError(f"MRKT API HTTP {r.status_code}: авторизация или доступ запрещены. Проверь MRKT_API_TOKEN и доступ сервера.")
                     r.raise_for_status()
                     data = r.json()
                     if isinstance(data, list):
@@ -210,17 +222,20 @@ class BroadcastStore:
         with self.connect() as db:
             return db.execute("SELECT COUNT(*) FROM mrkt_subscribers WHERE active=1").fetchone()[0]
 
-    def insert_feed(self, items: list[dict]) -> int:
-        """Persist listings before enqueueing; first successful scan creates a quiet baseline."""
+    def insert_feed(self, items: list[dict], notify_existing: bool = False, initial_limit: int = 5) -> int:
+        """Persist listings and optionally notify subscribers about the first active batch."""
         now = datetime.now(timezone.utc).isoformat()
         with self.connect() as db:
             baseline = db.execute("SELECT 1 FROM mrkt_meta WHERE key='baseline'").fetchone() is None
             inserted = 0
+            initial_keys: list[str] = []
             for item in items:
                 payload = json.dumps(item, ensure_ascii=False, separators=(",", ":"))
                 cur = db.execute("INSERT OR IGNORE INTO mrkt_giveaways(key,content,first_seen_at) VALUES(?,?,?)", (item["key"], payload, now))
                 if cur.rowcount == 1:
                     inserted += 1
+                    if baseline and notify_existing and len(initial_keys) < max(1, min(20, initial_limit)):
+                        initial_keys.append(item["key"])
                     if not baseline:
                         db.execute(
                             "INSERT OR IGNORE INTO mrkt_delivery(chat_id,giveaway_key) "
@@ -228,6 +243,13 @@ class BroadcastStore:
                             (item["key"],))
                 else:
                     db.execute("UPDATE mrkt_giveaways SET content=? WHERE key=?", (payload, item["key"]))
+            if baseline and notify_existing:
+                for key in initial_keys:
+                    db.execute(
+                        "INSERT OR IGNORE INTO mrkt_delivery(chat_id,giveaway_key) "
+                        "SELECT chat_id, ? FROM mrkt_subscribers WHERE active=1",
+                        (key,),
+                    )
             db.execute("INSERT OR IGNORE INTO mrkt_meta(key,value) VALUES('baseline',?)", (now,))
             return inserted
 

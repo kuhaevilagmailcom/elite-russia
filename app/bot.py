@@ -75,7 +75,11 @@ async def monitor_loop(bot: Bot, store: BroadcastStore, settings: Settings) -> N
                 items = [item for item in items if item['type'] == wanted]
             if settings.mrkt_max_paid_ton > 0:
                 items = [item for item in items if item['type'] == 'Free' or item['price_ton'] is not None and item['price_ton'] <= settings.mrkt_max_paid_ton]
-            new = store.insert_feed(items)
+            new = store.insert_feed(
+                items,
+                notify_existing=settings.mrkt_notify_existing,
+                initial_limit=settings.mrkt_initial_limit,
+            )
             LOG.info('MRKT feed: received %d items, new %d, subscribed %d', len(items), new, store.count_subscribers())
         except Exception as exc:
             LOG.warning('MRKT scan failed: %s', exc)
@@ -105,6 +109,14 @@ async def run_bot(db: Database, settings: Settings) -> None:
             return
         store.subscribe(message.chat.id)
         await message.answer(start_text(message.from_user), parse_mode=ParseMode.HTML)
+        latest_items = store.latest(max(1, min(5, settings.mrkt_initial_limit)))
+        if latest_items:
+            await message.answer('🔥 Активные розыгрыши MRKT прямо сейчас:')
+            for item in latest_items:
+                await message.answer(
+                    format_giveaway(item), parse_mode=ParseMode.HTML,
+                    reply_markup=giveaway_keyboard(item), disable_web_page_preview=True,
+                )
 
     @router.message(Command('stop'))
     async def stop(message: Message):
