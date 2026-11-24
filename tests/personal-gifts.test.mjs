@@ -1,0 +1,31 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {giftSlug,findUserGift,PersonalGifts} from "../packages/personal-gifts.mjs";
+import {SQLiteRepository} from "../packages/database/repository.mjs";
+const slug="PlushPepe-123", link="https://t.me/nft/"+slug;
+const gift={type:"unique",gift:{name:slug,base_name:"Plush Pepe",number:123,model:{name:"Test",sticker:{thumbnail:{file_id:"image"}}}}};
+test("strict Telegram NFT URL",()=>{
+  assert.equal(giftSlug(link),slug);
+  for(const bad of ["https://evil.example/nft/"+slug,"https://t.me.evil/nft/"+slug,"https://t.me/nft/"+slug+"?x=1","http://t.me/nft/"+slug,"https://t.me/nft/../"+slug]) assert.throws(()=>giftSlug(bad));
+});
+test("only gifts of authenticated user, pagination and nontradable result",async()=>{
+  let n=0;
+  const api={call:async(method,p)=>{assert.equal(method,"getUserGifts");assert.equal(p.user_id,123);return ++n===1?{gifts:[],next_offset:"next"}:{gifts:[gift]};}};
+  const result=await findUserGift(api,"123",slug);
+  assert.equal(result.tradable,false);assert.equal(result.slug,slug);assert.equal(n,2);
+  assert.equal(await findUserGift({call:async()=>({gifts:[]})},"123",slug),null);
+  await assert.rejects(()=>findUserGift(api,"demo",slug));
+});
+test("private references are isolated, deduplicated and never create market assets",async()=>{
+  const repo=await SQLiteRepository.open();
+  try{
+    const store=new PersonalGifts(repo,{call:async(_m,p)=>({gifts:p.user_id===123?[gift]:[]})});
+    await store.initialize();await store.add("123",link);await store.add("123",link);
+    assert.equal((await store.list("123")).length,1);
+    assert.equal((await store.list("456")).length,0);
+    await assert.rejects(()=>store.add("456",link));
+    assert.equal((await repo.all("SELECT * FROM gifts")).length,0);
+    await store.remove("456",slug);assert.equal((await store.list("123")).length,1);
+    await store.remove("123",slug);assert.equal((await store.list("123")).length,0);
+  }finally{await repo.close();}
+});

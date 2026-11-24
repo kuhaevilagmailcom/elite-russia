@@ -279,7 +279,7 @@ const server = http.createServer(async (q, r) => {
         liveFinance: false,
         custody: env.TELEGRAM_CUSTODY_USERNAME || null,
         appUrl: url,
-        network: "testnet",
+        network: env.TON_NETWORK === "mainnet" ? "mainnet" : "testnet",
         currency: env.MARKET_CURRENCY || "GRAM",
         integrations: {
           telegramBot: health.bot.status,

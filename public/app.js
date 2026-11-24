@@ -41,6 +41,7 @@ const state = {
   bundles: [],
   analytics: [],
   collectibles: [],
+  personalGifts: [],
   giveaways: [],
   me: null,
   config: { demo: true },
@@ -142,12 +143,17 @@ async function reload() {
       state.giveaways = [];
     }
   }
+  state.personalGifts = [];
+  if (state.token && !state.config.demo) {
+    try { state.personalGifts = (await api("personal-gifts")).items || []; } catch { /* leave empty */ }
+  }
   if (state.token) {
     try {
       state.me = await api("state");
     } catch (e) {
       state.token = "";
       state.me = null;
+      state.personalGifts = [];
       sessionStorage.removeItem("mm-session");
     }
   }
@@ -292,7 +298,7 @@ function page() {
   if (state.page === "activity")
     return `<div class="hero"><div><h1>Активность</h1><div class="muted">Последние операции маркета</div></div>${btn("Обновить", "refresh")}</div><div class="panel">${state.activity.map((a) => `<div class="row"><div><b>${esc(a.collection)} #${esc(a.number)}</b><div class="muted">${{ listed: "Выставлен", sold: "Продан", price_changed: "Цена изменена", delisted: "Снят" }[a.type] || esc(a.type)} · ${new Date(Number(a.created)).toLocaleString("ru")}</div></div><b>${fmt(a.price)} ${cur()}</b></div>`).join("") || empty("Нет операций")}</div>`;
   if (state.page === "inventory")
-    return `<div class="hero"><div><h1>Мои подарки</h1><div class="muted">${state.me?.inventory.length || 0} в инвентаре</div></div><div>${btn("Обмены", "swaps")}${btn("Набор", "bundle-new")}${btn("+ Добавить", "deposit-gift", "", "accent")}</div></div><div class="panel"><span class="muted">Доступный баланс</span><div class="metric">${fmt(state.me?.balance.available || "0")} ${cur()}</div></div><div class="grid">${(state.me?.inventory || []).map((g) => giftCard(g, true)).join("")}</div>${state.me?.inventory.length ? "" : empty("Здесь появятся твои подарки")}${offersContent()}`;
+    return `<div class="hero"><div><h1>Мои подарки</h1><div class="muted">${(state.me?.inventory.length || 0) + state.personalGifts.length} в инвентаре</div></div><div>${btn("Обмены", "swaps")}${btn("Набор", "bundle-new")}${btn("+ Добавить", "deposit-gift", "", "accent")}</div></div><div class="panel"><span class="muted">Доступный баланс</span><div class="metric">${fmt(state.me?.balance.available || "0")} ${cur()}</div></div><div class="grid">${(state.me?.inventory || []).map((g) => giftCard(g, true)).join("")}</div>${state.personalGifts.length ? `<div class="sectionhead"><b>Подарки из Telegram</b></div><div class="grid">${state.personalGifts.map(g=>`<div>${collectibleCard(g)}<div class="panel"><p class="muted">В Telegram на момент проверки: ${new Date(g.checkedAt).toLocaleString("ru")} · не на хранении маркета</p>${btn("Проверить снова","personal-refresh",g.slug)}${btn("Продажа","personal-sale",g.slug)}${btn("Убрать","personal-remove",g.slug)}</div></div>`).join("")}</div>` : ""}${state.me?.inventory.length || state.personalGifts.length ? "" : empty("Здесь появятся твои подарки")}${offersContent()}`;
   if (state.page === "giveaways")
     return `<div class="hero"><div><h1>Розыгрыши</h1><div class="muted">Только бесплатное участие</div></div>${btn("Создать", "giveaway-new", "", "accent")}</div><div class="giveaway-list">${state.giveaways
       .map(
@@ -424,7 +430,7 @@ let proofListener;
 async function connect() {
   show(
     "TON-кошелёк",
-    `<div class="detail"><div class="muted">Подтверждение владения кошельком в testnet. Средства не списываются.</div><div id="ton-proof-status" role="status">Проверка настроек…</div><div id="ton-root"></div>${btn("Отключить кошелёк", "disconnect")}</div>`,
+    `<div class="detail"><div class="muted">Подключение реального TON-кошелька с проверкой подписи. Средства не списываются.</div><div id="ton-proof-status" role="status">Проверка настроек…</div><div id="ton-root"></div>${btn("Отключить кошелёк", "disconnect")}</div>`,
   );
   const status = (t) => {
     const el = $("#ton-proof-status");
@@ -435,7 +441,7 @@ async function connect() {
       throw Error("Для TON Proof настройте публичный HTTPS-домен.");
     const connection = await api("wallet/connection");
     if (!connection.enabled)
-      throw Error("TON Proof отключён сервером. Требуется restricted/testnet.");
+      throw Error("TON Proof отключён сервером. Требуется restricted и HTTPS.");
     if (!window.TON_CONNECT_UI)
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
@@ -451,13 +457,15 @@ async function connect() {
         manifestUrl: location.origin + "/tonconnect-manifest.json",
       });
     if (proofListener) proofListener();
-    if (connection.connection && tonUI.connected) {
+    await tonUI.connectionRestored;
+    if (connection.connection && tonUI.connected && tonUI.wallet?.account?.address?.toLowerCase() === connection.connection.address && tonUI.wallet?.account?.chain === connection.network && connection.connection.network === connection.network) {
       status(
-        `Кошелёк подтверждён · testnet · ${connection.connection.address.slice(0, 8)}…${connection.connection.address.slice(-6)}`,
+        `Кошелёк подтверждён · ${connection.network === "-239" ? "mainnet" : "testnet"} · ${connection.connection.address.slice(0, 8)}…${connection.connection.address.slice(-6)}`,
       );
       tonUI.buttonRootId = "ton-root";
       return;
     }
+    if (tonUI.connected) await tonUI.disconnect();
     const challenge = await api("wallet/proof/challenge", {
       method: "POST",
       body: "{}",
@@ -956,10 +964,25 @@ document.addEventListener("click", async (e) => {
         modal.close();
         break;
       case "deposit-gift":
-        show(
-          "Добавить подарок",
-          `<div class="detail"><p>Хранилище ещё не прошло проверку. Не отправляйте реальные подарки.</p><p class="muted">${state.config.custody ? "Настроенный аккаунт: " + esc(state.config.custody) : "Аккаунт хранилища не настроен."}</p></div>`,
-        );
+        show("Добавить подарок",`<div class="detail"><p>Вставьте ссылку на свой подарок Telegram. Маркет проверит его через Telegram API.</p><label>Ссылка<input id="gift-link" type="url" placeholder="https://t.me/nft/PlushPepe-123"></label>${btn("Добавить","personal-add","","accent")}<p class="muted">Импорт не переводит подарок на хранение и не разрешает реальные сделки.</p></div>`);
+        break;
+      case "personal-add":
+      case "personal-refresh": {
+        busy=true;
+        const link=a==="personal-add" ? $("#gift-link").value.trim() : "https://t.me/nft/"+id;
+        await api("personal-gifts",{method:"POST",body:JSON.stringify({link})});
+        state.personalGifts=(await api("personal-gifts")).items;
+        modal.close(); render(); toast("Подарок проверен через Telegram");
+        break;
+      }
+      case "personal-remove":
+        busy=true;
+        await api("personal-gifts",{method:"DELETE",body:JSON.stringify({slug:id})});
+        state.personalGifts=(await api("personal-gifts")).items;
+        render(); toast("Ссылка удалена из инвентаря");
+        break;
+      case "personal-sale":
+        show("Продажа подарка",`<div class="detail"><p>Продажа за реальные средства в MINION MARKET ещё отключена. Если подарок доступен для продажи в Telegram, откройте его в Telegram и используйте штатную продажу.</p><a class="gift-link" href="https://t.me/nft/${encodeURIComponent(id)}" target="_blank" rel="noopener noreferrer">Открыть подарок в Telegram</a></div>`);
         break;
       case "filters": {
         const sel = (k, title) =>

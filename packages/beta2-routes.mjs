@@ -4,14 +4,17 @@ import { CustodyEvidence } from "./custody/reconciliation.mjs";
 import { rolesFromEnv, hasPermission } from "./rbac.mjs";
 import { hashToken } from "./market-safety.mjs";
 import { GiveawayService } from "./giveaways.mjs";
+import { PersonalGifts } from "./personal-gifts.mjs";
 export async function beta2Routes(repo, env, demo) {
   const url = new URL(env.APP_URL || "http://localhost:3000");
-  const configured =
-    !demo && url.protocol === "https:" && env.TON_NETWORK === "testnet";
+  const network = env.TON_NETWORK === "mainnet" ? "-239" : "-3";
+  const configured = !demo && url.protocol === "https:" && ["mainnet","testnet"].includes(env.TON_NETWORK);
+  const personal = new PersonalGifts(repo, !demo && env.TELEGRAM_BOT_TOKEN ? new TelegramAPI(env.TELEGRAM_BOT_TOKEN) : null);
+  await personal.initialize();
   const roles = rolesFromEnv(env);
   const evidence = new CustodyEvidence(repo);
   await evidence.initialize();
-  const proof = new ProofService(repo, { domain: url.host, network: "-3" });
+  const proof = new ProofService(repo, { domain: url.host, network });
   await proof.initialize();
   const giveaways = new GiveawayService(repo);
   await giveaways.initialize();
@@ -62,6 +65,7 @@ export async function beta2Routes(repo, env, demo) {
       json(r, 200, {
         connection: await proof.connection(u.id),
         enabled: configured,
+        network,
       });
       return true;
     }
@@ -72,7 +76,7 @@ export async function beta2Routes(repo, env, demo) {
     if (path.startsWith("/api/v1/wallet/proof/")) {
       if (!configured) {
         json(r, 503, {
-          error: "TON Proof требует restricted mode, HTTPS и testnet",
+          error: "TON Proof требует restricted mode, HTTPS и настроенную сеть TON",
         });
         return true;
       }
@@ -82,6 +86,19 @@ export async function beta2Routes(repo, env, demo) {
       }
       if (method === "POST" && path.endsWith("/verify")) {
         json(r, 200, await proof.verify(u.id, session, await body(q)));
+        return true;
+      }
+    }
+    if (path === "/api/v1/personal-gifts") {
+      if (method === "GET") {
+        json(r,200,{items:await personal.list(u.id),enabled:!!personal.api});
+        return true;
+      }
+      if (method === "POST" || method === "DELETE") {
+        if (!personal.api) { json(r,503,{error:"Импорт доступен только в Telegram с настроенным ботом"}); return true; }
+        const input=await body(q);
+        const result=method==="POST" ? await personal.add(u.id,input.link) : await personal.remove(u.id,input.slug);
+        json(r,200,result);
         return true;
       }
     }

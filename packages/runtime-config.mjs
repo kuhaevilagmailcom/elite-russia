@@ -33,6 +33,7 @@ export function normalizedEnv(source = process.env) {
   const onBotHost = Boolean(env.BOT_ID || env.DOMAIN || env.DATA_DIR);
   if (onBotHost) {
     env.APP_ENV ||= "restricted";
+    env.TON_NETWORK ||= "mainnet"; // wallet proof only; no finance enabled
     env.BIND_HOST ||= "0.0.0.0";
     env.APP_URL ||= publicOrigin(env.DOMAIN) || publicOrigin(env.WEBHOOK_URL);
     env.DATABASE_DRIVER ||= "sqlite";
