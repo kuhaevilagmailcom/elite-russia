@@ -1,0 +1,4 @@
+# Verification report
+Baseline: `npm test` 34/34 before changes. Final local run: `npm run check` passed; `npm test` 51/51 passed. See `artifacts/unit-tests.txt`.
+Tests include original trading, async HTTP auth and race, async purchase/collection/bundle rollback, Ledger V2 no full scan during trade and mismatch pause, Ed25519 verification with injected resolver, challenge replay/session binding, collectible API fixture, custody observations and RBAC.
+Not run: `APP_ENV=test DATABASE_URL=... node --test tests/postgres.integration.mjs` on an empty disposable PG database; `node --test tests/ton-sdk.integration.mjs` with real SDK. No real TON testnet payment and no live Telegram integration. Browser command attempted: `CHROMIUM_PATH=/usr/bin/chromium MARKET_URL=http://127.0.0.1:38130 python scripts/browser_test.py`; Page.goto blocked. CI workflow added but not executed remotely.

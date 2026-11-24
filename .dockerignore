@@ -1,9 +1,10 @@
-.git
 .env
-.venv
-__pycache__
-.pytest_cache
-data/*.db*
-outputs
+data
+node_modules
+.git
+artifacts
+legacy-python
+tests
+docs
 work
-
+*.sqlite*

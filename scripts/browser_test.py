@@ -1,0 +1,28 @@
+"""Real browser QA. Requires Python playwright and installed Chromium."""
+import os, pathlib
+from playwright.sync_api import sync_playwright
+BASE=os.environ.get('MARKET_URL','http://127.0.0.1:3000')
+OUT=pathlib.Path('artifacts/screenshots');OUT.mkdir(parents=True,exist_ok=True)
+with sync_playwright() as p:
+    browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or None)
+    errors=[]
+    for w,h in [(320,568),(375,667),(390,844),(430,932),(768,1024),(1440,900)]:
+        page=browser.new_page(viewport={'width':w,'height':h});page.on('pageerror',lambda e:errors.append(str(e)))
+        # External SDKs are excluded from local UI QA, not simulated as connected.
+        page.route('https://**/*',lambda route:route.abort())
+        page.goto(BASE,wait_until='domcontentloaded');page.locator('.gift').first.wait_for()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow {w}'
+        page.screenshot(path=OUT/f'market-{w}.png',full_page=True)
+        if w==390:
+            def click(action):page.locator(f'[data-action="{action}"]').first.click()
+            def shot(name):page.screenshot(path=OUT/f'{name}-390.png')
+            for action,name in [('filters','filters'),('detail','gift-details'),('buy','buy'),('sweep','sweep'),('cart','cart'),('wallet','wallet')]:
+                click(action);page.locator('dialog[open]').wait_for();shot(name);click('close')
+            for tab in ['collections','offers','bundles']:
+                page.locator(f'.tabs [data-action="tab"][data-id="{tab}"]').click();shot(tab)
+            for section in ['activity','inventory','giveaways','profile']:
+                page.locator(f'[data-action="nav"][data-id="{section}"]').click();shot(section)
+            page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')
+        page.close()
+    browser.close();assert not errors,errors
+print('Chromium UI checks passed')

@@ -1,0 +1,46 @@
+BEGIN;
+  
+CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,balance BIGINT NOT NULL DEFAULT 0 CHECK(id='treasury' OR balance>=0));
+CREATE TABLE IF NOT EXISTS journal(id TEXT PRIMARY KEY,kind TEXT NOT NULL,src TEXT REFERENCES accounts(id),dst TEXT REFERENCES accounts(id),amount BIGINT NOT NULL CHECK(amount>0),ref TEXT NOT NULL,created BIGINT NOT NULL);
+
+
+CREATE TABLE IF NOT EXISTS gifts(id TEXT PRIMARY KEY,collection TEXT NOT NULL,number BIGINT NOT NULL,model TEXT NOT NULL,backdrop TEXT NOT NULL,symbol TEXT NOT NULL,art TEXT NOT NULL,owner TEXT NOT NULL REFERENCES users(id),UNIQUE(collection,number));
+CREATE TABLE IF NOT EXISTS listings(id TEXT PRIMARY KEY,gift TEXT REFERENCES gifts(id),seller TEXT REFERENCES users(id),price BIGINT NOT NULL CHECK(price>0),version BIGINT NOT NULL DEFAULT 1,status TEXT NOT NULL CHECK(status IN ('active','sold','cancelled')),created BIGINT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS one_listing ON listings(gift) WHERE status='active';
+CREATE TABLE IF NOT EXISTS offers(id TEXT PRIMARY KEY,gift TEXT REFERENCES gifts(id),buyer TEXT REFERENCES users(id),price BIGINT NOT NULL CHECK(price>0),status TEXT NOT NULL CHECK(status IN ('active','accepted','cancelled','expired')),expires BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS activity(id TEXT PRIMARY KEY,gift TEXT REFERENCES gifts(id),type TEXT NOT NULL,price BIGINT,created BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS ownership(id TEXT PRIMARY KEY,gift TEXT REFERENCES gifts(id),previous TEXT REFERENCES users(id),next TEXT REFERENCES users(id),ref TEXT,created BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS requests("user" TEXT,key TEXT,action TEXT,body TEXT,result TEXT,PRIMARY KEY("user",key));
+CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,"user" TEXT REFERENCES users(id),expires BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_replay(hash TEXT PRIMARY KEY,expires BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS favorites("user" TEXT REFERENCES users(id),gift TEXT REFERENCES gifts(id),PRIMARY KEY("user",gift));
+CREATE TABLE IF NOT EXISTS tickets(id TEXT PRIMARY KEY,"user" TEXT REFERENCES users(id),message TEXT,status TEXT DEFAULT 'OPEN',created BIGINT);
+CREATE TABLE IF NOT EXISTS collection_offers(id TEXT PRIMARY KEY,buyer TEXT NOT NULL REFERENCES users(id),collection TEXT NOT NULL,model TEXT NOT NULL DEFAULT '',backdrop TEXT NOT NULL DEFAULT '',symbol TEXT NOT NULL DEFAULT '',price BIGINT NOT NULL CHECK(price>0),remaining BIGINT NOT NULL CHECK(remaining>=0),quantity BIGINT NOT NULL CHECK(quantity>0),status TEXT NOT NULL CHECK(status IN ('active','filled','cancelled','expired')),expires BIGINT NOT NULL,created BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS collection_offer_book ON collection_offers(collection,status,price DESC,created);
+CREATE TABLE IF NOT EXISTS bundles(id TEXT PRIMARY KEY,seller TEXT NOT NULL REFERENCES users(id),price BIGINT NOT NULL CHECK(price>0),version BIGINT NOT NULL DEFAULT 1,status TEXT NOT NULL CHECK(status IN ('active','sold','cancelled')),created BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS bundle_items(bundle TEXT NOT NULL REFERENCES bundles(id),gift TEXT NOT NULL REFERENCES gifts(id),PRIMARY KEY(bundle,gift));
+CREATE TABLE IF NOT EXISTS bundle_locks(gift TEXT PRIMARY KEY REFERENCES gifts(id),bundle TEXT NOT NULL REFERENCES bundles(id));
+
+
+CREATE TABLE IF NOT EXISTS quotes(id TEXT PRIMARY KEY,"user" TEXT NOT NULL REFERENCES users(id),listing TEXT NOT NULL REFERENCES listings(id),gift TEXT NOT NULL REFERENCES gifts(id),version BIGINT NOT NULL,price BIGINT NOT NULL CHECK(price>0),expires BIGINT NOT NULL,used BIGINT NOT NULL CHECK(used IN(0,1)));
+CREATE TABLE IF NOT EXISTS swaps(id TEXT PRIMARY KEY,sender TEXT NOT NULL REFERENCES users(id),recipient TEXT NOT NULL REFERENCES users(id),give TEXT NOT NULL,take TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('pending','accepted','cancelled','expired')),created BIGINT NOT NULL,expires BIGINT NOT NULL,CHECK(sender<>recipient));
+CREATE INDEX IF NOT EXISTS swaps_sender ON swaps(sender,created);
+CREATE INDEX IF NOT EXISTS swaps_recipient ON swaps(recipient,created);
+CREATE INDEX IF NOT EXISTS journal_src ON journal(src);
+CREATE INDEX IF NOT EXISTS journal_dst ON journal(dst);
+CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY,"user" TEXT REFERENCES users(id),message TEXT,created BIGINT);
+CREATE TABLE IF NOT EXISTS giveaways(id TEXT PRIMARY KEY,organizer TEXT NOT NULL REFERENCES users(id),gift TEXT NOT NULL REFERENCES gifts(id),title TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN('active','completed','cancelled')),starts BIGINT NOT NULL,ends BIGINT NOT NULL,created BIGINT NOT NULL,winner TEXT REFERENCES users(id),random_hash TEXT);
+CREATE TABLE IF NOT EXISTS giveaway_entries(giveaway TEXT NOT NULL REFERENCES giveaways(id),"user" TEXT NOT NULL REFERENCES users(id),created BIGINT NOT NULL,PRIMARY KEY(giveaway,"user"));
+CREATE TABLE IF NOT EXISTS giveaway_locks(gift TEXT PRIMARY KEY REFERENCES gifts(id),giveaway TEXT NOT NULL UNIQUE REFERENCES giveaways(id));
+CREATE TABLE IF NOT EXISTS giveaway_requests("user" TEXT NOT NULL,key TEXT NOT NULL,result TEXT NOT NULL,PRIMARY KEY("user",key));
+
+CREATE TABLE IF NOT EXISTS integration_snapshots(kind TEXT PRIMARY KEY,payload TEXT NOT NULL,checked BIGINT NOT NULL);
+CREATE OR REPLACE FUNCTION immutable_journal() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'immutable'; END; $$;
+DROP TRIGGER IF EXISTS journal_immutable ON journal;
+CREATE TRIGGER journal_immutable BEFORE UPDATE OR DELETE ON journal FOR EACH ROW EXECUTE FUNCTION immutable_journal();
+DROP TRIGGER IF EXISTS ownership_immutable ON ownership;
+CREATE TRIGGER ownership_immutable BEFORE UPDATE OR DELETE ON ownership FOR EACH ROW EXECUTE FUNCTION immutable_journal();
+
+COMMIT;

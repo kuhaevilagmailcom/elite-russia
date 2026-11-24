@@ -1,0 +1,2 @@
+import {PostgresRepository} from '../packages/database/repository.mjs';
+if(process.env.APP_ENV!=='test'&&process.env.APP_ENV!=='development'&&process.env.APP_ENV!=='restricted')throw Error('Migration allowed only in explicit non-production mode');const repo=await PostgresRepository.open(process.env.DATABASE_URL,{migrate:true});console.log('PostgreSQL schema applied and reachable');await repo.close();

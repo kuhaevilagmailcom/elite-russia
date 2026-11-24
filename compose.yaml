@@ -1,0 +1,18 @@
+services:
+  market:
+    build: .
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      APP_ENV: development
+      BIND_HOST: 0.0.0.0
+      APP_URL: http://localhost:3000
+      DB_PATH: /app/data/demo.sqlite
+      LIVE_FINANCE_ENABLED: "false"
+    volumes: ["market-data:/app/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+volumes:
+  market-data:
