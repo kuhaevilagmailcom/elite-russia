@@ -19,7 +19,7 @@ with sync_playwright() as p:
             for action,name in [('filters','filters'),('detail','gift-details'),('buy','buy'),('sweep','sweep'),('cart','cart'),('wallet','wallet')]:
                 click(action);page.locator('dialog[open]').wait_for();shot(name);click('close')
             for tab in ['collections','offers','bundles']:
-                page.locator(f'[data-action="tab"][data-id="{tab}"]').click();shot(tab)
+                page.locator(f'.tabs [data-action="tab"][data-id="{tab}"]').click();shot(tab)
             for section in ['activity','inventory','events','profile']:
                 page.locator(f'[data-action="nav"][data-id="{section}"]').click();shot(section)
             page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')
