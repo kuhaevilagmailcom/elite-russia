@@ -1,3 +1,4 @@
+import {giftAppearance} from "./gift-appearance.mjs";
 // Personal Telegram inventory references. Never insert into tradable gifts or credit a balance.
 export function giftSlug(value) {
   if (typeof value !== "string" || value.length > 240) throw Error("Некорректная ссылка");
@@ -34,7 +35,7 @@ export async function findUserGifts(api, user, slugs) {
         modelMediaUrl:file ? "/api/v1/media/telegram/"+encodeURIComponent(file) : null,
         modelVideoUrl:video ? "/api/v1/media/telegram/"+encodeURIComponent(video) : null,
         modelAnimationUrl:animation ? "/api/v1/media/telegram/"+encodeURIComponent(animation) : null,
-        mediaVersion:2,
+        ...giftAppearance(g),mediaVersion:3,
         checkedAt:Date.now(), status:"observed", tradable:false});
       wanted.delete(slug);
     }
@@ -66,7 +67,7 @@ export class PersonalGifts {
     return rows.map(x=>({...JSON.parse(x.payload),status:"observed",tradable:false}));
   }
   async refreshMedia(user){
-    const old=(await this.list(user)).filter(x=>x.mediaVersion!==2);
+    const old=(await this.list(user)).filter(x=>x.mediaVersion!==3);
     if(!old.length)return {updated:0};
     const found=await findUserGifts(this.api,user,old.map(x=>x.slug));
     await this.repo.tx(async()=>{for(const [slug,item] of found)await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);});

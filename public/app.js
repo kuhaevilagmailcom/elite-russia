@@ -151,7 +151,7 @@ async function reload() {
   if (state.token && !state.config.demo) {
     try {
       const response=await api("personal-gifts");state.personalGifts=response.items||[];
-      if(response.enabled&&state.personalGifts.some(g=>g.mediaVersion!==2)&&state.mediaRefreshToken!==state.token){
+      if(response.enabled&&state.personalGifts.some(g=>g.mediaVersion!==3)&&state.mediaRefreshToken!==state.token){
         state.mediaRefreshToken=state.token;
         try{await api("personal-gifts/refresh-media",{method:"POST",body:"{}"});state.personalGifts=(await api("personal-gifts")).items||[];}catch{}
       }
@@ -188,6 +188,14 @@ function giftCard(g, mine = false) {
   return `<article class="gift">${art(g)}<div class="info"><div class="name">${esc(g.collection)}</div><div class="muted">${esc(g.model)}</div><div class="price">${gramIcon()} ${g.price ? fmt(g.price) : g.best_offer ? fmt(g.best_offer) : "—"} <small>${cur()}</small></div><div class="cardbuttons">${mine && g.bundle ? '<span class="muted">В составе набора</span>' : mine ? btn(g.listing ? "Изменить" : "Продать", "sell", g.id, "accent") + (g.listing ? btn("Снять", "delist", g.id) : btn("•••", "detail", g.id)) : btn("Купить", "buy", g.id, "accent") + btn(uiIcon(state.cart.has(g.id) ? "check" : "plus"), "cart-add", g.id, "icon-button")}</div></div></article>`;
 }
 // Only same-origin Telegram media proxy URLs are accepted here.
+function giftBackdrop(g){
+ const rgb=v=>Number.isInteger(v)&&v>=0&&v<=0xffffff?"#"+v.toString(16).padStart(6,"0"):null;
+ const c=g.backdropColors||{},center=rgb(c.center),edge=rgb(c.edge),symbol=rgb(c.symbol);
+ const pattern=typeof g.symbolMediaUrl==="string"&&/^\/api\/v1\/media\/telegram\/[A-Za-z0-9_-]{5,512}$/.test(g.symbolMediaUrl)?g.symbolMediaUrl:null;
+ const styles=center&&edge?`--gift-center:${center};--gift-edge:${edge};`:"";
+ const patternStyle=pattern&&symbol?`--gift-symbol:${symbol};--gift-symbol-url:url('${pattern}');`:"";
+ return `<div class="gift-original-backdrop ${center&&edge?"has-colors":""}" style="${styles+patternStyle}" aria-hidden="true">${patternStyle?Array.from({length:12},(_,i)=>`<i class="gift-symbol gift-symbol-${i}"></i>`).join(""):""}</div>`;
+}
 function giftMedia(g) {
   const safe = (url) => typeof url === "string" && /^\/api\/v1\/media\/telegram\/[A-Za-z0-9_-]{5,512}$/.test(url);
   const image = safe(g.modelMediaUrl) ? g.modelMediaUrl : "";
@@ -195,10 +203,11 @@ function giftMedia(g) {
   const animation = safe(g.modelAnimationUrl) ? g.modelAnimationUrl : "";
   const alt = esc(g.collection + " #" + g.number);
   const still = image ? `<img class="gift-media-still" src="${esc(image)}" alt="${alt}" loading="lazy">` : '<span class="gift-media-unavailable">Медиа недоступно</span>';
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return still;
-  if(animation) return `${still}<div class="gift-media-lottie" data-animation="${esc(animation)}" aria-label="${alt}"></div>`;
-  if(!video) return still;
-  return `${still}<video class="gift-media-video" src="${esc(video)}" muted loop playsinline preload="none" aria-label="${alt}" hidden></video>`;
+  const background=giftBackdrop(g);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return background+still;
+  if(animation) return `${background}${still}<div class="gift-media-lottie" data-animation="${esc(animation)}" aria-label="${alt}"></div>`;
+  if(!video) return background+still;
+  return `${background}${still}<video class="gift-media-video" src="${esc(video)}" muted loop playsinline preload="none" aria-label="${alt}" hidden></video>`;
 }
 // Play only visible videos; retain the original thumbnail if playback fails.
 const giftVideoObserver = new IntersectionObserver(entries => {
@@ -1188,6 +1197,15 @@ document.addEventListener("click", async (e) => {
     busy = false;
   }
 });
+let startupComplete=false;
+function finishSplash(){
+ const splash=document.getElementById("splash");
+ if(!splash)return;
+ splash.setAttribute("aria-hidden","true");
+ if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){splash.remove();return;}
+ splash.classList.add("splash-exit");
+ setTimeout(()=>splash.remove(),240);
+}
 async function init() {
   try {
     const startRoute = new URLSearchParams(location.search).get("startapp");
@@ -1219,7 +1237,7 @@ async function init() {
     render();
   } catch (e) {
     app.innerHTML = empty("Не удалось запустить маркет", esc(e.message));
-  }
+  } finally {startupComplete=true;finishSplash();}
 }
 init();
 const feed = new EventSource("/api/v1/stream");
@@ -1229,7 +1247,7 @@ feed.addEventListener("market", async () => {
     firstFeed = false;
     return;
   }
-  if (busy || modal.open || document.activeElement?.id === "search") return;
+  if (!startupComplete || busy || modal.open || document.activeElement?.id === "search") return;
   try {
     await reload();
     render();

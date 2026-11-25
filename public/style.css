@@ -969,3 +969,19 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
 .profile-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 18px}.profile-stats button{padding:12px 6px;background:#242427;border-radius:15px;display:grid;gap:5px}.profile-stats b{font-size:22px}.profile-stats span{font-size:11px;color:var(--muted)}
 .profile-menu{background:#242427;border-radius:20px;overflow:hidden;padding:3px 12px}.profile-menu-item{width:100%;display:flex;align-items:center;gap:11px;background:transparent;padding:12px 0;border-radius:0;text-align:left;min-height:48px}.profile-menu-item+.profile-menu-item{border-top:1px solid #353538}.profile-menu-item b{flex:1;font-size:14px}.profile-menu-icon{display:grid;place-items:center;background:#34312a;border-radius:10px;color:#fbd22e;width:32px;height:32px;flex:none}.profile-menu-icon svg{width:20px;height:20px}.profile-chevron{color:#9b9ba0;font-size:22px}
 .personal-inventory-card .real-gift-art{cursor:pointer}.personal-inventory-card .cardbuttons button{min-height:38px}
+
+/* Full-height user-supplied splash, shown only during actual bootstrap. */
+#splash{position:fixed;inset:0;z-index:10000;background:#090909;display:grid;place-items:center;overflow:hidden;opacity:1;transition:opacity 220ms ease}
+#splash img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block}
+#splash.splash-exit{opacity:0;pointer-events:none}
+@media(prefers-reduced-motion:reduce){#splash{transition:none}}
+/* Telegram actual RGB backdrop and repeated actual sticker silhouette. */
+.gift-original-backdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.gift-original-backdrop.has-colors{background:radial-gradient(ellipse at 50% 44%,var(--gift-center),var(--gift-edge) 100%)}
+.gift-original-backdrop .gift-symbol{position:absolute;width:15%;aspect-ratio:1;background:var(--gift-symbol);mask:var(--gift-symbol-url) center/contain no-repeat;-webkit-mask:var(--gift-symbol-url) center/contain no-repeat;opacity:.7;transform:rotate(-15deg)}
+.gift-symbol-0{left:5%;top:7%}.gift-symbol-1{left:29%;top:2%}.gift-symbol-2{right:30%;top:5%}.gift-symbol-3{right:5%;top:9%}
+.gift-symbol-4{left:-2%;top:37%}.gift-symbol-5{right:0;top:40%}.gift-symbol-6{left:8%;bottom:11%}.gift-symbol-7{left:31%;bottom:3%}.gift-symbol-8{right:30%;bottom:5%}.gift-symbol-9{right:6%;bottom:13%}.gift-symbol-10{left:20%;top:33%;width:11%}.gift-symbol-11{right:20%;top:35%;width:11%}
+.real-gift-art,.personal-preview{isolation:isolate;position:relative;overflow:hidden}
+.real-gift-art .gift-media-still,.personal-preview .gift-media-still{position:relative;z-index:1}
+.gift-media-lottie,.gift-media-video,.gift-media-unavailable{z-index:1}
+.real-gift-art .serial,.real-gift-art .verified-source,.personal-preview .telegram-mark{z-index:2}

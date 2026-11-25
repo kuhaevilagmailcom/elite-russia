@@ -1,3 +1,4 @@
+import {giftAppearance} from "./gift-appearance.mjs";
 import { decodeTgs } from "./tgs.mjs";
 export class TelegramAPI {
   constructor(token, fetcher = fetch) {
@@ -66,6 +67,7 @@ export class TelegramAPI {
       modelAnimationFile: g.model?.sticker?.is_animated ? g.model.sticker.file_id : null,
       modelVideoFile: g.model?.sticker?.is_video ? g.model.sticker.file_id : null,
       symbolFile: g.symbol?.sticker?.file_id ?? null,
+      ...giftAppearance(g),mediaVersion:3,
       source: "Telegram Bot API/getUniqueGift",
       verifiedAt: Date.now(),
     };

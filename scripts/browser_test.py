@@ -10,7 +10,10 @@ with sync_playwright() as p:
         page=browser.new_page(viewport={'width':w,'height':h});page.on('pageerror',lambda e:errors.append(str(e)))
         # External SDKs are excluded from local UI QA, not simulated as connected.
         page.route('https://**/*',lambda route:route.abort())
+        splash=page.request.get(BASE+'/splash.webp')
+        assert splash.ok and splash.headers['content-type']=='image/webp' and splash.body()[:4]==b'RIFF'
         page.goto(BASE,wait_until='domcontentloaded');page.locator('.reference-banner').wait_for()
+        page.locator('#splash').wait_for(state='detached')
         overflow = page.evaluate("""() => ({width: innerWidth, scrollWidth: document.documentElement.scrollWidth, offenders: [...document.querySelectorAll('#app *')].filter(e => {const r=e.getBoundingClientRect();return r.right>innerWidth+1 && getComputedStyle(e).position!=='absolute'}).slice(0,15).map(e=>({tag:e.tagName,cls:e.getAttribute('class'),right:e.getBoundingClientRect().right}))})""")
         banner = page.locator('.reference-banner').bounding_box()
         shell = page.locator('.reference-shell').bounding_box()
