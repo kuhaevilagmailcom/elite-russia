@@ -160,6 +160,7 @@ const files = {
   "/lottie-light.min.js":"lottie-light.min.js",
   "/style.css": "style.css",
   "/splash.webp":"splash.webp",
+  "/gram.svg": "gram.svg",
   "/minion-logo.webp": "minion-logo.webp",
   "/minion-logo.png": "minion-logo.png",
   "/beta.js": "beta.js",

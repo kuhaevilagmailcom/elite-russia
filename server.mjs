@@ -143,6 +143,7 @@ const files = {
   "/app.js": "app.js",
   "/style.css": "style.css",
   "/splash.webp":"splash.webp",
+  "/gram.svg": "gram.svg",
   "/minion-logo.webp": "minion-logo.webp",
   "/minion-logo.png": "minion-logo.png",
   "/phosphor.js": "phosphor.js",
