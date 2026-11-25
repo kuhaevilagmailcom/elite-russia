@@ -67,3 +67,6 @@ Baseline main e6670391 passed CI 45585302110. Added browser boundary tests for 0
 
 ## Activity statistics
 Baseline main 48b24cee passed CI 45604511435. Added seven-day UTC count of sold events from the existing activity response, explicitly limited to available history, no fabricated volume or prices. Added event filters and browser fixture assertions. New CI pending; no financial changes or visual acceptance claimed.
+
+## Personal media refresh concurrency
+Baseline main efb8ec2 passed CI 45614554692. Legacy media refresh now compares the original stored payload before writing after Telegram I/O and reports only actual updated rows. Added deterministic regression tests for concurrent newer verification and deletion. New CI pending; no live finance or custody changes.
