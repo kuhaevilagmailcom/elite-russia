@@ -578,11 +578,12 @@ async function connect() {
     if(proofListener){proofListener();proofListener=null;}
     await tonUI.connectionRestored;
     if(connection.connection&&tonUI.connected&&tonUI.wallet?.account?.address?.toLowerCase()===connection.connection.address&&tonUI.wallet?.account?.chain===connection.network&&connection.connection.network===connection.network){
-      walletResult("Кошелёк подтверждён · "+(connection.network==="-239"?"Mainnet":"Testnet")+" · "+connection.connection.address,true);
+      state.walletConnection=connection.connection;render();walletResult("Кошелёк подтверждён · "+(connection.network==="-239"?"Mainnet":"Testnet")+" · "+connection.connection.address,true);
       return;
     }
     if(tonUI.connected)await tonUI.disconnect();
     if(connection.connection)await api("wallet/connection",{method:"DELETE"});
+    state.walletConnection=null;
     const challenge=await api("wallet/proof/challenge",{method:"POST",body:"{}"});
     tonUI.setConnectRequestParameters({state:"ready",value:{tonProof:challenge.payload}});
     let verifying=false;

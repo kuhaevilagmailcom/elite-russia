@@ -2,7 +2,7 @@
 import os, pathlib
 from playwright.sync_api import sync_playwright
 BASE=os.environ.get('MARKET_URL','http://127.0.0.1:3000')
-OUT=pathlib.Path('artifacts/screenshots');OUT.mkdir(parents=True,exist_ok=True)
+OUT=pathlib.Path('artifacts/screenshots')/os.environ.get('BROWSER_ENGINE','chromium');OUT.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as p:
     engine=os.environ.get('BROWSER_ENGINE','chromium')
     browser=getattr(p,engine).launch(**({'executable_path':os.environ['CHROMIUM_PATH']} if engine=='chromium' and os.environ.get('CHROMIUM_PATH') else {}))
