@@ -23,12 +23,15 @@ export async function findUserGift(api, user, slug) {
       if (!g.base_name || !Number.isSafeInteger(g.number) || g.number < 1) throw Error("Некорректные данные Telegram");
       const sticker = g.model?.sticker;
       const video = sticker?.is_video === true && sticker?.is_animated !== true ? sticker.file_id : null;
+      const animation=sticker?.is_animated===true?sticker.file_id:null;
       const thumb = sticker?.thumbnail?.file_id;
       const file = thumb || (!g.model?.sticker?.is_animated && !g.model?.sticker?.is_video ? g.model?.sticker?.file_id : null);
       return {slug, collection:g.base_name, number:g.number, model:g.model?.name,
         backdrop:g.backdrop?.name, symbol:g.symbol?.name,
         modelMediaUrl:file ? "/api/v1/media/telegram/"+encodeURIComponent(file) : null,
         modelVideoUrl:video ? "/api/v1/media/telegram/"+encodeURIComponent(video) : null,
+        modelAnimationUrl:animation ? "/api/v1/media/telegram/"+encodeURIComponent(animation) : null,
+        mediaVersion:2,
         checkedAt:Date.now(), status:"observed", tradable:false};
     }
     if (!r.next_offset) return null;

@@ -957,3 +957,8 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
 .storefront-grid .gift{border-radius:16px}.storefront-grid .info{padding:10px}
 .catalog-heading{margin:20px 0 4px}.catalog-heading h1{font-size:19px}
 @media(max-width:350px){.banner-emblem{width:48px;height:48px;margin-right:12px}.reference-banner-text{padding:13px}.reference-banner-text strong{font-size:25px}}
+
+.gift-media-lottie{position:absolute;inset:9%;width:82%;height:82%;opacity:0;pointer-events:none}.gift-media-lottie.playing{opacity:1}
+.real-gift-art:has(.gift-media-lottie.playing) .gift-media-still,.personal-preview:has(.gift-media-lottie.playing) .gift-media-still,.real-gift-art:has(.gift-media-lottie.playing) .gift-media-unavailable,.personal-preview:has(.gift-media-lottie.playing) .gift-media-unavailable{visibility:hidden}
+.real-gift-art .gift-media-lottie svg,.personal-preview .gift-media-lottie svg{width:100%;height:100%}
+@media(prefers-reduced-motion:reduce){.gift-media-lottie{display:none!important}.real-gift-art .gift-media-still,.personal-preview .gift-media-still{visibility:visible!important}}

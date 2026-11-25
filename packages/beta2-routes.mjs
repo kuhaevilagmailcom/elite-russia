@@ -111,9 +111,9 @@ export async function beta2Routes(repo, env, demo) {
           const item = JSON.parse(x.payload);
           return {
             ...item,
-            modelMediaUrl: item.modelFile
-              ? `/api/v1/media/telegram/${encodeURIComponent(item.modelFile)}`
-              : null,
+            modelMediaUrl: (item.modelPreviewFile ?? (item.modelAnimationFile||item.modelVideoFile?null:item.modelFile)) ? `/api/v1/media/telegram/${encodeURIComponent(item.modelPreviewFile ?? item.modelFile)}` : null,
+            modelAnimationUrl:item.modelAnimationFile?`/api/v1/media/telegram/${encodeURIComponent(item.modelAnimationFile)}`:null,
+            modelVideoUrl:item.modelVideoFile?`/api/v1/media/telegram/${encodeURIComponent(item.modelVideoFile)}`:null,
           };
         }),
         source: "Telegram metadata; not listed assets",

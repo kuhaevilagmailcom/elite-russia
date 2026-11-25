@@ -186,9 +186,12 @@ function giftMedia(g) {
   const safe = (url) => typeof url === "string" && /^\/api\/v1\/media\/telegram\/[A-Za-z0-9_-]{5,512}$/.test(url);
   const image = safe(g.modelMediaUrl) ? g.modelMediaUrl : "";
   const video = safe(g.modelVideoUrl) ? g.modelVideoUrl : "";
+  const animation = safe(g.modelAnimationUrl) ? g.modelAnimationUrl : "";
   const alt = esc(g.collection + " #" + g.number);
   const still = image ? `<img class="gift-media-still" src="${esc(image)}" alt="${alt}" loading="lazy">` : '<span class="gift-media-unavailable">Медиа недоступно</span>';
-  if (!video || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return still;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return still;
+  if(animation) return `${still}<div class="gift-media-lottie" data-animation="${esc(animation)}" aria-label="${alt}"></div>`;
+  if(!video) return still;
   return `${still}<video class="gift-media-video" src="${esc(video)}" muted loop playsinline preload="none" aria-label="${alt}" hidden></video>`;
 }
 // Play only visible videos; retain the original thumbnail if playback fails.
@@ -200,7 +203,35 @@ const giftVideoObserver = new IntersectionObserver(entries => {
     } else { target.pause(); }
   }
 }, {threshold: 0.25});
+const lottieInstances=new WeakMap();
+const motionPreference=window.matchMedia("(prefers-reduced-motion: reduce)");
+const lottieObserver=new IntersectionObserver(entries=>{
+  for(const {target,isIntersecting} of entries){
+    const entry=lottieInstances.get(target); if(!entry) continue;
+    entry.visible=isIntersecting;
+    if(!isIntersecting||motionPreference.matches){entry.player?.pause();continue;}
+    if(entry.player){entry.player.play();continue;}
+    if(entry.loading||entry.failed||!window.lottie)continue;
+    entry.loading=true;
+    fetch(target.dataset.animation,{signal:entry.abort.signal}).then(res=>{
+      if(!res.ok||!res.headers.get("content-type")?.includes("application/json"))throw Error("Animation unavailable");
+      return res.json();
+    }).then(data=>{
+      if(!target.isConnected||entry.abort.signal.aborted)return;
+      const player=window.lottie.loadAnimation({container:target,renderer:"svg",loop:true,autoplay:false,animationData:data,rendererSettings:{progressiveLoad:false,preserveAspectRatio:"xMidYMid meet"}});
+      entry.player=player;
+      player.addEventListener("DOMLoaded",()=>{if(!target.isConnected)return;target.classList.add("playing");if(entry.visible&&!motionPreference.matches)player.play();});
+      player.addEventListener("data_failed",()=>{target.classList.remove("playing");entry.failed=true;player.destroy();entry.player=null;});
+    }).catch(()=>{entry.failed=true;target.classList.remove("playing");}).finally(()=>{entry.loading=false;});
+  }
+},{threshold:.15});
+motionPreference.addEventListener?.("change",()=>{for(const target of document.querySelectorAll(".gift-media-lottie")){const entry=lottieInstances.get(target);if(motionPreference.matches)entry?.player?.pause();else if(entry?.visible)entry.player?.play();}});
 function observeGiftMedia(root) {
+  for(const target of root.querySelectorAll(".gift-media-lottie")){
+    if(lottieInstances.has(target))continue;
+    lottieInstances.set(target,{abort:new AbortController(),visible:false,loading:false,failed:false,player:null});
+    lottieObserver.observe(target);
+  }
   for (const video of root.querySelectorAll(".gift-media-video")) {
     video.hidden = false;
     video.addEventListener("playing", () => { video.classList.add("playing"); });
@@ -210,6 +241,7 @@ function observeGiftMedia(root) {
   }
 }
 function releaseGiftMedia(root) {
+  for(const target of root.querySelectorAll(".gift-media-lottie")){const entry=lottieInstances.get(target);lottieObserver.unobserve(target);entry?.abort.abort();entry?.player?.destroy();lottieInstances.delete(target);}
   for (const video of root.querySelectorAll(".gift-media-video")) { giftVideoObserver.unobserve(video); video.pause(); }
 }
 document.addEventListener("error", event => {

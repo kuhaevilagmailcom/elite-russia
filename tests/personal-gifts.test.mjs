@@ -35,5 +35,5 @@ test("original video sticker and thumbnail remain nontradable references",async(
  const item=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);
  assert.equal(item.modelVideoUrl,"/api/v1/media/telegram/video123");assert.equal(item.modelMediaUrl,"/api/v1/media/telegram/image123");assert.equal(item.tradable,false);
  videoGift.gift.model.sticker.is_video=false;videoGift.gift.model.sticker.is_animated=true;
- const animated=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);assert.equal(animated.modelVideoUrl,null);
+ const animated=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);assert.equal(animated.modelVideoUrl,null);assert.equal(animated.modelAnimationUrl,"/api/v1/media/telegram/video123");assert.equal(animated.mediaVersion,2);
 });
