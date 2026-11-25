@@ -161,6 +161,9 @@ const files = {
   "/style.css": "style.css",
   "/splash.webp":"splash.webp",
   "/gram.svg": "gram.svg",
+  "/banner-gift.webp": "banner-gift.webp",
+  "/fonts/manrope-cyrillic.woff2": "fonts/manrope-cyrillic.woff2",
+  "/fonts/manrope-latin.woff2": "fonts/manrope-latin.woff2",
   "/minion-logo.webp": "minion-logo.webp",
   "/minion-logo.png": "minion-logo.png",
   "/beta.js": "beta.js",
@@ -172,6 +175,7 @@ const mime = {
   svg: "image/svg+xml",
   webp:"image/webp",
   png:"image/png",
+  woff2: "font/woff2",
 };
 let streams = 0;
 let checking = false;

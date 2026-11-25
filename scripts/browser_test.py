@@ -7,14 +7,25 @@ with sync_playwright() as p:
     engine=os.environ.get('BROWSER_ENGINE','chromium')
     browser=getattr(p,engine).launch(**({'executable_path':os.environ['CHROMIUM_PATH']} if engine=='chromium' and os.environ.get('CHROMIUM_PATH') else {}))
     errors=[]
-    for w,h in [(320,568),(375,667),(390,844),(393,852),(430,932),(768,1024),(1440,900)]:
+    for w,h in [(320,568),(360,740),(375,667),(390,844),(430,932),(768,1024),(1440,900)]:
         page=browser.new_page(viewport={'width':w,'height':h});page.on('pageerror',lambda e:errors.append(str(e)))
+        page.on('response',lambda r:errors.append(f'HTTP {r.status} {r.url}') if r.status>=400 and r.url.startswith(BASE) else None)
+        page.on('console',lambda m:errors.append(f'Console {m.text}') if m.type=='error' and m.location.get('url','').startswith(BASE) else None)
         # External SDKs are excluded from local UI QA, not simulated as connected.
         page.route('https://**/*',lambda route:route.abort())
-        splash=page.request.get(BASE+'/splash.webp')
-        assert splash.ok and splash.headers['content-type']=='image/webp' and splash.body()[:4]==b'RIFF'
+        for asset,mime in [('/splash.webp','image/webp'),('/minion-logo.webp','image/webp'),('/banner-gift.webp','image/webp'),('/gram.svg','image/svg+xml'),('/fonts/manrope-cyrillic.woff2','font/woff2'),('/fonts/manrope-latin.woff2','font/woff2')]:
+            response=page.request.get(BASE+asset)
+            assert response.ok and response.headers['content-type']==mime, f'{asset}: {response.status} {response.headers}'
+        assert '#30A1F5' in page.request.get(BASE+'/gram.svg').text()
         page.goto(BASE,wait_until='domcontentloaded');page.locator('.reference-banner').wait_for()
         page.locator('#splash').wait_for(state='detached')
+        page.evaluate("async()=>{await document.fonts.ready;await document.fonts.load('600 16px Manrope Variable')}")
+        assert page.evaluate("document.fonts.check('600 16px Manrope Variable')")
+        page.wait_for_function("()=>['.reference-brand-logo','.banner-gift','.reference-balance .gram-icon'].every(s=>{const e=document.querySelector(s);return e?.complete&&e.naturalWidth>0})")
+        assert page.locator('.reference-brand-logo').evaluate('(e)=>e.complete&&e.naturalWidth>0')
+        assert page.locator('.banner-gift').evaluate('(e)=>e.complete&&e.naturalWidth>0')
+        assert page.locator('.reference-balance .gram-icon').evaluate('(e)=>e.complete&&e.naturalWidth>0')
+        assert page.locator('.reference-brand>span').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1'), f'Brand clipped at {w}'
         overflow = page.evaluate("""() => ({width: innerWidth, scrollWidth: document.documentElement.scrollWidth, offenders: [...document.querySelectorAll('#app *')].filter(e => {const r=e.getBoundingClientRect();return r.right>innerWidth+1 && getComputedStyle(e).position!=='absolute'}).slice(0,15).map(e=>({tag:e.tagName,cls:e.getAttribute('class'),right:e.getBoundingClientRect().right}))})""")
         banner = page.locator('.reference-banner').bounding_box()
         shell = page.locator('.reference-shell').bounding_box()
@@ -23,7 +34,7 @@ with sync_playwright() as p:
         assert page.locator('.account-summary').count()==0
         assert page.locator('.storefront-grid .gift').count()>0
         assert page.locator('.home-actions button').count()==2
-        assert page.locator('.reference-nav button').count()==5
+        assert page.locator('.reference-nav button').count()==4
         assert page.locator('.reference-nav span').evaluate_all('(els)=>els.every(e=>getComputedStyle(e).whiteSpace === "nowrap" && e.scrollWidth <= e.parentElement.clientWidth+1)')
         assert page.locator('.reference-shell').evaluate('(e)=>parseFloat(getComputedStyle(e).paddingBottom)>=90')
         page.screenshot(path=OUT/f'home-{w}.png',full_page=True)
@@ -37,6 +48,17 @@ with sync_playwright() as p:
             assert page.locator('.reference-nav button').first.evaluate('(e) => getComputedStyle(e).transitionDuration') == '0s'
             page.emulate_media(reduced_motion='no-preference')
             page.locator('dialog [data-action="close"]').click()
+            page.locator('dialog').wait_for(state='hidden')
+            for method in ['escape','backdrop','swipe']:
+                page.locator('.home-actions [data-action="deposit-gift"]').click()
+                page.locator('dialog[open]').wait_for()
+                if method=='escape': page.keyboard.press('Escape')
+                elif method=='backdrop': page.mouse.click(8,8)
+                else:
+                    handle=page.locator('.sheet-head').bounding_box()
+                    page.mouse.move(handle['x']+handle['width']/2,handle['y']+20)
+                    page.mouse.down();page.mouse.move(handle['x']+handle['width']/2,handle['y']+150,steps=6);page.mouse.up()
+                page.locator('dialog').wait_for(state='hidden')
             page.locator('.reference-nav [data-id="sales"]').click()
             page.get_by_role('heading',name='Мои продажи').wait_for()
             assert page.get_by_role('navigation',name='Основная навигация').locator('[aria-current=page]').get_attribute('data-id') == 'sales'
@@ -47,14 +69,27 @@ with sync_playwright() as p:
         page.screenshot(path=OUT/f'market-{w}.png',full_page=True)
         if w==390:
             def click(action):page.locator(f'[data-action="{action}"]').first.click()
-            def shot(name):page.screenshot(path=OUT/f'{name}-390.png')
+            def shot(name):
+                # Capture the settled UI, not a translucent entrance-animation frame.
+                page.wait_for_timeout(350)
+                page.evaluate('scrollTo(0,0)')
+                modal_open=page.locator('dialog[open]').count()>0
+                page.screenshot(path=OUT/f'{name}-390.png',full_page=not modal_open)
+                if page.locator('.reference-brand>span').count():
+                    assert page.locator('.reference-brand>span').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1')
             for action,name in [('filters','filters'),('detail','gift-details'),('buy','buy'),('sweep','sweep'),('cart','cart'),('wallet','wallet')]:
-                click(action);page.locator('dialog[open]').wait_for();shot(name);click('close')
+                click(action);page.locator('dialog[open]').wait_for();shot(name);click('close');page.locator('dialog').wait_for(state='hidden')
             for tab in ['collections','offers','bundles']:
                 page.locator(f'.tabs [data-action="tab"][data-id="{tab}"]').click();shot(tab)
             for section in ['activity','inventory','giveaways','profile']:
-                if section=='giveaways': page.locator('.reference-nav [data-id="home"]').click()
-                page.locator(f'[data-action="nav"][data-id="{section}"]').first.click();shot(section)
+                if section=='giveaways':
+                    page.locator('.reference-nav [data-id="home"]').click()
+                    page.locator('.reference-shortcuts [data-id="giveaways"]').click()
+                elif section in ['inventory','profile']: page.locator(f'.reference-nav [data-id="{section}"]').click()
+                else:
+                    page.locator('.reference-nav [data-id="profile"]').click()
+                    page.locator('.profile-stats [data-id="activity"]').click()
+                page.locator(f'.page-{section}').wait_for();shot(section)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),section
                 if section=='activity':
                     page.evaluate("""()=>{window.qaActivity=state.activity;state.activity=[{type:'sold',collection:'QA',number:1,created:Date.now(),price:'1000000000'},{type:'listed',collection:'QA',number:2,created:Date.now(),price:'1000000000'},{type:'sold',collection:'QA',number:3,created:Date.now()-10*86400000,price:'1000000000'}];render()}""")
@@ -126,7 +161,12 @@ with sync_playwright() as p:
         if w!=390:
             for section in ['inventory','sales','activity','profile','giveaways']:
                 page.locator('.reference-nav [data-id="home"]').click()
-                page.locator(f'[data-action="nav"][data-id="{section}"]').first.click()
+                if section=='giveaways': page.locator('.reference-shortcuts [data-id="giveaways"]').click()
+                elif section=='activity':
+                    page.locator('.reference-nav [data-id="profile"]').click()
+                    page.locator('.profile-stats [data-id="activity"]').click()
+                else: page.locator(f'.reference-nav [data-id="{section}"]').click()
+                page.locator(f'.page-{section}').wait_for()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),f'{section} overflow at {w}'
                 page.screenshot(path=OUT/f'{section}-{w}.png',full_page=True)
         page.close()
