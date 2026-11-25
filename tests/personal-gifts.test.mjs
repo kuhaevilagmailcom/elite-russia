@@ -75,3 +75,19 @@ test("legacy media refresh cannot overwrite a newer check or count a removed ref
   assert.deepEqual(await second,{updated:0});assert.deepEqual(await store.list("123"),[]);
  }finally{await repo.close();}
 });
+
+test("batch refresh skips concurrent payload changes even with identical timestamps",async()=>{
+ const repo=await SQLiteRepository.open();try{
+  const store=new PersonalGifts(repo,{call:async()=>({gifts:[gift]})});
+  await store.initialize();await store.add("123",link);
+  let release,started;const gate=new Promise(r=>{release=r});const entered=new Promise(r=>{started=r});
+  store.api={call:async()=>{started();await gate;return {gifts:[]}}};
+  const pending=store.batch("123","refresh",[slug]);await entered;
+  const row=await repo.get("SELECT payload FROM personal_gift_refs WHERE user_id=? AND slug=?","123",slug);
+  const newer={...JSON.parse(row.payload),model:"New metadata"};
+  await repo.run("UPDATE personal_gift_refs SET payload=? WHERE user_id=? AND slug=?",JSON.stringify(newer),"123",slug);
+  release();assert.deepEqual(await pending,{observed:0,notObserved:0,skipped:1});
+  assert.equal((await store.list("123"))[0].model,"New metadata");
+  assert.equal((await store.list("123"))[0].status,"observed");
+ }finally{await repo.close();}
+});

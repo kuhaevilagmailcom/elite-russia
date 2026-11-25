@@ -70,3 +70,6 @@ Baseline main 48b24cee passed CI 45604511435. Added seven-day UTC count of sold 
 
 ## Personal media refresh concurrency
 Baseline main efb8ec2 passed CI 45614554692. Legacy media refresh now compares the original stored payload before writing after Telegram I/O and reports only actual updated rows. Added deterministic regression tests for concurrent newer verification and deletion. New CI pending; no live finance or custody changes.
+
+## Batch refresh concurrency
+PR #32 merged; PR CI 45623807000 succeeded. Batch refresh now uses atomic payload comparison and counts only successful writes, skipping concurrently changed or removed references. Added same-timestamp metadata regression test. New CI pending; no live finance or custody changes.
