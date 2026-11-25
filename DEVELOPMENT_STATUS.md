@@ -58,3 +58,6 @@ Baseline b17ce1a7 main CI successful. Implemented grouped inventory without dupl
 
 ### Inventory 3.0 follow-up
 Initial PR #28 CI failed at the browser test navigating from Sales to a deliberately removed shortcut; restored correct navigation through Home in QA. Added real attribute filters (collection, model, backdrop, symbol), active count, reset, and reuse of unchanged personal gift card DOM during incremental search/sort/view updates to retain Lottie instances. Browser assertions verify card identity and combined filters. CI pending; no financial changes.
+
+## Inventory batch management
+PR #28 merged: CI 45580062830 and 45580073906 successful. Added batch selection of personal references, one bounded Telegram scan for selected refs, explicit confirmation for batch removal, scoped transactional operations, accurate missing-from-list status (not proof of lost ownership), and tests for isolation, deduplication, upstream failures and confirmation. Telegram Bot API getUserGifts returns owned AND hosted gifts, so UI explicitly treats matches as observations, not proof of ownership/custody. No transfer or finance enabled. New CI pending; live Telegram tests still required.

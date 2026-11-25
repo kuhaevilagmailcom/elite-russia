@@ -85,6 +85,15 @@ with sync_playwright() as p:
                     page.locator('dialog [data-action="personal-remove-confirm"]').click()
                     assert page.get_by_text('Убрать ссылку?',exact=True).count()==1
                     page.locator('dialog [data-action="close"]').click()
+                    page.locator('[data-action="inventory-select-mode"]').click()
+                    page.locator('.card-hit').click(position={'x':30,'y':30})
+                    assert page.locator('.card-hit').get_attribute('aria-pressed')=='true'
+                    assert page.locator('#inventory-selection strong').inner_text()=='Выбрано: 1'
+                    page.locator('[data-action="inventory-batch-confirm"]').click()
+                    assert page.get_by_text('Убрать выбранные ссылки?',exact=True).count()==1
+                    page.locator('dialog [data-action="close"]').first.click()
+                    page.locator('[data-action="inventory-select-mode"]').click()
+                    assert page.locator('.card-hit').get_attribute('aria-pressed') is None
                     page.evaluate("()=>{state.personalGifts=[];state.inventoryQuery='';state.inventoryFilter='all';state.inventoryView='grid';render()}")
 
             page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')

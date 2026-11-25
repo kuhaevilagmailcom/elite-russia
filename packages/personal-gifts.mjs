@@ -66,7 +66,7 @@ export class PersonalGifts {
   }
   async list(user) {
     const rows=await this.repo.all("SELECT payload FROM personal_gift_refs WHERE user_id=? ORDER BY checked DESC LIMIT 100",user);
-    return rows.map(x=>({...JSON.parse(x.payload),status:"observed",tradable:false}));
+    return rows.map(x=>{const item=JSON.parse(x.payload);return {...item,status:item.status==="not_observed"?"not_observed":"observed",tradable:false};});
   }
   async refreshMedia(user){
     const old=(await this.list(user)).filter(x=>x.mediaVersion!==4);
@@ -74,6 +74,34 @@ export class PersonalGifts {
     const found=await findUserGifts(this.api,user,old.map(x=>x.slug));
     await this.repo.tx(async()=>{for(const [slug,item] of found)await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);});
     return {updated:found.size};
+  }
+  // Batch operations concern private references only, never ownership transfer.
+  async batch(user,action,slugs){
+    if(!["refresh","remove"].includes(action)||!Array.isArray(slugs)||!slugs.length||slugs.length>100)throw Error("Выберите от 1 до 100 ссылок и допустимое действие");
+    const wanted=[...new Set(slugs.map(s=>{if(typeof s!=="string"||giftSlug("https://t.me/nft/"+s)!==s)throw Error("Некорректный идентификатор подарка");return s;}))];
+    const known=new Map((await this.list(user)).filter(x=>wanted.includes(x.slug)).map(x=>[x.slug,x]));
+    if(action==="remove"){
+      return this.repo.tx(async()=>{
+        let removed=0;for(const slug of known.keys()){const res=await this.repo.run("DELETE FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);removed+=Number(res.changes);}
+        return {removed,skipped:wanted.length-known.size};
+      });
+    }
+    if(!this.api)throw Error("Telegram не настроен");
+    // A failed/incomplete scan throws before any write, preserving prior evidence.
+    const found=await findUserGifts(this.api,user,[...known.keys()]);
+    const now=Date.now();
+    return this.repo.tx(async()=>{
+      let observed=0,notObserved=0,skipped=wanted.length-known.size;
+      for(const [slug,previous] of known){
+        const current=await this.repo.get("SELECT payload FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);
+        if(!current||JSON.parse(current.payload).checkedAt!==previous.checkedAt||JSON.parse(current.payload).lastAttempt!==previous.lastAttempt){skipped++;continue;}
+        const match=found.get(slug);
+        const item=match?{...match,lastAttempt:now}:{...previous,status:"not_observed",lastAttempt:now,tradable:false};
+        await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);
+        if(match)observed++;else notObserved++;
+      }
+      return {observed,notObserved,skipped};
+    });
   }
   async remove(user,slug) {
     await this.repo.run("DELETE FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);

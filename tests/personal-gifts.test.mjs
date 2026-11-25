@@ -43,3 +43,15 @@ test("legacy media refresh only updates existing owned gift references",async()=
 test("original Telegram background colors and symbol mask survive import",async()=>{const item=structuredClone(gift);item.gift.backdrop={name:"Blue",colors:{center_color:0x71abef,edge_color:0x274486,symbol_color:0x4969a6,text_color:0xffffff}};item.gift.symbol={name:"Star",sticker:{is_animated:true,file_id:"tgs123",thumbnail:{file_id:"pattern123"}}};const result=await findUserGift({call:async()=>({gifts:[item]})},"123",slug);assert.deepEqual(result.backdropColors,{center:0x71abef,edge:0x274486,symbol:0x4969a6,text:0xffffff});assert.equal(result.symbolMediaUrl,"/api/v1/media/telegram/pattern123");assert.equal(result.tradable,false);});
 
 test("personal gift rarity is original per mille metadata, unknown is null",async()=>{const g=structuredClone(gift);g.gift.model.rarity_per_mille=15;g.gift.symbol={rarity_per_mille:1001};const result=await findUserGift({call:async()=>({gifts:[g]})},"123",slug);assert.equal(result.modelRarity,15);assert.equal(result.symbolRarity,null);assert.equal(result.backdropRarity,null);assert.equal(result.tradable,false);});
+
+test("batch refresh is scoped, deduplicated, and does not equate missing with loss of ownership",async()=>{
+ const repo=await SQLiteRepository.open();try{
+ let gifts=[gift],calls=0;const store=new PersonalGifts(repo,{call:async()=>{calls++;return {gifts}}});await store.initialize();await store.add("123",link);await store.add("456",link);const before=(await store.list("123"))[0].checkedAt;
+ gifts=[];calls=0;assert.deepEqual(await store.batch("123","refresh",[slug,slug,"Other-456"]),{observed:0,notObserved:1,skipped:1});assert.equal(calls,1);
+ let item=(await store.list("123"))[0];assert.equal(item.status,"not_observed");assert.equal(item.checkedAt,before);assert.equal(item.tradable,false);assert.equal((await store.list("456"))[0].status,"observed");
+ gifts=[gift];assert.deepEqual(await store.batch("123","refresh",[slug]),{observed:1,notObserved:0,skipped:0});assert.equal((await store.list("123"))[0].status,"observed");
+ store.api={call:async()=>{throw Error("network")}};const snapshot=await store.list("123");await assert.rejects(()=>store.batch("123","refresh",[slug]));assert.deepEqual(await store.list("123"),snapshot);
+ await assert.rejects(()=>store.batch("123","remove",[slug,"../bad"]));assert.deepEqual(await store.list("123"),snapshot);
+ assert.deepEqual(await store.batch("123","remove",[slug,slug,"Other-456"]),{removed:1,skipped:1});assert.equal((await store.list("456")).length,1);assert.equal((await repo.all("SELECT * FROM gifts")).length,0);
+ }finally{await repo.close();}
+});
