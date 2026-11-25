@@ -87,7 +87,8 @@ export class PersonalGifts {
   async batch(user,action,slugs){
     if(!["refresh","remove"].includes(action)||!Array.isArray(slugs)||!slugs.length||slugs.length>100)throw Error("Выберите от 1 до 100 ссылок и допустимое действие");
     const wanted=[...new Set(slugs.map(s=>{if(typeof s!=="string"||giftSlug("https://t.me/nft/"+s)!==s)throw Error("Некорректный идентификатор подарка");return s;}))];
-    const known=new Map((await this.list(user)).filter(x=>wanted.includes(x.slug)).map(x=>[x.slug,x]));
+    const rows=await this.repo.all("SELECT slug,payload FROM personal_gift_refs WHERE user_id=? ORDER BY checked DESC LIMIT 100",user);
+    const known=new Map(rows.filter(x=>wanted.includes(x.slug)).map(x=>[x.slug,x.payload]));
     if(action==="remove"){
       return this.repo.tx(async()=>{
         let removed=0;for(const slug of known.keys()){const res=await this.repo.run("DELETE FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);removed+=Number(res.changes);}
@@ -100,12 +101,12 @@ export class PersonalGifts {
     const now=Date.now();
     return this.repo.tx(async()=>{
       let observed=0,notObserved=0,skipped=wanted.length-known.size;
-      for(const [slug,previous] of known){
-        const current=await this.repo.get("SELECT payload FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);
-        if(!current||JSON.parse(current.payload).checkedAt!==previous.checkedAt||JSON.parse(current.payload).lastAttempt!==previous.lastAttempt){skipped++;continue;}
+      for(const [slug,original] of known){
+        const previous=JSON.parse(original);
         const match=found.get(slug);
         const item=match?{...match,lastAttempt:now}:{...previous,status:"not_observed",lastAttempt:now,tradable:false};
-        await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);
+        const result=await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=? AND payload=?",JSON.stringify(item),item.checkedAt,user,slug,original);
+        if(!Number(result.changes)){skipped++;continue;}
         if(match)observed++;else notObserved++;
       }
       return {observed,notObserved,skipped};
