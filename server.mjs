@@ -143,7 +143,10 @@ const files = {
   "/app.js": "app.js",
   "/style.css": "style.css",
   "/splash.webp":"splash.webp",
-  "/logo.svg": "logo.svg",
+  "/minion-logo.webp": "minion-logo.webp",
+  "/minion-logo.png": "minion-logo.png",
+  "/phosphor.js": "phosphor.js",
+  "/lottie-light.min.js": "lottie-light.min.js",
   "/beta.js": "beta.js",
 };
 const mime = {
@@ -152,6 +155,7 @@ const mime = {
   css: "text/css; charset=utf-8",
   svg: "image/svg+xml",
   webp:"image/webp",
+  png:"image/png",
 };
 let streams = 0;
 let checking = false;
@@ -213,7 +217,7 @@ const server = http.createServer(async (q, r) => {
       return json(r, 200, {
         url,
         name: "MINION MARKET",
-        iconUrl: url + "/logo.svg",
+        iconUrl: url + "/minion-logo.png",
         termsOfUseUrl: url + "/terms",
         privacyPolicyUrl: url + "/privacy",
       });
