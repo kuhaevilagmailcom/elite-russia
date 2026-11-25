@@ -21,3 +21,6 @@ Residual dependency note: `npm audit --omit=dev` reports the current upstream Zo
 
 ## Proposed personal gift import and mainnet wallet connection
 User-scoped read-only Telegram gift references are stored separately from tradable inventory; ownership visibility is checked on import/refresh, not continuously. Mainnet TON Proof connection is supported as a read-only configuration; supported fixed-key wallet contracts only. No live transfer, sale or balance credit. New tests added; CI and live Telegram/mainnet verification pending.
+
+## Reference UI update
+Implemented the user-supplied dark/yellow home reference with a cropped decorative mascot, live account statistics, real inventory references, working shortcuts, a separate sales view and matching navigation. VIP and wheel are not invented; existing offers and giveaways are linked. Finance and custody restrictions are unchanged. Visual/live deployment verification pending.
