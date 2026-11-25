@@ -171,18 +171,55 @@ function toast(s) {
   timer = setTimeout(() => ($("#toast").style.display = "none"), 3600);
 }
 function show(title, content) {
+  releaseGiftMedia(modal);
   modal.innerHTML = `<div class="sheet-head"><h2>${esc(title)}</h2><button class="icon-button" data-action="close" aria-label="Закрыть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>${content}`;
   if (!modal.open) modal.showModal();
+  observeGiftMedia(modal);
 }
 const btn = (name, action, id = "", cls = "") =>
   `<button class="${cls}" data-action="${action}" data-id="${esc(id)}">${name}</button>`;
 function giftCard(g, mine = false) {
   return `<article class="gift">${art(g)}<div class="info"><div class="name">${esc(g.collection)}</div><div class="muted">${esc(g.model)}</div><div class="price">${g.price ? fmt(g.price) : g.best_offer ? fmt(g.best_offer) : "—"} <small>${cur()}</small></div><div class="cardbuttons">${mine && g.bundle ? '<span class="muted">В составе набора</span>' : mine ? btn(g.listing ? "Изменить" : "Продать", "sell", g.id, "accent") + (g.listing ? btn("Снять", "delist", g.id) : btn("•••", "detail", g.id)) : btn("Купить", "buy", g.id, "accent") + btn(uiIcon(state.cart.has(g.id) ? "check" : "plus"), "cart-add", g.id, "icon-button")}</div></div></article>`;
 }
+// Only same-origin Telegram media proxy URLs are accepted here.
+function giftMedia(g) {
+  const safe = (url) => typeof url === "string" && /^\/api\/v1\/media\/telegram\/[A-Za-z0-9_-]{5,512}$/.test(url);
+  const image = safe(g.modelMediaUrl) ? g.modelMediaUrl : "";
+  const video = safe(g.modelVideoUrl) ? g.modelVideoUrl : "";
+  const alt = esc(g.collection + " #" + g.number);
+  const still = image ? `<img class="gift-media-still" src="${esc(image)}" alt="${alt}" loading="lazy">` : '<span class="gift-media-unavailable">Медиа недоступно</span>';
+  if (!video || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return still;
+  return `${still}<video class="gift-media-video" src="${esc(video)}" muted loop playsinline preload="none" aria-label="${alt}" hidden></video>`;
+}
+// Play only visible videos; retain the original thumbnail if playback fails.
+const giftVideoObserver = new IntersectionObserver(entries => {
+  for (const {target, isIntersecting} of entries) {
+    if (!target.isConnected) { giftVideoObserver.unobserve(target); continue; }
+    if (isIntersecting && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      target.play().catch(() => { target.hidden = true; });
+    } else { target.pause(); }
+  }
+}, {threshold: 0.25});
+function observeGiftMedia(root) {
+  for (const video of root.querySelectorAll(".gift-media-video")) {
+    video.hidden = false;
+    video.addEventListener("playing", () => { video.classList.add("playing"); });
+    video.addEventListener("pause", () => { video.classList.remove("playing"); });
+    video.addEventListener("error", () => { video.hidden = true; video.classList.remove("playing"); giftVideoObserver.unobserve(video); });
+    giftVideoObserver.observe(video);
+  }
+}
+function releaseGiftMedia(root) {
+  for (const video of root.querySelectorAll(".gift-media-video")) { giftVideoObserver.unobserve(video); video.pause(); }
+}
+document.addEventListener("error", event => {
+  if (event.target instanceof HTMLImageElement && event.target.classList.contains("gift-media-still")) {
+    event.target.hidden = true;
+    event.target.parentElement.classList.add("media-error");
+  }
+}, true);
 function collectibleCard(g) {
-  const media = g.modelMediaUrl
-    ? `<img src="${esc(g.modelMediaUrl)}" alt="${esc(g.collection)} #${esc(g.number)}" loading="lazy" onerror="this.remove();this.parentElement.classList.add('media-error')">`
-    : "";
+  const media = giftMedia(g);
   return `<article class="gift real-gift"><div class="real-gift-art">${media}<span class="serial">#${esc(g.number)}</span><span class="verified-source">Telegram</span></div><div class="info"><div class="name">${esc(g.collection)}</div><div class="muted">${esc(g.model || "Модель не указана")}</div><div class="traits"><span>${esc(g.backdrop || "—")}</span><span>${esc(g.symbol || "—")}</span></div><a class="gift-link" href="https://t.me/nft/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener noreferrer">Открыть в Telegram</a></div></article>`;
 }
 const empty = (title, sub = "") =>
@@ -309,7 +346,7 @@ function accountSummary(){
 }
 function homeGift(g,personal=false){
  if(!personal)return `<article class="home-gift">${art(g,false)}<div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>${gramIcon()} ${g.price?fmt(g.price)+" "+esc(cur()):"Не выставлен"}</span>${btn("•••","detail",g.id,"home-more")}</div></div></article>`;
- return `<article class="home-gift imported"><div class="personal-preview" data-action="personal-detail" data-id="${esc(g.slug)}">${g.modelMediaUrl?`<img src="${esc(g.modelMediaUrl)}" alt="${esc(g.collection)}" loading="lazy">`:""}<span class="telegram-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 17-7-3 17-6-5-3 3 1-6 8-6-10 5z" fill="currentColor"/></svg></span></div><div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>#${esc(g.number)}</span>${btn("•••","personal-detail",g.slug,"home-more")}</div></div></article>`;
+ return `<article class="home-gift imported"><div class="personal-preview" data-action="personal-detail" data-id="${esc(g.slug)}">${giftMedia(g)}<span class="telegram-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 17-7-3 17-6-5-3 3 1-6 8-6-10 5z" fill="currentColor"/></svg></span></div><div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>#${esc(g.number)}</span>${btn("•••","personal-detail",g.slug,"home-more")}</div></div></article>`;
 }
 function homeContent(){
  const mine=state.me?.inventory||[], personal=state.personalGifts;
@@ -344,10 +381,12 @@ function page() {
   return `<div class="hero"><h1>Профиль</h1></div>${accountSummary()}<div class="panel"><div class="muted">Торговый баланс</div><div class="metric">${fmt(state.me?.balance.available || "0")} ${cur()}</div><p class="muted">В резерве: ${fmt(state.me?.balance.reserved || "0")} ${cur()}</p>${btn("Управление балансом", "wallet", "", "accent")}</div><div class="panel">${state.config.demo ? `<div class="row"><b>Тестовый аккаунт</b>${btn("Сменить", "demo-switch")}</div>` : ""}<div class="row"><b>TON Connect</b>${btn("Кошелёк", "connect")}</div><div class="row"><b>Избранное</b>${btn("Открыть", "favorites")}</div><div class="row"><b>Поддержка</b>${btn("Написать", "support")}</div><div class="row"><b>Админ-панель</b><a href="/admin">Открыть →</a></div></div><div class="panel"><h3>Уведомления</h3>${(state.me?.notifications || []).map((n) => `<div class="row">${esc(n.message)}</div>`).join("") || '<div class="muted">Нет уведомлений</div>'}</div>`;
 }
 function render() {
+  releaseGiftMedia(app);
   if (location.pathname === "/admin") return renderAdmin();
   
  app.innerHTML=`<div class="shell reference-shell"><header class="reference-top"><button class="top-back" data-action="nav" data-id="home" aria-label="Главная">‹</button><button class="reference-brand" data-action="nav" data-id="home">Minion Market</button><button class="reference-balance" data-action="wallet">${gramIcon()}<b>${fmt(state.me?.balance.available||0)}</b></button><button class="top-cart" data-action="cart" aria-label="Корзина">${icon("cart")}${state.cart.size?`<sup>${state.cart.size}</sup>`:""}</button></header><div class="reference-shortcuts">${[["home","star","Главная"],["market","inventory","Маркет"],["offers","offers","Офферы"],["giveaways","giveaways","Розыгрыши"],["wallet","wallet","Кошелёк"]].map(([route,i,label])=>`<button class="${state.page===route?"active":""}" data-action="${route==="wallet"?"wallet":route==="offers"?"open-offers":"nav"}" data-id="${route}" title="${label}" aria-label="${label}">${icon(i)}${route==="offers"?"<span>Офферы</span>":""}</button>`).join("")}</div><div class="reference-status"><b>${state.config.demo?"TEST":"PREVIEW"}</b> · ${state.config.demo?"Тестовые подарки и средства":"Реальные сделки пока отключены"}</div>${page()}</div><nav class="nav reference-nav">${[["home","Главная"],["inventory","Инвентарь"],["sales","Мои продажи"],["activity","Статистика"],["profile","Профиль"]].map(([n,label])=>`<button data-action="nav" data-id="${n}" class="${state.page===n?"active":""}">${icon(n)}<span>${label}</span></button>`).join("")}</nav>`;
 
+  observeGiftMedia(app);
   $("#search")?.addEventListener("input", (e) => {
     state.query = e.target.value;
     const pos = e.target.selectionStart;

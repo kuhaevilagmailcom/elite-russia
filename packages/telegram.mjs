@@ -98,6 +98,7 @@ export class TelegramAPI {
         jpg: "image/jpeg",
         jpeg: "image/jpeg",
         gif: "image/gif",
+        webm: "video/webm",
         tgs: "application/gzip",
         json: "application/json",
       }[extension] || "application/octet-stream";
