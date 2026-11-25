@@ -93,6 +93,11 @@ export async function beta2Routes(repo, env, demo) {
       if(!personal.api){json(r,503,{error:"Telegram не настроен"});return true;}
       json(r,200,await personal.refreshMedia(u.id));return true;
     }
+    if(path==="/api/v1/personal-gifts/batch"&&method==="POST"){
+      if(demo||!personal.api){json(r,503,{error:"Telegram не настроен"});return true;}
+      const input=await body(q);
+      json(r,200,await personal.batch(u.id,input.action,input.slugs));return true;
+    }
     if (path === "/api/v1/personal-gifts") {
       if (method === "GET") {
         json(r,200,{items:await personal.list(u.id),enabled:!!personal.api});

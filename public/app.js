@@ -411,7 +411,7 @@ function inventorySort(items,mode){
  return [...items].sort((a,b)=>mode==="collection"?cmp(a,b):mode==="number"?Number(a.number)-Number(b.number):mode==="rarity"?(value(a)-value(b)||cmp(a,b)):(Number(b.checkedAt||0)-Number(a.checkedAt||0)));
 }
 function personalInventoryCard(g){
- return `<article class="gift personal-inventory-card inventory-item" data-inventory-key="${esc(g.slug)}" data-inventory-version="${esc(JSON.stringify(g))}"><div class="real-gift-art">${giftMedia(g)}<span class="serial">#${esc(g.number)}</span><span class="inventory-source" aria-label="В Telegram">${icon("shield")}</span></div><div class="info"><span class="name">${esc(g.collection)}</span><span class="muted">${esc(g.model||"")}</span><span class="inventory-card-status">В Telegram</span></div><button class="card-hit" aria-label="Открыть ${esc(g.collection)} #${esc(g.number)}" data-action="personal-detail" data-id="${esc(g.slug)}"></button><button class="inventory-more" aria-label="Действия с ${esc(g.collection)}" data-action="personal-menu" data-id="${esc(g.slug)}">${icon("more")}</button></article>`;
+ return `<article class="gift personal-inventory-card inventory-item" data-inventory-key="${esc(g.slug)}" data-inventory-version="${esc(JSON.stringify(g))}"><div class="real-gift-art">${giftMedia(g)}<span class="serial">#${esc(g.number)}</span><span class="inventory-source" aria-label="Ссылка Telegram">${icon("gift")}</span><span class="inventory-check" aria-hidden="true"></span></div><div class="info"><span class="name">${esc(g.collection)}</span><span class="muted">${esc(g.model||"")}</span><span class="inventory-card-status ${g.status==="not_observed"?"unobserved":""}">${g.status==="not_observed"?"Не найден при проверке":"В Telegram"}</span></div><button class="card-hit" aria-label="Открыть ${esc(g.collection)} #${esc(g.number)}" data-action="personal-detail" data-id="${esc(g.slug)}"></button><button class="inventory-more" aria-label="Действия с ${esc(g.collection)}" data-action="personal-menu" data-id="${esc(g.slug)}">${icon("more")}</button></article>`;
 }
 const inventoryTraits=[["collection","Коллекция"],["model","Модель"],["backdrop","Фон"],["symbol","Символ"]];
 function inventoryTraitCount(){return inventoryTraits.filter(([key])=>state.inventoryTraits?.[key]).length;}
@@ -433,12 +433,27 @@ function inventoryResults(){
  const groups=visible.map(([key,title,items])=>{const shown=items.slice(0,remaining);remaining=Math.max(0,remaining-shown.length);return shown.length?`<section class="inventory-group"><div class="sectionhead"><b>${title}</b><span class="count-pill">${items.length}</span></div><div class="grid inventory-grid view-${view}">${shown.map(g=>key==="telegram"?personalInventoryCard(g):giftCard(g,true)).join("")}</div></section>`:""}).join("");
  return `<div class="inventory-result-count" aria-live="polite">${giftCount(count)}</div>${groups||empty(filtered?"Ничего не найдено":"Твоя коллекция начинается здесь",filtered?"Попробуйте изменить поиск или фильтры.":"Добавьте свой подарок по ссылке.","gift")}${!count?`<div class="empty-actions">${btn(filtered?"Сбросить фильтры":"Добавить подарок",filtered?"inventory-reset":"deposit-gift","","accent")}</div>`:""}${count>limit?`<div class="empty-actions">${btn("Показать ещё "+Math.min(24,count-limit),"inventory-more-items")}</div>`:""}`;
 }
+function selectedRefs(){return state.inventorySelected??=new Set();}
+function syncInventorySelection(){
+ const selected=selectedRefs(),existing=new Set((state.personalGifts||[]).map(g=>g.slug));
+ for(const slug of selected)if(!existing.has(slug))selected.delete(slug);
+ const root=$("#inventory-results");if(!root)return;
+ root.classList.toggle("selecting",!!state.inventorySelecting);
+ for(const card of root.querySelectorAll("[data-inventory-key]")){
+  const slug=card.dataset.inventoryKey,on=selected.has(slug),hit=card.querySelector(".card-hit");
+  card.classList.toggle("selected",on);
+  hit.dataset.action=state.inventorySelecting?"inventory-select-one":"personal-detail";
+  if(state.inventorySelecting)hit.setAttribute("aria-pressed",String(on));else hit.removeAttribute("aria-pressed");
+  card.querySelector(".inventory-more").hidden=!!state.inventorySelecting;
+ }
+ const bar=$("#inventory-selection");if(bar){bar.hidden=!state.inventorySelecting;bar.querySelector("strong").textContent="Выбрано: "+selected.size;for(const b of bar.querySelectorAll("[data-needs-selection]"))b.disabled=!selected.size;}
+}
 function inventoryContent(){
  state.inventoryView??=inventoryPref("view","grid",["grid","list"]);
  state.inventorySort??=inventoryPref("sort","new",["new","collection","number","rarity"]);
  const groups=inventoryGroups(),total=groups.reduce((n,x)=>n+x[2].length,0),filter=state.inventoryFilter||"all";
  const labels=[["all","Все",total],...groups.map(([key,title,items])=>[key,key==="telegram"?"Telegram":key==="held"?"На маркете":"В продаже",items.length])];
- return `<div class="hero inventory-hero"><div><h1>Инвентарь</h1><div class="muted">${giftCount(total)} в коллекции</div></div>${btn(giftBoxIcon()+" Добавить","deposit-gift","","accent")}</div><div class="search">${searchBar("inventory-search","Название, модель или номер",state.inventoryQuery||"")}<button class="icon-button inventory-filter-button ${inventoryTraitCount()?"active":""}" data-action="inventory-traits" aria-label="Фильтры атрибутов">${icon("filter")}${inventoryTraitCount()?`<span class="filter-indicator">${inventoryTraitCount()}</span>`:""}</button></div><div class="tabs inventory-tabs" aria-label="Статус подарков">${labels.map(([id,n,count])=>`<button data-action="inventory-filter" data-id="${id}" class="${filter===id?"active":""}" aria-pressed="${filter===id}">${n}<span class="filter-count">${count}</span></button>`).join("")}</div><div class="inventory-toolbar"><label class="inventory-sort"><span class="sr-only">Сортировка</span><select id="inventory-sort">${[["new","Недавние"],["collection","Коллекция"],["number","Номер"],["rarity","Редкость модели"]].map(([v,n])=>`<option value="${v}" ${state.inventorySort===v?"selected":""}>${n}</option>`).join("")}</select></label><div class="view-toggle" aria-label="Вид коллекции">${["grid","list"].map(v=>`<button data-action="inventory-view" data-id="${v}" aria-label="${v==="grid"?"Сетка":"Список"}" aria-pressed="${state.inventoryView===v}" class="${state.inventoryView===v?"active":""}">${icon(v)}</button>`).join("")}</div></div><div id="inventory-results">${inventoryResults()}</div><section class="inventory-tools"><h3>Инструменты</h3><div>${btn(icon("swap")+" Обмены","swaps")}${btn(icon("inventory")+" Наборы","bundle-new")}</div></section>`;
+ return `<div class="hero inventory-hero"><div><h1>Инвентарь</h1><div class="muted">${giftCount(total)} в коллекции</div></div>${btn(giftBoxIcon()+" Добавить","deposit-gift","","accent")}</div><div class="search">${searchBar("inventory-search","Название, модель или номер",state.inventoryQuery||"")}<button class="icon-button inventory-filter-button ${inventoryTraitCount()?"active":""}" data-action="inventory-traits" aria-label="Фильтры атрибутов">${icon("filter")}${inventoryTraitCount()?`<span class="filter-indicator">${inventoryTraitCount()}</span>`:""}</button></div><div class="tabs inventory-tabs" aria-label="Статус подарков">${labels.map(([id,n,count])=>`<button data-action="inventory-filter" data-id="${id}" class="${filter===id?"active":""}" aria-pressed="${filter===id}">${n}<span class="filter-count">${count}</span></button>`).join("")}</div><div class="inventory-toolbar"><label class="inventory-sort"><span class="sr-only">Сортировка</span><select id="inventory-sort">${[["new","Недавние"],["collection","Коллекция"],["number","Номер"],["rarity","Редкость модели"]].map(([v,n])=>`<option value="${v}" ${state.inventorySort===v?"selected":""}>${n}</option>`).join("")}</select></label><div class="view-toggle" aria-label="Вид коллекции">${["grid","list"].map(v=>`<button data-action="inventory-view" data-id="${v}" aria-label="${v==="grid"?"Сетка":"Список"}" aria-pressed="${state.inventoryView===v}" class="${state.inventoryView===v?"active":""}">${icon(v)}</button>`).join("")}</div></div><div class="selection-entry">${(state.personalGifts||[]).length?btn(state.inventorySelecting?"Готово":"Выбрать","inventory-select-mode","","text-action"):""}</div><div id="inventory-selection" class="selection-bar" ${state.inventorySelecting?"":"hidden"}><strong>Выбрано: ${selectedRefs().size}</strong><div><button data-action="inventory-select-visible">Все видимые</button><button data-action="inventory-batch-refresh" data-needs-selection>Проверить</button><button class="danger-action" data-action="inventory-batch-confirm" data-needs-selection>Убрать</button></div></div><div id="inventory-results">${inventoryResults()}</div><section class="inventory-tools"><h3>Инструменты</h3><div>${btn(icon("swap")+" Обмены","swaps")}${btn(icon("inventory")+" Наборы","bundle-new")}</div></section>`;
 }
 function updateInventoryResults(){
  const root=$("#inventory-results");if(!root)return;
@@ -452,12 +467,12 @@ function updateInventoryResults(){
  }
  // Reused cards retain the actual Lottie player and image/video nodes.
  // Release only cards still in the old subtree before swapping the results.
- releaseGiftMedia(root);root.replaceChildren(template.content);observeGiftMedia(root);
+ releaseGiftMedia(root);root.replaceChildren(template.content);observeGiftMedia(root);syncInventorySelection();
 }
 function rarityText(n){return Number.isInteger(n)&&n>=0&&n<=1000?`<span class="rarity">${(n/10).toLocaleString("ru-RU",{maximumFractionDigits:1})}%</span>`:"";}
 function personalMenu(slug){
  const g=state.personalGifts.find(x=>x.slug===slug);if(!g)return;
- show(g.collection+" #"+g.number,`<div class="detail">${btn("Подробнее","personal-detail",slug)}<a class="gift-link" href="https://t.me/nft/${encodeURIComponent(slug)}" target="_blank" rel="noopener noreferrer">Открыть в Telegram</a>${btn("Проверить владение","personal-refresh",slug)}${btn("Убрать из инвентаря","personal-remove-confirm",slug,"danger-action")}</div>`);
+ show(g.collection+" #"+g.number,`<div class="detail">${btn("Подробнее","personal-detail",slug)}<a class="gift-link" href="https://t.me/nft/${encodeURIComponent(slug)}" target="_blank" rel="noopener noreferrer">Открыть в Telegram</a>${btn("Проверить в Telegram","personal-refresh",slug)}${btn("Убрать из инвентаря","personal-remove-confirm",slug,"danger-action")}</div>`);
 }
 function salesContent(){
  const mine=(state.me?.inventory||[]).filter(g=>g.listing),tab=state.salesTab||"active";
@@ -467,7 +482,7 @@ function salesContent(){
 function personalDetail(slug){
  const g=state.personalGifts.find(x=>x.slug===slug);if(!g)return;
  const trait=(label,value,rarity)=>`<div class="trait-row"><span>${label}</span><div><b>${esc(value||"—")}</b>${rarityText(rarity)}</div></div>`;
- show(g.collection+" #"+g.number,`<div class="detail personal-detail"><div class="personal-preview">${giftMedia(g)}<span class="verified-source">Telegram</span></div><div class="trait-table">${trait("Модель",g.model,g.modelRarity)}${trait("Фон",g.backdrop,g.backdropRarity)}${trait("Символ",g.symbol,g.symbolRarity)}</div><div class="ownership-note">${icon("shield")}<div><b>Проверен через Telegram</b><p>${esc(new Date(g.checkedAt).toLocaleString("ru"))} · не на хранении маркета</p></div></div><a class="gift-link primary-link" href="https://t.me/nft/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener noreferrer">Открыть в Telegram</a><p class="muted">Продажа на маркете пока недоступна.</p><div class="detail-actions">${btn("Проверить владение","personal-refresh",g.slug)}${btn(icon("more"),"personal-menu",g.slug,"icon-button")}</div></div>`);
+ show(g.collection+" #"+g.number,`<div class="detail personal-detail"><div class="personal-preview">${giftMedia(g)}<span class="verified-source">Telegram</span></div><div class="trait-table">${trait("Модель",g.model,g.modelRarity)}${trait("Фон",g.backdrop,g.backdropRarity)}${trait("Символ",g.symbol,g.symbolRarity)}</div><div class="ownership-note ${g.status==="not_observed"?"unobserved":""}">${icon("shield")}<div><b>${g.status==="not_observed"?"Не найден при последней проверке":"Найден в списке Telegram"}</b><p>Последнее обнаружение: ${esc(new Date(g.checkedAt).toLocaleString("ru"))}. Не доказывает право собственности или хранение на маркете.</p></div></div><a class="gift-link primary-link" href="https://t.me/nft/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener noreferrer">Открыть в Telegram</a><p class="muted">Продажа на маркете пока недоступна.</p><div class="detail-actions">${btn("Проверить в Telegram","personal-refresh",g.slug)}${btn(icon("more"),"personal-menu",g.slug,"icon-button")}</div></div>`);
 }
 function profileContent(){
  const name=state.me?.user?.name||"Гость", photo=window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url;
@@ -502,6 +517,7 @@ function render() {
  app.innerHTML=`<div class="shell reference-shell page-${esc(state.page)}"><header class="reference-top"><button class="top-back" data-action="nav" data-id="home" aria-label="Главная">${icon("home")}</button><button class="reference-brand" data-action="nav" data-id="home">Minion Market</button><button class="reference-balance" data-action="wallet">${gramIcon()}<b>${state.config.demo?"TEST "+fmt(state.me?.balance.available||0):walletLabel()}</b></button><button class="top-cart" data-action="cart" aria-label="Корзина">${icon("cart")}${state.cart.size?`<sup>${state.cart.size}</sup>`:""}</button></header>${["home","market","giveaways"].includes(state.page)?`<div class="reference-shortcuts">${[["market","market","Маркет"],["offers","offers","Офферы"],["giveaways","giveaways","Розыгрыши"]].map(([route,i,label])=>`<button class="${state.page===route?"active":""}" data-action="${route==="wallet"?"wallet":route==="offers"?"open-offers":"nav"}" data-id="${route}" title="${label}" aria-label="${label}">${icon(i)}<span>${label}</span></button>`).join("")}</div>`:""}<div class="reference-status"><b>${state.config.demo?"TEST":"PREVIEW"}</b> · ${state.config.demo?"Тестовые подарки и средства":"Реальные сделки пока отключены"}</div>${page()}</div><nav class="nav reference-nav" aria-label="Основная навигация">${[["home","Главная"],["inventory","Инвентарь"],["sales","Продажи"],["activity","Статистика"],["profile","Профиль"]].map(([n,label])=>`<button data-action="nav" data-id="${n}" class="${state.page===n?"active":""}" ${state.page===n?'aria-current="page"':""}>${icon(n)}<span>${label}</span></button>`).join("")}</nav>`;
 
   observeGiftMedia(app);
+  syncInventorySelection();
   $("#home-search-form")?.addEventListener("submit",e=>{e.preventDefault();state.query=$("#home-search").value;state.page="market";state.tab="store";render();scrollTo(0,0);});
   $("#inventory-search")?.addEventListener("input",e=>{state.inventoryQuery=e.target.value;state.inventoryLimit=24;updateInventoryResults();});
   $("#inventory-sort")?.addEventListener("change",e=>{state.inventorySort=e.target.value;setInventoryPref("sort",e.target.value);state.inventoryLimit=24;updateInventoryResults();});
@@ -969,6 +985,27 @@ document.addEventListener("click", async (e) => {
       case "inventory-view": if(["grid","list"].includes(id)){state.inventoryView=id;setInventoryPref("view",id);for(const b of document.querySelectorAll("[data-action=inventory-view]")){b.classList.toggle("active",b.dataset.id===id);b.setAttribute("aria-pressed",String(b.dataset.id===id));}updateInventoryResults();}break;
       case "inventory-more-items": state.inventoryLimit=(state.inventoryLimit||24)+24;updateInventoryResults();break;
       case "inventory-reset": state.inventoryFilter="all";state.inventoryQuery="";state.inventoryTraits={};state.inventoryLimit=24;render();break;
+      case "inventory-select-mode":
+        state.inventorySelecting=!state.inventorySelecting;selectedRefs().clear();render();break;
+      case "inventory-select-one":
+        if(state.inventorySelecting&&state.personalGifts.some(x=>x.slug===id)){const set=selectedRefs();if(set.has(id))set.delete(id);else set.add(id);syncInventorySelection();}break;
+      case "inventory-select-visible":
+        if(state.inventorySelecting){for(const card of document.querySelectorAll("#inventory-results [data-inventory-key]"))selectedRefs().add(card.dataset.inventoryKey);syncInventorySelection();}break;
+      case "inventory-batch-confirm":
+        if(state.inventorySelecting&&selectedRefs().size)show("Убрать выбранные ссылки?",`<div class="detail"><p>Будут удалены только ссылки (${selectedRefs().size}). Оригинальные подарки останутся в Telegram.</p>${btn("Убрать ссылки","inventory-batch-remove","","danger-action")}${btn("Отмена","close")}</div>`);break;
+      case "inventory-batch-refresh":
+      case "inventory-batch-remove": {
+        if(!state.inventorySelecting||!selectedRefs().size)break;
+        busy=true;const action=a==="inventory-batch-refresh"?"refresh":"remove";
+        el.disabled=true;
+        try{
+          const result=await api("personal-gifts/batch",{method:"POST",body:JSON.stringify({action,slugs:[...selectedRefs()]})});
+          state.personalGifts=(await api("personal-gifts")).items;
+          selectedRefs().clear();state.inventorySelecting=false;if(modal.open)modal.close();render();
+          toast(action==="remove"?"Удалено ссылок: "+result.removed:"Найдено: "+result.observed+" · не найдено: "+result.notObserved+(result.skipped?" · пропущено: "+result.skipped:""));
+        }finally{el.disabled=false;}
+        break;
+      }
       case "inventory-traits": inventoryFilterSheet();break;
       case "inventory-traits-apply": state.inventoryTraits=Object.fromEntries(inventoryTraits.map(([key])=>[key,$("#inv-"+key).value]));state.inventoryLimit=24;modal.close();render();break;
       case "inventory-traits-reset": state.inventoryTraits={};state.inventoryLimit=24;modal.close();render();break;
@@ -982,6 +1019,7 @@ document.addEventListener("click", async (e) => {
         state.page="market"; state.tab="offers"; render(); scrollTo(0,0); break;
       case "nav":
         if(state.page!==id){try{window.Telegram?.WebApp?.HapticFeedback?.selectionChanged();}catch{}}
+        if(id!=="inventory"){state.inventorySelecting=false;selectedRefs().clear();}
         state.page = id;
         if(id==="market")state.tab="store";
         render();
@@ -1143,13 +1181,17 @@ document.addEventListener("click", async (e) => {
       case "deposit-gift":
         show("Добавить подарок",`<div class="detail"><p>Вставьте ссылку на свой подарок Telegram. Маркет проверит его через Telegram API.</p><label>Ссылка<input id="gift-link" type="url" placeholder="https://t.me/nft/PlushPepe-123"></label>${btn("Добавить","personal-add","","accent")}<p class="muted">Импорт не переводит подарок на хранение и не разрешает реальные сделки.</p></div>`);
         break;
-      case "personal-add":
       case "personal-refresh": {
+        busy=true;const result=await api("personal-gifts/batch",{method:"POST",body:JSON.stringify({action:"refresh",slugs:[id]})});
+        state.personalGifts=(await api("personal-gifts")).items;state.page="inventory";render();personalDetail(id);
+        toast(result.observed?"Подарок найден в Telegram":"Подарок не найден при проверке");break;
+      }
+      case "personal-add": {
         busy=true;
-        const link=a==="personal-add" ? $("#gift-link").value.trim() : "https://t.me/nft/"+id;
+        const link=$("#gift-link").value.trim();
         await api("personal-gifts",{method:"POST",body:JSON.stringify({link})});
         state.personalGifts=(await api("personal-gifts")).items;
-        state.page="inventory"; modal.close(); render(); toast("Подарок проверен через Telegram");
+        state.page="inventory"; modal.close(); render(); toast("Подарок найден в Telegram");
         break;
       }
       case "personal-remove":
