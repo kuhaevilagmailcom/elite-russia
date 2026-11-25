@@ -913,3 +913,12 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
    Set the inline size explicitly so the banner grows vertically on small phones. */
 .reference-banner{width:100%;max-width:100%;min-width:0;}
 .reference-banner-text{min-width:0;overflow-wrap:anywhere;}
+
+/* Original Telegram video stickers; still image remains the fallback. */
+.gift-media-video{position:absolute;inset:9%;width:82%;height:82%;object-fit:contain;opacity:0;pointer-events:none}
+.gift-media-video.playing{opacity:1}
+.gift-media-video[hidden],.gift-media-still[hidden]{display:none}
+.real-gift-art:has(.gift-media-video.playing) .gift-media-still,.personal-preview:has(.gift-media-video.playing) .gift-media-still,.real-gift-art:has(.gift-media-video.playing) .gift-media-unavailable,.personal-preview:has(.gift-media-video.playing) .gift-media-unavailable{visibility:hidden}
+.gift-media-unavailable{font-size:12px;color:var(--muted)}
+.personal-preview.media-error:after{content:"Медиа недоступно";font-size:12px;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.gift-media-video{display:none!important}.real-gift-art .gift-media-still,.personal-preview .gift-media-still{visibility:visible!important}}

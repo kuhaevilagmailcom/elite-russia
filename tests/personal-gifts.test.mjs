@@ -29,3 +29,11 @@ test("private references are isolated, deduplicated and never create market asse
     await store.remove("123",slug);assert.equal((await store.list("123")).length,0);
   }finally{await repo.close();}
 });
+
+test("original video sticker and thumbnail remain nontradable references",async()=>{
+ const videoGift=structuredClone(gift);videoGift.gift.model.sticker={is_video:true,file_id:"video123",thumbnail:{file_id:"image123"}};
+ const item=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);
+ assert.equal(item.modelVideoUrl,"/api/v1/media/telegram/video123");assert.equal(item.modelMediaUrl,"/api/v1/media/telegram/image123");assert.equal(item.tradable,false);
+ videoGift.gift.model.sticker.is_video=false;videoGift.gift.model.sticker.is_animated=true;
+ const animated=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);assert.equal(animated.modelVideoUrl,null);
+});
