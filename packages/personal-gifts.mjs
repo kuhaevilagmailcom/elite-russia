@@ -1,5 +1,6 @@
 import {giftAppearance} from "./gift-appearance.mjs";
 // Personal Telegram inventory references. Never insert into tradable gifts or credit a balance.
+const rarity=n=>Number.isInteger(n)&&n>=0&&n<=1000?n:null;
 export function giftSlug(value) {
   if (typeof value !== "string" || value.length > 240) throw Error("Некорректная ссылка");
   const match = /^https:\/\/t\.me\/nft\/([A-Za-z0-9_-]{1,110}-[1-9][0-9]{0,11})\/?$/i.exec(value.trim());
@@ -35,7 +36,8 @@ export async function findUserGifts(api, user, slugs) {
         modelMediaUrl:file ? "/api/v1/media/telegram/"+encodeURIComponent(file) : null,
         modelVideoUrl:video ? "/api/v1/media/telegram/"+encodeURIComponent(video) : null,
         modelAnimationUrl:animation ? "/api/v1/media/telegram/"+encodeURIComponent(animation) : null,
-        ...giftAppearance(g),mediaVersion:3,
+        ...giftAppearance(g),mediaVersion:4,
+        modelRarity:rarity(g.model?.rarity_per_mille),backdropRarity:rarity(g.backdrop?.rarity_per_mille),symbolRarity:rarity(g.symbol?.rarity_per_mille),
         checkedAt:Date.now(), status:"observed", tradable:false});
       wanted.delete(slug);
     }
@@ -67,7 +69,7 @@ export class PersonalGifts {
     return rows.map(x=>({...JSON.parse(x.payload),status:"observed",tradable:false}));
   }
   async refreshMedia(user){
-    const old=(await this.list(user)).filter(x=>x.mediaVersion!==3);
+    const old=(await this.list(user)).filter(x=>x.mediaVersion!==4);
     if(!old.length)return {updated:0};
     const found=await findUserGifts(this.api,user,old.map(x=>x.slug));
     await this.repo.tx(async()=>{for(const [slug,item] of found)await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);});
