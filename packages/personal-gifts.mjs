@@ -69,11 +69,19 @@ export class PersonalGifts {
     return rows.map(x=>{const item=JSON.parse(x.payload);return {...item,status:item.status==="not_observed"?"not_observed":"observed",tradable:false};});
   }
   async refreshMedia(user){
-    const old=(await this.list(user)).filter(x=>x.mediaVersion!==4);
-    if(!old.length)return {updated:0};
-    const found=await findUserGifts(this.api,user,old.map(x=>x.slug));
-    await this.repo.tx(async()=>{for(const [slug,item] of found)await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);});
-    return {updated:found.size};
+    const rows=await this.repo.all("SELECT slug,payload FROM personal_gift_refs WHERE user_id=? ORDER BY checked DESC LIMIT 100",user);
+    const old=new Map(rows.filter(x=>JSON.parse(x.payload).mediaVersion!==4).map(x=>[x.slug,x.payload]));
+    if(!old.size)return {updated:0};
+    const found=await findUserGifts(this.api,user,[...old.keys()]);
+    return this.repo.tx(async()=>{
+      let updated=0;
+      // Do not overwrite a reference removed or changed during the external scan.
+      for(const [slug,item] of found){
+        const result=await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=? AND payload=?",JSON.stringify(item),item.checkedAt,user,slug,old.get(slug));
+        updated+=Number(result.changes);
+      }
+      return {updated};
+    });
   }
   // Batch operations concern private references only, never ownership transfer.
   async batch(user,action,slugs){

@@ -55,3 +55,23 @@ test("batch refresh is scoped, deduplicated, and does not equate missing with lo
  assert.deepEqual(await store.batch("123","remove",[slug,slug,"Other-456"]),{removed:1,skipped:1});assert.equal((await store.list("456")).length,1);assert.equal((await repo.all("SELECT * FROM gifts")).length,0);
  }finally{await repo.close();}
 });
+
+test("legacy media refresh cannot overwrite a newer check or count a removed reference",async()=>{
+ const repo=await SQLiteRepository.open();try{
+  let release,started;const gate=new Promise(r=>{release=r});const entered=new Promise(r=>{started=r});
+  const store=new PersonalGifts(repo,{call:async()=>{started();await gate;return {gifts:[gift]}}});
+  await store.initialize();
+  const legacy=JSON.stringify({slug,mediaVersion:1,checkedAt:1});
+  await repo.run("INSERT INTO personal_gift_refs VALUES (?,?,?,?)","123",slug,legacy,1);
+  const pending=store.refreshMedia("123");await entered;
+  const newer=JSON.stringify({slug,mediaVersion:4,checkedAt:2,status:"not_observed",lastAttempt:3});
+  await repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",newer,2,"123",slug);
+  release();assert.deepEqual(await pending,{updated:0});
+  assert.equal((await store.list("123"))[0].status,"not_observed");
+  await repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",legacy,1,"123",slug);
+  let resume,begin;const waiting=new Promise(r=>{resume=r});const ready=new Promise(r=>{begin=r});
+  store.api={call:async()=>{begin();await waiting;return {gifts:[gift]}}};
+  const second=store.refreshMedia("123");await ready;await store.remove("123",slug);resume();
+  assert.deepEqual(await second,{updated:0});assert.deepEqual(await store.list("123"),[]);
+ }finally{await repo.close();}
+});
