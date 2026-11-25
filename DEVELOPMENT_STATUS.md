@@ -49,3 +49,6 @@ PR 24 merged after successful CI. User-provided launch image optimized to WebP 3
 
 ## Wallet overlay regression
 PR #25 merged after green CI. Fixed native dialog covering the SDK wallet picker: native sheet is closed before opening SDK and no SDK button is mounted inside it. Only verified or failed status is shown afterward. Regression tests simulate SDK modal and proof callbacks; real iOS client verification remains required. No finance/custody changes.
+
+## MINION Premium 2.0 — design-system refactor
+Baseline main f497752 passed CI 45570283222. Replaced accumulated stylesheet with a single token/component system; redesigned shell, home, inventory, sales, profile, cards, dialogs, empty states, responsive navigation. Local Phosphor additions. Preserved original gift media layers, startup image, wallet proof, backend and financial gates. Public listings remain empty until real trading is enabled. Existing official GRAM approximation retained pending asset verification. New browser tests cover compact layout and WebKit in CI; live iOS and visual screenshot review pending.
