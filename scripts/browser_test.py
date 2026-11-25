@@ -11,7 +11,11 @@ with sync_playwright() as p:
         # External SDKs are excluded from local UI QA, not simulated as connected.
         page.route('https://**/*',lambda route:route.abort())
         page.goto(BASE,wait_until='domcontentloaded');page.locator('.reference-banner').wait_for()
-        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Home horizontal overflow {w}'
+        overflow = page.evaluate("""() => ({width: innerWidth, scrollWidth: document.documentElement.scrollWidth, offenders: [...document.querySelectorAll('#app *')].filter(e => {const r=e.getBoundingClientRect();return r.right>innerWidth+1 && getComputedStyle(e).position!=='absolute'}).slice(0,15).map(e=>({tag:e.tagName,cls:e.getAttribute('class'),right:e.getBoundingClientRect().right}))})""")
+        banner = page.locator('.reference-banner').bounding_box()
+        shell = page.locator('.reference-shell').bounding_box()
+        assert banner['x'] >= shell['x'] and banner['x'] + banner['width'] <= shell['x'] + shell['width'] + 1, f'Banner exceeds shell at {w}: {banner}'
+        assert overflow['scrollWidth'] <= w, f'Home horizontal overflow {w}: {overflow}'
         assert page.locator('.account-summary').count()==1
         assert page.locator('.home-actions button').count()==2
         page.screenshot(path=OUT/f'home-{w}.png',full_page=True)
@@ -33,7 +37,7 @@ with sync_playwright() as p:
             for tab in ['collections','offers','bundles']:
                 page.locator(f'.tabs [data-action="tab"][data-id="{tab}"]').click();shot(tab)
             for section in ['activity','inventory','giveaways','profile']:
-                page.locator(f'[data-action="nav"][data-id="{section}"]').click();shot(section)
+                page.locator(f'[data-action="nav"][data-id="{section}"]').first.click();shot(section)
             page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')
         page.close()
     browser.close();assert not errors,errors
