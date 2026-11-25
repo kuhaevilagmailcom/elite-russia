@@ -61,3 +61,6 @@ Initial PR #28 CI failed at the browser test navigating from Sales to a delibera
 
 ## Inventory batch management
 PR #28 merged: CI 45580062830 and 45580073906 successful. Added batch selection of personal references, one bounded Telegram scan for selected refs, explicit confirmation for batch removal, scoped transactional operations, accurate missing-from-list status (not proof of lost ownership), and tests for isolation, deduplication, upstream failures and confirmation. Telegram Bot API getUserGifts returns owned AND hosted gifts, so UI explicitly treats matches as observations, not proof of ownership/custody. No transfer or finance enabled. New CI pending; live Telegram tests still required.
+
+## Inventory scale and responsive QA
+Baseline main e6670391 passed CI 45585302110. Added browser boundary tests for 0, 1, 20 and 100 private reference fixtures, incremental loading, selection across search, and primary-screen screenshot capture at all seven viewport widths. Fixtures are test-only; no API limit or finance changes. New CI and manual screenshot review pending.

@@ -60,6 +60,24 @@ with sync_playwright() as p:
                     assert page.locator('.inventory-tabs').count()==1
                     assert page.get_by_text('Доступный баланс',exact=True).count()==0
                     assert page.locator('.reference-shortcuts').count()==0
+                    # Boundary coverage for the supported private reference limit.
+                    for count in [0,1,20,100]:
+                        page.evaluate("""count=>{state.personalGifts=Array.from({length:count},(_,i)=>({slug:'Scale-'+(i+1),number:i+1,collection:'QA Scale',model:'Fixture',checkedAt:i+1,status:'observed',tradable:false}));state.inventoryFilter='telegram';state.inventoryQuery='';state.inventoryTraits={};state.inventoryLimit=24;state.inventoryView='grid';render()}""",count)
+                        assert page.locator('.personal-inventory-card').count()==min(count,24)
+                        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                        page.screenshot(path=OUT/f'inventory-{count}-390.png')
+                        for _ in range(max(0,(count-1)//24)):
+                            page.locator('[data-action="inventory-more-items"]').click()
+                        assert page.locator('.personal-inventory-card').count()==count
+                        if count:
+                            page.locator('[data-action="inventory-select-mode"]').click()
+                            page.locator('[data-action="inventory-select-visible"]').click()
+                            assert page.locator('#inventory-selection strong').inner_text()==f'Выбрано: {count}'
+                            page.locator('#inventory-search').fill('no-match-qa')
+                            assert page.locator('.personal-inventory-card').count()==0
+                            assert page.locator('#inventory-selection strong').inner_text()==f'Выбрано: {count}'
+                            page.locator('[data-action="inventory-select-mode"]').click()
+                    page.evaluate("()=>{state.inventoryQuery='';state.inventoryLimit=24;render()}")
                     # Explicit test-only references, not production catalog.
                     page.evaluate("""()=>{state.personalGifts=Array.from({length:30},(_,i)=>({slug:'Fixture-'+(i+1),number:i+1,collection:'QA Gift',model:'Fixture model',backdrop:i%2?'Blue':'Gold',symbol:'Wolf',checkedAt:1,modelRarity:15,status:'observed',tradable:false}));state.inventoryFilter='telegram';render()}""")
                     assert page.locator('.personal-inventory-card').count()==24
@@ -97,6 +115,13 @@ with sync_playwright() as p:
                     page.evaluate("()=>{state.personalGifts=[];state.inventoryQuery='';state.inventoryFilter='all';state.inventoryView='grid';render()}")
 
             page.goto(BASE+'/admin');page.get_by_text('Диагностика интеграций').wait_for();shot('admin')
+        # Capture every primary screen at every supported viewport, not just 390px.
+        if w!=390:
+            for section in ['inventory','sales','activity','profile','giveaways']:
+                page.locator('.reference-nav [data-id="home"]').click()
+                page.locator(f'[data-action="nav"][data-id="{section}"]').first.click()
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),f'{section} overflow at {w}'
+                page.screenshot(path=OUT/f'{section}-{w}.png',full_page=True)
         page.close()
     browser.close();assert not errors,errors
 print(engine+' UI checks passed')
