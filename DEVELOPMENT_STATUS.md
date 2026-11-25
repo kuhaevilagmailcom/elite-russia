@@ -27,3 +27,6 @@ Implemented the user-supplied dark/yellow home reference with a cropped decorati
 
 ## Narrow viewport regression fix (2026-11-25)
 Main CI run 45517181766 passed Node, TON SDK, PostgreSQL and secret checks but failed Chromium at 320px. Constrain header and navigation intrinsic widths, add overflow diagnostics and disambiguate duplicate navigation targets in browser QA. Verification pending on this branch.
+
+### Reference banner follow-up
+CI on 18425fb failed at 320px: banner right edge 354.72px. Explicit inline width and maximum width prevent min-height/aspect-ratio from expanding the banner outside its shell. Added a banner bounds regression assertion; CI pending.

@@ -908,3 +908,8 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
 .reference-nav button{flex:1 1 0}
 .reference-nav span{max-width:100%;overflow-wrap:anywhere}
 @media(max-width:350px){.reference-top{gap:4px}.reference-top .reference-brand{padding:4px 0}.reference-top .top-cart{padding:4px}.home-action i{display:none}.account-head{gap:6px}}
+
+/* A minimum height transfers through aspect-ratio into an automatic width.
+   Set the inline size explicitly so the banner grows vertically on small phones. */
+.reference-banner{width:100%;max-width:100%;min-width:0;}
+.reference-banner-text{min-width:0;overflow-wrap:anywhere;}
