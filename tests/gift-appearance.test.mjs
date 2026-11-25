@@ -1,0 +1,3 @@
+import test from "node:test";import assert from "node:assert/strict";import {giftAppearance} from "../packages/gift-appearance.mjs";
+test("invalid colors and file identifiers never enter inline CSS",()=>{assert.deepEqual(giftAppearance({backdrop:{colors:{center_color:-1,edge_color:16777216,symbol_color:"red"}},symbol:{sticker:{file_id:"https://bad.example"}}}),{backdropColors:{center:null,edge:null,symbol:null,text:null},symbolMediaUrl:null});});
+test("static symbol is supported; animated symbol without thumbnail stays unavailable",()=>{assert.equal(giftAppearance({symbol:{sticker:{file_id:"static123"}}}).symbolMediaUrl,"/api/v1/media/telegram/static123");assert.equal(giftAppearance({symbol:{sticker:{file_id:"anim123",is_animated:true}}}).symbolMediaUrl,null);});

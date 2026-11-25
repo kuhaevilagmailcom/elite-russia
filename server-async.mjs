@@ -159,6 +159,7 @@ const files = {
   "/phosphor.js":"phosphor.js",
   "/lottie-light.min.js":"lottie-light.min.js",
   "/style.css": "style.css",
+  "/splash.webp":"splash.webp",
   "/logo.svg": "logo.svg",
   "/beta.js": "beta.js",
 };
@@ -167,6 +168,7 @@ const mime = {
   js: "text/javascript; charset=utf-8",
   css: "text/css; charset=utf-8",
   svg: "image/svg+xml",
+  webp:"image/webp",
 };
 let streams = 0;
 let checking = false;

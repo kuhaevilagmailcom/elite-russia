@@ -43,3 +43,6 @@ Previous motion PR merged after green CI. Home shows public listings/catalog, no
 Wallet proof: default Wallet V5R1 supported for mainnet and testnet, retaining state-init/address/signature matching. Added network mismatch feedback and stale connection reset. Existing private gifts refresh animation metadata in one bounded Telegram gift scan once per session. New CI and real Telegram verification pending. No transfer or payment enabled.
 
 Profile and personal inventory redesigned into compact sections; removed cropped banner image data from stylesheet. Public storefront remains separate from private inventory. Restricted header no longer presents the internal placeholder balance as a real wallet balance. New CI pending.
+
+## Splash and collectible appearance
+PR 24 merged after successful CI. User-provided launch image optimized to WebP 320x569, served locally and displayed without cropping until initial render/error; reduced motion supported. Actual Telegram RGB backdrop and symbol thumbnail captured for both public catalog and personal gifts. Private older references upgraded using mediaVersion 3; old public catalog entries require reimport. Repeating pattern placement is approximate; no invented symbol if thumbnail missing. New automated tests and CI pending; live iOS verification still required.
