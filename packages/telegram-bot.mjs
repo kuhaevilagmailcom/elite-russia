@@ -18,6 +18,7 @@ const commandRoute = (text = "") => {
     ?.toLowerCase();
   return (
     {
+      start: "home",
       inventory: "inventory",
       wallet: "wallet",
       offers: "offers",

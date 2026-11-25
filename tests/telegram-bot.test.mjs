@@ -83,4 +83,6 @@ test("bot opens requested Mini App section", async () => {
     message.reply_markup.inline_keyboard[0][0].web_app.url,
     "https://market.example/?startapp=giveaways",
   );
+  await bot.handle({message:{chat:{id:42,type:"private"},text:"/start"}});
+  assert.equal(calls.at(-1).body.reply_markup.inline_keyboard[0][0].web_app.url,"https://market.example/?startapp=home");
 });
