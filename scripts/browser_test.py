@@ -56,6 +56,13 @@ with sync_playwright() as p:
                 if section=='giveaways': page.locator('.reference-nav [data-id="home"]').click()
                 page.locator(f'[data-action="nav"][data-id="{section}"]').first.click();shot(section)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),section
+                if section=='activity':
+                    page.evaluate("""()=>{window.qaActivity=state.activity;state.activity=[{type:'sold',collection:'QA',number:1,created:Date.now(),price:'1000000000'},{type:'listed',collection:'QA',number:2,created:Date.now(),price:'1000000000'},{type:'sold',collection:'QA',number:3,created:Date.now()-10*86400000,price:'1000000000'}];render()}""")
+                    assert page.locator('.activity-total').inner_text()=='1'
+                    assert page.locator('.activity-day').count()==7
+                    page.locator('[data-action="activity-filter"][data-id="sold"]').click()
+                    assert page.locator('.activity-tabs + .panel .row').count()==2
+                    page.evaluate("()=>{state.activity=window.qaActivity;state.activityFilter='all';render()}")
                 if section=='inventory':
                     assert page.locator('.inventory-tabs').count()==1
                     assert page.get_by_text('Доступный баланс',exact=True).count()==0
