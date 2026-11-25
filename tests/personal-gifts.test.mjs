@@ -35,5 +35,7 @@ test("original video sticker and thumbnail remain nontradable references",async(
  const item=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);
  assert.equal(item.modelVideoUrl,"/api/v1/media/telegram/video123");assert.equal(item.modelMediaUrl,"/api/v1/media/telegram/image123");assert.equal(item.tradable,false);
  videoGift.gift.model.sticker.is_video=false;videoGift.gift.model.sticker.is_animated=true;
- const animated=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);assert.equal(animated.modelVideoUrl,null);
+ const animated=await findUserGift({call:async()=>({gifts:[videoGift]})},"123",slug);assert.equal(animated.modelVideoUrl,null);assert.equal(animated.modelAnimationUrl,"/api/v1/media/telegram/video123");assert.equal(animated.mediaVersion,2);
 });
+
+test("legacy media refresh only updates existing owned gift references",async()=>{const repo=await SQLiteRepository.open();try{const animated=structuredClone(gift);animated.gift.model.sticker={is_animated:true,file_id:"animation123",thumbnail:{file_id:"image123"}};let count=0;const store=new PersonalGifts(repo,{call:async()=>{count++;return {gifts:[animated]}}});await store.initialize();await repo.run("INSERT INTO personal_gift_refs VALUES (?,?,?,?)","123",slug,JSON.stringify({slug,mediaVersion:1}),1);assert.deepEqual(await store.refreshMedia("456"),{updated:0});assert.deepEqual(await store.refreshMedia("123"),{updated:1});assert.equal((await store.list("123"))[0].modelAnimationUrl,"/api/v1/media/telegram/animation123");assert.equal(count,1);assert.deepEqual(await store.refreshMedia("123"),{updated:0});}finally{await repo.close();}});

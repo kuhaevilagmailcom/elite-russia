@@ -36,3 +36,10 @@ Main CI 45539807457 succeeded. Proposed original Telegram WebM sticker playback 
 
 ## Motion and navigation accessibility (2026-11-25)
 Main CI 45553829890 passed after WebM preview merge. Proposed short button feedback and sheet entrance animations, reduced-motion overrides, touch hover suppression, accessible dialog title and current navigation state. Browser regression assertions added; branch CI pending. No finance or custody changes.
+
+## Storefront and TGS revision
+Previous motion PR merged after green CI. Home shows public listings/catalog, not private inventory. Local MIT Phosphor navigation icons, blue GRAM mark based on official media description (not original download), removed cropped banner image. Vendored Lottie Light 5.13.0 and bounded TGS JSON decoder enable original Telegram vector animation. Existing imports need re-check for new animation IDs. Live Telegram media and new CI pending. Financial restrictions unchanged.
+
+Wallet proof: default Wallet V5R1 supported for mainnet and testnet, retaining state-init/address/signature matching. Added network mismatch feedback and stale connection reset. Existing private gifts refresh animation metadata in one bounded Telegram gift scan once per session. New CI and real Telegram verification pending. No transfer or payment enabled.
+
+Profile and personal inventory redesigned into compact sections; removed cropped banner image data from stylesheet. Public storefront remains separate from private inventory. Restricted header no longer presents the internal placeholder balance as a real wallet balance. New CI pending.

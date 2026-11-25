@@ -89,6 +89,10 @@ export async function beta2Routes(repo, env, demo) {
         return true;
       }
     }
+    if(path==="/api/v1/personal-gifts/refresh-media"&&method==="POST"){
+      if(!personal.api){json(r,503,{error:"Telegram не настроен"});return true;}
+      json(r,200,await personal.refreshMedia(u.id));return true;
+    }
     if (path === "/api/v1/personal-gifts") {
       if (method === "GET") {
         json(r,200,{items:await personal.list(u.id),enabled:!!personal.api});
@@ -111,9 +115,9 @@ export async function beta2Routes(repo, env, demo) {
           const item = JSON.parse(x.payload);
           return {
             ...item,
-            modelMediaUrl: item.modelFile
-              ? `/api/v1/media/telegram/${encodeURIComponent(item.modelFile)}`
-              : null,
+            modelMediaUrl: (item.modelPreviewFile ?? (item.modelAnimationFile||item.modelVideoFile?null:item.modelFile)) ? `/api/v1/media/telegram/${encodeURIComponent(item.modelPreviewFile ?? item.modelFile)}` : null,
+            modelAnimationUrl:item.modelAnimationFile?`/api/v1/media/telegram/${encodeURIComponent(item.modelAnimationFile)}`:null,
+            modelVideoUrl:item.modelVideoFile?`/api/v1/media/telegram/${encodeURIComponent(item.modelVideoFile)}`:null,
           };
         }),
         source: "Telegram metadata; not listed assets",

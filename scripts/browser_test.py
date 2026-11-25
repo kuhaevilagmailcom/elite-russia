@@ -16,7 +16,8 @@ with sync_playwright() as p:
         shell = page.locator('.reference-shell').bounding_box()
         assert banner['x'] >= shell['x'] and banner['x'] + banner['width'] <= shell['x'] + shell['width'] + 1, f'Banner exceeds shell at {w}: {banner}'
         assert overflow['scrollWidth'] <= w, f'Home horizontal overflow {w}: {overflow}'
-        assert page.locator('.account-summary').count()==1
+        assert page.locator('.account-summary').count()==0
+        assert page.locator('.storefront-grid .gift').count()>0
         assert page.locator('.home-actions button').count()==2
         page.screenshot(path=OUT/f'home-{w}.png',full_page=True)
         if w==390:

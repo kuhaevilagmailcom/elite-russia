@@ -1,3 +1,4 @@
+import { decodeTgs } from "./tgs.mjs";
 export class TelegramAPI {
   constructor(token, fetcher = fetch) {
     if (!token || !/^\d+:[\w-]+$/.test(token))
@@ -61,6 +62,9 @@ export class TelegramAPI {
       backdropRarity: g.backdrop?.rarity_per_mille ?? null,
       symbolRarity: g.symbol?.rarity_per_mille ?? null,
       modelFile: g.model?.sticker?.file_id ?? null,
+      modelPreviewFile: g.model?.sticker?.thumbnail?.file_id ?? (g.model?.sticker?.is_animated || g.model?.sticker?.is_video ? null : g.model?.sticker?.file_id ?? null),
+      modelAnimationFile: g.model?.sticker?.is_animated ? g.model.sticker.file_id : null,
+      modelVideoFile: g.model?.sticker?.is_video ? g.model.sticker.file_id : null,
       symbolFile: g.symbol?.sticker?.file_id ?? null,
       source: "Telegram Bot API/getUniqueGift",
       verifiedAt: Date.now(),
@@ -102,6 +106,7 @@ export class TelegramAPI {
         tgs: "application/gzip",
         json: "application/json",
       }[extension] || "application/octet-stream";
+    if(extension==="tgs") return {body:decodeTgs(body),type:"application/json; charset=utf-8"};
     return { body, type };
   }
   async custody(connection, owner) {
