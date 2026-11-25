@@ -453,6 +453,16 @@ const server = http.createServer(async (q, r) => {
           .map((b) => b.id),
         balance: await market.balance(u.id),
         inventory: await market.inventory(u.id),
+        tradeStats: await (async()=>{
+          const rows=await market.all("SELECT kind,src,dst,amount,ref FROM journal WHERE kind IN ('sale','bundle_sale') AND (src IN (?,?) OR dst=?)",u.id+":available",u.id+":reserved",u.id+":available");
+          const bought=new Set(),sold=new Set();let volume=0n;
+          for(const row of rows){
+            if(row.src===u.id+":available"||row.src===u.id+":reserved")bought.add(row.ref);
+            if(row.dst===u.id+":available")sold.add(row.ref);
+            volume+=BigInt(row.amount);
+          }
+          return {bought:bought.size,sold:sold.size,volume};
+        })(),
         favorites: (
           await market.all("SELECT gift FROM favorites WHERE user=?", u.id)
         ).map((x) => x.gift),

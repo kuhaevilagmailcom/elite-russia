@@ -808,3 +808,85 @@ input:focus-visible {
     transition: none !important;
   }
 }
+
+/* MINION reference theme: compact dark/yellow home, live HTML controls. */
+:root{--bg:#141416;--surface:#222224;--card:#29292b;--line:#343437;--yellow:#ffd02a;--text:#f6f5f5;--muted:#a3a3a7;font-family:-apple-system,BlinkMacSystemFont,"Arial",sans-serif}
+.reference-shell{max-width:620px;padding:0 15px 110px;padding-top:max(env(safe-area-inset-top),var(--tg-content-safe-area-inset-top,0px));}
+.reference-top{height:54px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.reference-top button{background:transparent;padding:6px;border:0}
+.reference-top .top-back{font-size:34px;line-height:1;padding:0 4px;}
+.reference-brand{font-weight:850;font-size:clamp(17px,4.2vw,24px);letter-spacing:-.7px;white-space:nowrap;margin-right:auto}
+.reference-top .reference-balance{display:flex;align-items:center;gap:6px;background:#242426;border:1px solid #353538;border-radius:24px;padding:6px 10px;font-size:13px;white-space:nowrap}
+.gram-icon{width:19px;height:19px;color:var(--yellow);display:inline-block;vertical-align:middle;flex:none}
+.top-cart{position:relative}.top-cart svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.top-cart sup{position:absolute;right:0;top:0;color:var(--yellow)}
+.reference-shortcuts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:5px 0 10px}
+.reference-shortcuts button{border-radius:24px;display:flex;align-items:center;justify-content:center;gap:3px;height:40px;padding:5px;background:#242426;color:#a7a7ab}
+.reference-shortcuts svg,.account-stats svg,.home-action>svg,.home-empty>svg,.market-link svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linejoin:round;stroke-linecap:round}
+.reference-shortcuts button span{font-size:10px;font-weight:800}.reference-shortcuts .active{background:linear-gradient(180deg,#ffe05b,#ffca19);color:#28200a;box-shadow:0 4px 12px #ffc51b26}
+.reference-status{font-size:10px;color:#a3a3a7;margin:0 0 8px;line-height:1.25}.reference-status b{color:#ffdb64}
+.reference-banner{position:relative;aspect-ratio:2.78;min-height:124px;display:flex;align-items:center;overflow:hidden;background:linear-gradient(115deg,#111113 43%,#73560a);border:1px solid #88711f;border-radius:24px;isolation:isolate}
+.reference-banner-text{position:relative;z-index:2;width:55%;padding:14px 0 14px 19px}
+.reference-banner-text strong{font-size:clamp(24px,7.1vw,42px);font-weight:1000;letter-spacing:-1.7px;line-height:.96;display:block;transform:rotate(-3deg)}
+.reference-banner-text strong span{display:block;color:#ffcf24}
+.reference-banner-text p{font-size:clamp(11px,3.1vw,17px);font-weight:650;line-height:1.16;margin:10px 0 0;color:#f4f4f4}
+.mascot-crop{position:absolute;right:0;top:0;bottom:0;width:51%;background-size:cover;background-position:center;z-index:1}
+.mascot-crop:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#111113 0%,transparent 16%)}
+.account-summary{margin:12px 0 14px;background:#242426;border:1px solid #343436;border-radius:23px;padding:11px 10px 9px}
+.account-head{display:flex;gap:10px;align-items:center;padding:0 3px 11px}
+.account-avatar{width:57px;height:57px;flex:0 0 57px;border-radius:50%;object-fit:cover;background:#151516;color:#ffcf24}
+.account-avatar.initials{display:grid;place-items:center;font-size:27px;font-weight:850}
+.account-title{min-width:0;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.account-title strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(16px,4.7vw,24px);font-weight:850;letter-spacing:-.4px}
+.account-status{font-size:10px;font-weight:750;color:#ffce23;background:#453a18;border-radius:12px;padding:4px 7px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inventory-count{position:relative;text-align:left;min-width:92px;flex:0 0 29%;border-radius:17px;padding:9px 16px 9px 10px;background:#1b1b1d;display:grid;gap:3px}
+.inventory-count span{color:#98989c;font-size:10px}.inventory-count b{font-size:16px;white-space:nowrap}.inventory-count .chev{position:absolute;right:7px;top:35%;font-size:20px}
+.account-stats{border-top:1px solid #373739;display:grid;grid-template-columns:1fr 1.05fr 1.12fr;padding-top:10px}
+.account-stats button{background:none;display:flex;align-items:center;text-align:left;gap:5px;padding:0 5px;border-radius:0;min-width:0}
+.account-stats button+button{border-left:1px solid #373739}
+.account-stats button>svg{color:var(--yellow);width:20px;height:20px;flex:none}
+.account-stats button>span{min-width:0}.account-stats b{display:block;font-size:clamp(11px,3vw,16px);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-stats small{display:block;font-size:9px;color:#a3a3a7;line-height:1.2;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.account-stats b small{display:inline;font-weight:700;font-size:9px}
+.home-actions{display:grid;grid-template-columns:1.22fr 1fr;gap:8px;margin:0 0 18px}
+.home-action{display:flex;align-items:center;gap:9px;min-width:0;min-height:76px;border-radius:22px;text-align:left;padding:12px 9px}
+.home-action>svg{width:36px;height:36px;flex:none;color:#ffca25}.home-action>span{min-width:0;flex:1}
+.home-action b{display:block;font-size:clamp(12px,3.25vw,18px);font-weight:820;line-height:1.05;letter-spacing:-.25px}
+.home-action small{display:block;color:#a6a6a8;font-size:9px;margin-top:5px;line-height:1.15}
+.home-action i{font-style:normal;font-size:23px;color:#8e8e92}
+.wallet-action{background:#252527;border:1px solid #363638}
+.add-action{background:linear-gradient(155deg,#ffda51,#ffbe16);color:#21180a}
+.add-action .giftbox-icon{width:38px;height:38px;stroke:none;fill:none}
+.add-action small,.add-action i{color:#76530d}
+.home-section{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 10px}
+.home-section h1{font-size:clamp(20px,5.2vw,30px);letter-spacing:-.6px;font-weight:900;margin:0}
+.text-action{color:#ffd12a;background:none;padding:6px 0;font-size:13px}
+.home-gifts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.home-gift{border-radius:20px;overflow:hidden;position:relative;min-width:0;background:#33313d}
+.home-gift .art,.home-gift .personal-preview{aspect-ratio:1.42;border-radius:0;position:relative}
+.home-gift .art svg{width:65%;height:86%;filter:none}
+.home-gift .art:before{opacity:.07}.home-gift .art:after{bottom:auto;top:8px;right:8px}
+.home-gift .home-gift-copy{padding:7px 10px 9px;background:#29282d;color:#fff}
+.home-gift-copy>b{font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:800}
+.home-gift-copy>div{display:flex;align-items:center;justify-content:space-between;gap:3px}
+.home-gift-copy>div>span{font-size:11px;font-weight:750;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-gift-copy .gram-icon{width:16px;height:16px}.home-more{padding:4px 7px;border-radius:50%;background:#17171ba0;font-size:14px;line-height:1}
+.personal-preview{display:grid;place-items:center;background:#4b4260;cursor:pointer}.personal-preview img{width:80%;height:85%;object-fit:contain}
+.telegram-mark{position:absolute;top:8px;left:8px;background:#5d9a76;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff}
+.telegram-mark svg{width:19px;height:19px}.home-gift.imported .home-gift-copy{background:#342c42}
+.home-empty{border:1px dashed #454548;border-radius:20px;padding:18px;display:grid;justify-items:center;gap:8px;text-align:center;color:#b5b5b9;font-size:12px}
+.home-empty>svg{width:32px;height:32px;color:#ffd12a}.home-empty b{color:#fff;font-size:15px}.home-empty button{margin-top:3px}
+.home-market-link{margin:12px 0}.market-link{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#28282a;color:var(--yellow);border-radius:16px}
+.reference-nav{max-width:600px;width:calc(100% - 22px);left:50%;right:auto;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);border:1px solid #363638;border-radius:25px;background:#222224;padding:4px;gap:2px;backdrop-filter:none}
+.reference-nav button{flex:1;min-width:0;max-width:none;width:auto;min-height:53px;font-weight:700;gap:3px;border-radius:21px;line-height:1.1;color:#9d9da1;justify-content:center}
+.reference-nav svg{width:23px;height:23px;stroke-linecap:round;stroke-linejoin:round}
+.reference-nav button.active{color:#ffd026;background:#40351d;border:1px solid #776322}
+.reference-nav span{text-align:center;font-size:10px;white-space:normal}
+.reference-shell .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.reference-shell .gift{border-radius:20px;background:#242426}.reference-shell .art{aspect-ratio:1.12}
+.reference-shell .price{font-size:16px}.reference-shell .name{font-size:14px}
+.detail-price{display:flex;align-items:center;gap:8px}.detail-price .gram-icon{width:26px;height:26px}
+dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:none;background:#000a}
+@media(max-width:350px){.reference-shell{padding-left:10px;padding-right:10px}.reference-shortcuts button span{display:none}.home-action{gap:5px;padding:9px 6px}.home-action>svg,.add-action .giftbox-icon{width:28px;height:28px}.account-avatar{width:44px;height:44px;flex-basis:44px}.account-stats button{gap:3px;padding:0 3px}.account-stats button>svg{width:15px;height:15px}.reference-brand{font-size:16px}.reference-top .reference-balance{padding:6px}.reference-nav span{font-size:9px}}
+@media(min-width:551px){.reference-top{height:65px}.reference-shortcuts button{height:48px}.account-summary{padding:15px}.account-avatar{width:70px;height:70px;flex-basis:70px}.home-action{min-height:100px;padding:15px}.home-action>svg,.add-action .giftbox-icon{width:48px;height:48px}.home-section{margin-top:24px}.reference-nav{padding:6px}.reference-nav button{min-height:60px}}
+
+.mascot-crop{background-image:url("data:image/webp;base64,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")}

@@ -10,7 +10,19 @@ with sync_playwright() as p:
         page=browser.new_page(viewport={'width':w,'height':h});page.on('pageerror',lambda e:errors.append(str(e)))
         # External SDKs are excluded from local UI QA, not simulated as connected.
         page.route('https://**/*',lambda route:route.abort())
-        page.goto(BASE,wait_until='domcontentloaded');page.locator('.gift').first.wait_for()
+        page.goto(BASE,wait_until='domcontentloaded');page.locator('.reference-banner').wait_for()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Home horizontal overflow {w}'
+        assert page.locator('.account-summary').count()==1
+        assert page.locator('.home-actions button').count()==2
+        page.screenshot(path=OUT/f'home-{w}.png',full_page=True)
+        if w==390:
+            page.locator('.home-actions [data-action="deposit-gift"]').click()
+            page.locator('dialog[open] #gift-link').wait_for()
+            page.locator('dialog [data-action="close"]').click()
+            page.locator('.reference-nav [data-id="sales"]').click()
+            page.get_by_role('heading',name='Мои продажи').wait_for()
+        page.locator('.reference-shortcuts [data-id="market"]').click()
+        page.locator('.gift').first.wait_for()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow {w}'
         page.screenshot(path=OUT/f'market-{w}.png',full_page=True)
         if w==390:

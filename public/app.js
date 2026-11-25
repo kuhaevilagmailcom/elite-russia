@@ -25,7 +25,7 @@ const fmt = (v) => {
   );
 };
 const state = {
-  page: "market",
+  page: "home",
   tab: "store",
   query: "",
   collection: "",
@@ -51,13 +51,18 @@ const cur = () =>
   `${state.config.demo ? "TEST " : ""}${state.config.currency || "GRAM"}`;
 let tonUI;
 const icons = {
+  home: '<path d="M3 10.5 12 3l9 7.5V21h-6v-7H9v7H3z" fill="currentColor" stroke-linejoin="round"/>',
+  sales: '<path d="m13 3 8 8-4 4-8-8zM12 10 3 19l2 2 9-9M15 21h7"/>',
+  wallet: '<path d="M4 7V5l13-3 1 5M3 7h17a1 1 0 0 1 1 1v12H3zM21 12h-6a3 3 0 0 0 0 6h6M16 15h.1"/>',
+  star: '<path d="m12 2 3 6 7 .9-5 5 1 7-6-3.3L6 21l1-7-5-5L9 8z" fill="currentColor"/>',
+  offers: '<path d="M3 5h13l4 4-9 10-8-8zM8 9h.1"/>',
   market: '<path d="M3 9l2-5h14l2 5v12H3zM3 9h18M9 13v4m6-4v4"/>',
   activity: '<path d="M3 17l5-5 4 3 8-10M15 5h5v5"/>',
   inventory:
     '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M2 8h20M12 8C3 8 5 1 9 4l3 4c9 0 7-7 3-4z"/>',
   giveaways:
     '<path d="M4 10h16v11H4zM2 7h20v3H2zM12 7v14M12 7C5 7 6 2 9 3c2 1 3 4 3 4zm0 0c7 0 6-5 3-4-2 1-3 4-3 4z"/>',
-  profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>',
+  profile: '<circle cx="12" cy="7" r="4" fill="currentColor" stroke="none"/><path d="M3 21v-2a9 9 0 0118 0v2z" fill="currentColor" stroke="none"/>',
   cart: '<path d="M2 3h3l3 12h11l3-9H6M9 20h.01M19 20h.01"/>',
 };
 const icon = (n) =>
@@ -293,7 +298,35 @@ let quotedBundle = null,
 function offersContent() {
   return `<div class="panel"><h3>Мои предложения</h3>${(state.me?.offers || []).map((o) => `<div class="row"><div><b>${esc(o.collection)} #${esc(o.number)}</b><div class="muted">${esc(o.status)} · ${fmt(o.price)} ${cur()}</div></div>${o.status === "active" ? (o.buyer === state.me.user.id ? btn("Отменить", "cancel", o.id) : btn("Принять", "accept", o.id, "accent")) : ""}</div>`).join("") || empty("Нет предложений", "Создайте оффер на понравившийся подарок")}</div>`;
 }
+function gramIcon(){return `<svg class="gram-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M6.8 8.4c0-.7.5-1.2 1.3-1.2h7.8c.8 0 1.3.5 1.3 1.2 0 .3-.1.6-.3.9L12 17l-4.9-7.7a1.7 1.7 0 0 1-.3-.9ZM12 7.5v9" fill="none" stroke="#16130a" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
+function giftBoxIcon(){return `<svg class="giftbox-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M9 26 32 14 55 26v26L32 63 9 51Z" fill="#e3a91a"/><path d="m9 26 23 11v26L9 51Z" fill="#ffd435"/><path d="m32 37 23-11v26L32 63Z" fill="#d39812"/><path d="m5 19 27-12 27 12v12L32 43 5 31Z" fill="#ffdd46"/><path d="m32 31 27-12v12L32 43Z" fill="#e7ad19"/><path d="m26 28 12-5v37l-6 3-6-3ZM19 13l11-5 27 12-11 5Z" fill="#222124"/><path d="M31 17C13 16 9 4 17 2c8-3 15 7 15 13C35 3 43-2 49 4c5 6-5 12-17 13" fill="#242428" stroke="#121214" stroke-width="2"/></svg>`}
+function accountSummary(){
+ const u=state.me?.user, name=u?.name||"Гость", rawPhoto=window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url;
+ const photo=typeof rawPhoto==="string"&&/^https:\/\/[^\s]+$/i.test(rawPhoto)?`<img class="account-avatar" src="${esc(rawPhoto)}" alt="">`:`<div class="account-avatar initials">${esc(name.slice(0,1).toUpperCase())}</div>`;
+ const n=(state.me?.inventory?.length||0)+state.personalGifts.length;
+ const stats=state.me?.tradeStats||{}, balance=fmt(state.me?.balance.available||0);
+ return `<section class="account-summary"><div class="account-head">${photo}<div class="account-title"><strong>${esc(name)}</strong><span class="account-status">${state.config.demo?"TEST аккаунт":u?"Telegram":"Войдите в Telegram"}</span></div><button class="inventory-count" data-action="nav" data-id="inventory"><span>Инвентарь</span><b>${n} NFT</b><span class="chev">›</span></button></div><div class="account-stats"><button data-action="wallet">${gramIcon()}<span><b>${balance} <small>${esc(cur())}</small></b><small>Баланс</small></span></button><button data-action="nav" data-id="sales">${icon("sales")}<span><b>${esc(stats.bought??0)}/${esc(stats.sold??0)}</b><small>Покупки/Продажи</small></span></button><button data-action="nav" data-id="activity">${icon("activity")}<span><b>${fmt(stats.volume||0)}</b><small>Объём без комиссии</small></span></button></div></section>`;
+}
+function homeGift(g,personal=false){
+ if(!personal)return `<article class="home-gift">${art(g,false)}<div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>${gramIcon()} ${g.price?fmt(g.price)+" "+esc(cur()):"Не выставлен"}</span>${btn("•••","detail",g.id,"home-more")}</div></div></article>`;
+ return `<article class="home-gift imported"><div class="personal-preview" data-action="personal-detail" data-id="${esc(g.slug)}">${g.modelMediaUrl?`<img src="${esc(g.modelMediaUrl)}" alt="${esc(g.collection)}" loading="lazy">`:""}<span class="telegram-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 17-7-3 17-6-5-3 3 1-6 8-6-10 5z" fill="currentColor"/></svg></span></div><div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>#${esc(g.number)}</span>${btn("•••","personal-detail",g.slug,"home-more")}</div></div></article>`;
+}
+function homeContent(){
+ const mine=state.me?.inventory||[], personal=state.personalGifts;
+ return `<section class="reference-banner" aria-label="MINION MARKET — NFT подарки в Telegram"><div class="reference-banner-text"><strong>MINION<span>MARKET</span></strong><p>Лучшие NFT подарки<br>и многое другое!</p></div><div class="mascot-crop" aria-hidden="true"></div></section>${accountSummary()}<div class="home-actions"><button class="home-action wallet-action" data-action="connect">${icon("wallet")}<span><b>Подключить<br>TON-кошелёк</b><small>Проверка владения</small></span><i>›</i></button><button class="home-action add-action" data-action="deposit-gift">${giftBoxIcon()}<span><b>Добавить<br>NFT</b><small>По ссылке</small></span><i>›</i></button></div><div class="home-section"><h1>Твои подарки</h1>${btn("Все →","nav","inventory","text-action")}</div><div class="home-gifts">${[...personal.map(g=>homeGift(g,true)),...mine.map(g=>homeGift(g))].slice(0,4).join("")}</div>${mine.length||personal.length?"":`<div class="home-empty">${icon("inventory")}<b>Здесь будут твои подарки</b><span>Добавь NFT по ссылке из Telegram</span>${btn("Добавить NFT","deposit-gift","","accent")}</div>`}<div class="home-market-link">${btn(icon("market")+" Открыть маркет","nav","market","market-link")}</div>`;
+}
+function salesContent(){
+ const mine=(state.me?.inventory||[]).filter(g=>g.listing);
+ return `<div class="hero"><div><h1>Мои продажи</h1><p class="muted">Активные объявления</p></div>${btn("Выставить","nav","inventory","accent")}</div><div class="grid">${mine.map(g=>giftCard(g,true)).join("")}</div>${mine.length?"":empty("Нет активных продаж","Выберите подарок в инвентаре.")}${offersContent()}`;
+}
+function personalDetail(slug){
+ const g=state.personalGifts.find(x=>x.slug===slug);
+ if(!g)return;
+ show(g.collection,`<div class="detail personal-detail">${collectibleCard(g)}<div class="panel"><div class="row"><span>Модель</span><b>${esc(g.model||"—")}</b></div><div class="row"><span>Символ</span><b>${esc(g.symbol||"—")}</b></div><div class="row"><span>Фон</span><b>${esc(g.backdrop||"—")}</b></div></div><p class="muted">Проверен ${new Date(g.checkedAt).toLocaleString("ru")}. Не находится на хранении маркета.</p>${btn("Продажа","personal-sale",g.slug,"accent")}${btn("Проверить снова","personal-refresh",g.slug)}${btn("Убрать из инвентаря","personal-remove",g.slug)}</div>`);
+}
 function page() {
+  if (state.page === 'home') return homeContent();
+  if (state.page === 'sales') return salesContent();
   if (state.page === "market") return marketContent();
   if (state.page === "activity")
     return `<div class="hero"><div><h1>Активность</h1><div class="muted">Последние операции маркета</div></div>${btn("Обновить", "refresh")}</div><div class="panel">${state.activity.map((a) => `<div class="row"><div><b>${esc(a.collection)} #${esc(a.number)}</b><div class="muted">${{ listed: "Выставлен", sold: "Продан", price_changed: "Цена изменена", delisted: "Снят" }[a.type] || esc(a.type)} · ${new Date(Number(a.created)).toLocaleString("ru")}</div></div><b>${fmt(a.price)} ${cur()}</b></div>`).join("") || empty("Нет операций")}</div>`;
@@ -308,22 +341,13 @@ function page() {
       .join(
         "",
       )}</div>${state.giveaways.length ? "" : empty("Активных розыгрышей нет", "Создать бесплатный розыгрыш можно только из незанятого подарка в своём инвентаре.")}`;
-  return `<div class="hero"><div><h1>Профиль</h1><div class="muted">${esc(state.me?.user.name || "Гость")}</div></div></div><div class="panel"><div class="muted">Торговый баланс</div><div class="metric">${fmt(state.me?.balance.available || "0")} ${cur()}</div><p class="muted">В резерве: ${fmt(state.me?.balance.reserved || "0")} ${cur()}</p>${btn("Управление балансом", "wallet", "", "accent")}</div><div class="panel">${state.config.demo ? `<div class="row"><b>Тестовый аккаунт</b>${btn("Сменить", "demo-switch")}</div>` : ""}<div class="row"><b>TON Connect</b>${btn("Кошелёк", "connect")}</div><div class="row"><b>Избранное</b>${btn("Открыть", "favorites")}</div><div class="row"><b>Поддержка</b>${btn("Написать", "support")}</div><div class="row"><b>Админ-панель</b><a href="/admin">Открыть →</a></div></div><div class="panel"><h3>Уведомления</h3>${(state.me?.notifications || []).map((n) => `<div class="row">${esc(n.message)}</div>`).join("") || '<div class="muted">Нет уведомлений</div>'}</div>`;
+  return `<div class="hero"><h1>Профиль</h1></div>${accountSummary()}<div class="panel"><div class="muted">Торговый баланс</div><div class="metric">${fmt(state.me?.balance.available || "0")} ${cur()}</div><p class="muted">В резерве: ${fmt(state.me?.balance.reserved || "0")} ${cur()}</p>${btn("Управление балансом", "wallet", "", "accent")}</div><div class="panel">${state.config.demo ? `<div class="row"><b>Тестовый аккаунт</b>${btn("Сменить", "demo-switch")}</div>` : ""}<div class="row"><b>TON Connect</b>${btn("Кошелёк", "connect")}</div><div class="row"><b>Избранное</b>${btn("Открыть", "favorites")}</div><div class="row"><b>Поддержка</b>${btn("Написать", "support")}</div><div class="row"><b>Админ-панель</b><a href="/admin">Открыть →</a></div></div><div class="panel"><h3>Уведомления</h3>${(state.me?.notifications || []).map((n) => `<div class="row">${esc(n.message)}</div>`).join("") || '<div class="muted">Нет уведомлений</div>'}</div>`;
 }
 function render() {
   if (location.pathname === "/admin") return renderAdmin();
-  app.innerHTML = `<div class="shell"><header class="top"><div class="brand"><img src="/logo.svg" alt=""><div>MINION<small>MARKET</small></div></div><div class="actions">${btn(fmt(state.me?.balance.available || "0") + " " + cur() + " " + uiIcon("plus"), "wallet", "", "balance")}${btn(uiIcon("cart") + `<span>${state.cart.size}</span>`, "cart", "", "balance cart-button")}</div></header><div class="banner"><span><b class="tag">${state.config.demo ? "DEMO" : "RESTRICTED"}</b> · ${state.config.demo ? "Тестовые подарки и средства. Не реальные NFT." : "Реальные операции отключены."}</span></div>${page()}</div><nav class="nav">${[
-    ["market", "Маркет"],
-    ["activity", "Активность"],
-    ["inventory", "Подарки"],
-    ["giveaways", "Розыгрыши"],
-    ["profile", "Профиль"],
-  ]
-    .map(
-      ([n, label]) =>
-        `<button data-action="nav" data-id="${n}" class="${state.page === n ? "active" : ""}">${icon(n)}${label}</button>`,
-    )
-    .join("")}</nav>`;
+  
+ app.innerHTML=`<div class="shell reference-shell"><header class="reference-top"><button class="top-back" data-action="nav" data-id="home" aria-label="Главная">‹</button><button class="reference-brand" data-action="nav" data-id="home">Minion Market</button><button class="reference-balance" data-action="wallet">${gramIcon()}<b>${fmt(state.me?.balance.available||0)}</b></button><button class="top-cart" data-action="cart" aria-label="Корзина">${icon("cart")}${state.cart.size?`<sup>${state.cart.size}</sup>`:""}</button></header><div class="reference-shortcuts">${[["home","star","Главная"],["market","inventory","Маркет"],["offers","offers","Офферы"],["giveaways","giveaways","Розыгрыши"],["wallet","wallet","Кошелёк"]].map(([route,i,label])=>`<button class="${state.page===route?"active":""}" data-action="${route==="wallet"?"wallet":route==="offers"?"open-offers":"nav"}" data-id="${route}" title="${label}" aria-label="${label}">${icon(i)}${route==="offers"?"<span>Офферы</span>":""}</button>`).join("")}</div><div class="reference-status"><b>${state.config.demo?"TEST":"PREVIEW"}</b> · ${state.config.demo?"Тестовые подарки и средства":"Реальные сделки пока отключены"}</div>${page()}</div><nav class="nav reference-nav">${[["home","Главная"],["inventory","Инвентарь"],["sales","Мои продажи"],["activity","Статистика"],["profile","Профиль"]].map(([n,label])=>`<button data-action="nav" data-id="${n}" class="${state.page===n?"active":""}">${icon(n)}<span>${label}</span></button>`).join("")}</nav>`;
+
   $("#search")?.addEventListener("input", (e) => {
     state.query = e.target.value;
     const pos = e.target.selectionStart;
@@ -398,7 +422,7 @@ function detail(g) {
   const mine = state.me?.inventory.some((x) => x.id === g.id);
   show(
     g.collection,
-    `<div class="detail">${art(g, false)}<div class="metric">${fmt(g.price)} ${cur()}</div><div class="panel"><div class="row"><span>Модель</span><b>${esc(g.model)}</b></div><div class="row"><span>Фон</span><b>${esc(g.backdrop)}</b></div><div class="row"><span>Символ</span><b>${esc(g.symbol)}</b></div><div class="row"><span>Floor коллекции</span><b>${fmt(g.floor)} ${cur()}</b></div></div>${mine && g.bundle ? '<p class="muted">Подарок заблокирован в наборе.</p>' : mine ? btn("Quick Sell", "quick-sell", g.id) + btn("Выставить / изменить цену", "sell", g.id, "accent") + btn("Передать в тестовом маркете", "send", g.id) : btn("Купить", "buy", g.id, "accent") + btn("Сделать оффер", "offer", g.id)}</div>`,
+    `<div class="detail">${art(g, false)}<div class="metric detail-price">${gramIcon()} ${fmt(g.price)} ${cur()}</div><div class="panel"><div class="row"><span>Модель</span><b>${esc(g.model)}</b></div><div class="row"><span>Фон</span><b>${esc(g.backdrop)}</b></div><div class="row"><span>Символ</span><b>${esc(g.symbol)}</b></div><div class="row"><span>Floor коллекции</span><b>${fmt(g.floor)} ${cur()}</b></div></div>${mine && g.bundle ? '<p class="muted">Подарок заблокирован в наборе.</p>' : mine ? btn("Quick Sell", "quick-sell", g.id) + btn("Выставить / изменить цену", "sell", g.id, "accent") + btn("Передать в тестовом маркете", "send", g.id) : btn("Купить", "buy", g.id, "accent") + btn("Сделать оффер", "offer", g.id)}</div>`,
   );
 }
 let purchaseQuote;
@@ -805,6 +829,10 @@ document.addEventListener("click", async (e) => {
           );
           break;
         }
+      case "personal-detail":
+        personalDetail(id); break;
+      case "open-offers":
+        state.page="market"; state.tab="offers"; render(); scrollTo(0,0); break;
       case "nav":
         state.scrolls ??= {};
         state.scrolls[state.page] = scrollY;
@@ -977,6 +1005,7 @@ document.addEventListener("click", async (e) => {
       }
       case "personal-remove":
         busy=true;
+        if(modal.open)modal.close();
         await api("personal-gifts",{method:"DELETE",body:JSON.stringify({slug:id})});
         state.personalGifts=(await api("personal-gifts")).items;
         render(); toast("Ссылка удалена из инвентаря");
@@ -1073,8 +1102,9 @@ document.addEventListener("click", async (e) => {
 async function init() {
   try {
     const startRoute = new URLSearchParams(location.search).get("startapp");
-    if (["market", "inventory", "giveaways", "profile"].includes(startRoute))
-      state.page = startRoute;
+    if (["home","market","inventory","giveaways","profile","sales","activity"].includes(startRoute)) state.page=startRoute;
+    if(startRoute==="offers"){state.page="market";state.tab="offers";}
+    if(startRoute==="wallet")state.page="profile";
     for (let i = 0; i < 20 && !window.Telegram?.WebApp; i++)
       await new Promise((resolve) => setTimeout(resolve, 50));
     window.Telegram?.WebApp?.ready();
