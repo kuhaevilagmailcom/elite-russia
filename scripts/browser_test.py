@@ -40,6 +40,7 @@ with sync_playwright() as p:
             page.locator('.reference-nav [data-id="sales"]').click()
             page.get_by_role('heading',name='Мои продажи').wait_for()
             assert page.get_by_role('navigation',name='Основная навигация').locator('[aria-current=page]').get_attribute('data-id') == 'sales'
+            page.locator('.reference-nav [data-id="home"]').click()
         page.locator('.reference-shortcuts [data-id="market"]').click()
         page.locator('.gift').first.wait_for()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow {w}'
@@ -60,16 +61,24 @@ with sync_playwright() as p:
                     assert page.get_by_text('Доступный баланс',exact=True).count()==0
                     assert page.locator('.reference-shortcuts').count()==0
                     # Explicit test-only references, not production catalog.
-                    page.evaluate("""()=>{state.personalGifts=Array.from({length:30},(_,i)=>({slug:'Fixture-'+(i+1),number:i+1,collection:'QA Gift',model:'Fixture model',checkedAt:1,modelRarity:15,status:'observed',tradable:false}));state.inventoryFilter='telegram';render()}""")
+                    page.evaluate("""()=>{state.personalGifts=Array.from({length:30},(_,i)=>({slug:'Fixture-'+(i+1),number:i+1,collection:'QA Gift',model:'Fixture model',backdrop:i%2?'Blue':'Gold',symbol:'Wolf',checkedAt:1,modelRarity:15,status:'observed',tradable:false}));state.inventoryFilter='telegram';render()}""")
                     assert page.locator('.personal-inventory-card').count()==24
                     page.locator('[data-action="inventory-more-items"]').click()
                     assert page.locator('.personal-inventory-card').count()==30
+                    page.evaluate("()=>window.qaCard=document.querySelector('[data-inventory-key=Fixture-30]')")
                     page.locator('#inventory-search').fill('#30')
                     assert page.locator('.personal-inventory-card').count()==1
                     assert page.locator('#inventory-search').evaluate('(e)=>document.activeElement===e')
+                    assert page.evaluate("()=>window.qaCard===document.querySelector('[data-inventory-key=Fixture-30]')")
+                    page.locator('[data-action="inventory-traits"]').click()
+                    page.locator('#inv-backdrop').select_option('Gold')
+                    page.locator('[data-action="inventory-traits-apply"]').click()
+                    assert page.locator('.personal-inventory-card').count()==0
+                    page.locator('[data-action="inventory-reset"]').click()
+                    page.locator('#inventory-search').fill('#30')
                     page.locator('[data-action="inventory-view"][data-id="list"]').click()
                     assert page.locator('.view-list .personal-inventory-card').count()==1
-                    page.locator('.card-hit').click()
+                    page.locator('.card-hit').click(position={'x':30,'y':30})
                     assert page.get_by_text('1,5%',exact=True).count()==1
                     assert page.locator('.personal-detail .personal-preview').count()==1
                     page.locator('dialog [data-action="personal-menu"]').click()

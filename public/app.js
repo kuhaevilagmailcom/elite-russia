@@ -212,6 +212,7 @@ function giftMedia(g) {
   return `${background}${still}<video class="gift-media-video" src="${esc(video)}" muted loop playsinline preload="none" aria-label="${alt}" hidden></video>`;
 }
 // Play only visible videos; retain the original thumbnail if playback fails.
+const observedGiftVideos=new WeakSet();
 const giftVideoObserver = new IntersectionObserver(entries => {
   for (const {target, isIntersecting} of entries) {
     if (!target.isConnected) { giftVideoObserver.unobserve(target); continue; }
@@ -250,6 +251,8 @@ function observeGiftMedia(root) {
     lottieObserver.observe(target);
   }
   for (const video of root.querySelectorAll(".gift-media-video")) {
+    if(observedGiftVideos.has(video))continue;
+    observedGiftVideos.add(video);
     video.hidden = false;
     video.addEventListener("playing", () => { video.classList.add("playing"); });
     video.addEventListener("pause", () => { video.classList.remove("playing"); });
@@ -259,7 +262,7 @@ function observeGiftMedia(root) {
 }
 function releaseGiftMedia(root) {
   for(const target of root.querySelectorAll(".gift-media-lottie")){const entry=lottieInstances.get(target);lottieObserver.unobserve(target);entry?.abort.abort();entry?.player?.destroy();lottieInstances.delete(target);}
-  for (const video of root.querySelectorAll(".gift-media-video")) { giftVideoObserver.unobserve(video); video.pause(); }
+  for (const video of root.querySelectorAll(".gift-media-video")) { giftVideoObserver.unobserve(video); observedGiftVideos.delete(video); video.pause(); }
 }
 document.addEventListener("error", event => {
   if(event.target instanceof HTMLImageElement&&event.target.classList.contains("profile-photo"))event.target.remove();
@@ -408,27 +411,48 @@ function inventorySort(items,mode){
  return [...items].sort((a,b)=>mode==="collection"?cmp(a,b):mode==="number"?Number(a.number)-Number(b.number):mode==="rarity"?(value(a)-value(b)||cmp(a,b)):(Number(b.checkedAt||0)-Number(a.checkedAt||0)));
 }
 function personalInventoryCard(g){
- return `<article class="gift personal-inventory-card inventory-item"><div class="real-gift-art">${giftMedia(g)}<span class="serial">#${esc(g.number)}</span><span class="inventory-source" aria-label="В Telegram">${icon("shield")}</span></div><div class="info"><span class="name">${esc(g.collection)}</span><span class="muted">${esc(g.model||"")}</span><span class="inventory-card-status">В Telegram</span></div><button class="card-hit" aria-label="Открыть ${esc(g.collection)} #${esc(g.number)}" data-action="personal-detail" data-id="${esc(g.slug)}"></button><button class="inventory-more" aria-label="Действия с ${esc(g.collection)}" data-action="personal-menu" data-id="${esc(g.slug)}">${icon("more")}</button></article>`;
+ return `<article class="gift personal-inventory-card inventory-item" data-inventory-key="${esc(g.slug)}" data-inventory-version="${esc(JSON.stringify(g))}"><div class="real-gift-art">${giftMedia(g)}<span class="serial">#${esc(g.number)}</span><span class="inventory-source" aria-label="В Telegram">${icon("shield")}</span></div><div class="info"><span class="name">${esc(g.collection)}</span><span class="muted">${esc(g.model||"")}</span><span class="inventory-card-status">В Telegram</span></div><button class="card-hit" aria-label="Открыть ${esc(g.collection)} #${esc(g.number)}" data-action="personal-detail" data-id="${esc(g.slug)}"></button><button class="inventory-more" aria-label="Действия с ${esc(g.collection)}" data-action="personal-menu" data-id="${esc(g.slug)}">${icon("more")}</button></article>`;
+}
+const inventoryTraits=[["collection","Коллекция"],["model","Модель"],["backdrop","Фон"],["symbol","Символ"]];
+function inventoryTraitCount(){return inventoryTraits.filter(([key])=>state.inventoryTraits?.[key]).length;}
+function inventoryFilterSheet(){
+ const all=inventoryGroups().flatMap(x=>x[2]),filters=state.inventoryTraits||{};
+ show("Фильтры коллекции",`<div class="detail">${inventoryTraits.map(([key,label])=>{
+ const values=[...new Set(all.map(g=>g[key]).filter(v=>typeof v==="string"&&v.length))].sort((a,b)=>a.localeCompare(b,"ru"));
+ if(filters[key]&&!values.includes(filters[key]))values.push(filters[key]);
+ return `<label>${label}<select id="inv-${key}"><option value="">Все</option>${values.map(v=>`<option value="${esc(v)}" ${filters[key]===v?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`;
+ }).join("")}${btn("Применить","inventory-traits-apply","","accent")}${btn("Сбросить атрибуты","inventory-traits-reset")}</div>`);
 }
 function inventoryResults(){
  const query=(state.inventoryQuery||"").trim().toLowerCase().replace(/^#/,""),filter=state.inventoryFilter||"all",sort=state.inventorySort||"new";
- const match=g=>!query||[g.collection,g.model,g.number,g.backdrop,g.symbol,g.slug].join(" ").toLowerCase().includes(query);
+ const match=g=>(!query||[g.collection,g.model,g.number,g.backdrop,g.symbol,g.slug].join(" ").toLowerCase().includes(query))&&inventoryTraits.every(([key])=>!state.inventoryTraits?.[key]||g[key]===state.inventoryTraits[key]);
  const visible=inventoryGroups().filter(([key])=>filter==="all"||filter===key).map(([key,title,items])=>[key,title,inventorySort(items.filter(match),sort)]).filter(x=>x[2].length);
+ const filtered=!!query||filter!=="all"||inventoryTraitCount()>0;
  const count=visible.reduce((n,x)=>n+x[2].length,0),limit=state.inventoryLimit||24,view=state.inventoryView||"grid";
  let remaining=limit;
  const groups=visible.map(([key,title,items])=>{const shown=items.slice(0,remaining);remaining=Math.max(0,remaining-shown.length);return shown.length?`<section class="inventory-group"><div class="sectionhead"><b>${title}</b><span class="count-pill">${items.length}</span></div><div class="grid inventory-grid view-${view}">${shown.map(g=>key==="telegram"?personalInventoryCard(g):giftCard(g,true)).join("")}</div></section>`:""}).join("");
- return `<div class="inventory-result-count" aria-live="polite">${giftCount(count)}</div>${groups||empty(query||filter!=="all"?"Ничего не найдено":"Твоя коллекция начинается здесь",query||filter!=="all"?"Попробуйте изменить поиск или фильтры.":"Добавьте свой подарок по ссылке.","gift")}${!count?`<div class="empty-actions">${btn(query||filter!=="all"?"Сбросить фильтры":"Добавить подарок",query||filter!=="all"?"inventory-reset":"deposit-gift","","accent")}</div>`:""}${count>limit?`<div class="empty-actions">${btn("Показать ещё "+Math.min(24,count-limit),"inventory-more-items")}</div>`:""}`;
+ return `<div class="inventory-result-count" aria-live="polite">${giftCount(count)}</div>${groups||empty(filtered?"Ничего не найдено":"Твоя коллекция начинается здесь",filtered?"Попробуйте изменить поиск или фильтры.":"Добавьте свой подарок по ссылке.","gift")}${!count?`<div class="empty-actions">${btn(filtered?"Сбросить фильтры":"Добавить подарок",filtered?"inventory-reset":"deposit-gift","","accent")}</div>`:""}${count>limit?`<div class="empty-actions">${btn("Показать ещё "+Math.min(24,count-limit),"inventory-more-items")}</div>`:""}`;
 }
 function inventoryContent(){
  state.inventoryView??=inventoryPref("view","grid",["grid","list"]);
  state.inventorySort??=inventoryPref("sort","new",["new","collection","number","rarity"]);
  const groups=inventoryGroups(),total=groups.reduce((n,x)=>n+x[2].length,0),filter=state.inventoryFilter||"all";
  const labels=[["all","Все",total],...groups.map(([key,title,items])=>[key,key==="telegram"?"Telegram":key==="held"?"На маркете":"В продаже",items.length])];
- return `<div class="hero inventory-hero"><div><h1>Инвентарь</h1><div class="muted">${giftCount(total)} в коллекции</div></div>${btn(giftBoxIcon()+" Добавить","deposit-gift","","accent")}</div><div class="search">${searchBar("inventory-search","Название, модель или номер",state.inventoryQuery||"")}</div><div class="tabs inventory-tabs" aria-label="Статус подарков">${labels.map(([id,n,count])=>`<button data-action="inventory-filter" data-id="${id}" class="${filter===id?"active":""}" aria-pressed="${filter===id}">${n}<span class="filter-count">${count}</span></button>`).join("")}</div><div class="inventory-toolbar"><label class="inventory-sort"><span class="sr-only">Сортировка</span><select id="inventory-sort">${[["new","Недавние"],["collection","Коллекция"],["number","Номер"],["rarity","Редкость модели"]].map(([v,n])=>`<option value="${v}" ${state.inventorySort===v?"selected":""}>${n}</option>`).join("")}</select></label><div class="view-toggle" aria-label="Вид коллекции">${["grid","list"].map(v=>`<button data-action="inventory-view" data-id="${v}" aria-label="${v==="grid"?"Сетка":"Список"}" aria-pressed="${state.inventoryView===v}" class="${state.inventoryView===v?"active":""}">${icon(v)}</button>`).join("")}</div></div><div id="inventory-results">${inventoryResults()}</div><section class="inventory-tools"><h3>Инструменты</h3><div>${btn(icon("swap")+" Обмены","swaps")}${btn(icon("inventory")+" Наборы","bundle-new")}</div></section>`;
+ return `<div class="hero inventory-hero"><div><h1>Инвентарь</h1><div class="muted">${giftCount(total)} в коллекции</div></div>${btn(giftBoxIcon()+" Добавить","deposit-gift","","accent")}</div><div class="search">${searchBar("inventory-search","Название, модель или номер",state.inventoryQuery||"")}<button class="icon-button inventory-filter-button ${inventoryTraitCount()?"active":""}" data-action="inventory-traits" aria-label="Фильтры атрибутов">${icon("filter")}${inventoryTraitCount()?`<span class="filter-indicator">${inventoryTraitCount()}</span>`:""}</button></div><div class="tabs inventory-tabs" aria-label="Статус подарков">${labels.map(([id,n,count])=>`<button data-action="inventory-filter" data-id="${id}" class="${filter===id?"active":""}" aria-pressed="${filter===id}">${n}<span class="filter-count">${count}</span></button>`).join("")}</div><div class="inventory-toolbar"><label class="inventory-sort"><span class="sr-only">Сортировка</span><select id="inventory-sort">${[["new","Недавние"],["collection","Коллекция"],["number","Номер"],["rarity","Редкость модели"]].map(([v,n])=>`<option value="${v}" ${state.inventorySort===v?"selected":""}>${n}</option>`).join("")}</select></label><div class="view-toggle" aria-label="Вид коллекции">${["grid","list"].map(v=>`<button data-action="inventory-view" data-id="${v}" aria-label="${v==="grid"?"Сетка":"Список"}" aria-pressed="${state.inventoryView===v}" class="${state.inventoryView===v?"active":""}">${icon(v)}</button>`).join("")}</div></div><div id="inventory-results">${inventoryResults()}</div><section class="inventory-tools"><h3>Инструменты</h3><div>${btn(icon("swap")+" Обмены","swaps")}${btn(icon("inventory")+" Наборы","bundle-new")}</div></section>`;
 }
 function updateInventoryResults(){
  const root=$("#inventory-results");if(!root)return;
- releaseGiftMedia(root);root.innerHTML=inventoryResults();observeGiftMedia(root);
+ const template=document.createElement("template");template.innerHTML=inventoryResults();
+ const previous=new Map([...root.querySelectorAll("[data-inventory-key]")].map(node=>[node.dataset.inventoryKey,node]));
+ for(const next of template.content.querySelectorAll("[data-inventory-key]")){
+  const old=previous.get(next.dataset.inventoryKey);
+  if(old&&old.dataset.inventoryVersion===next.dataset.inventoryVersion){
+   next.replaceWith(old);previous.delete(next.dataset.inventoryKey);
+  }
+ }
+ // Reused cards retain the actual Lottie player and image/video nodes.
+ // Release only cards still in the old subtree before swapping the results.
+ releaseGiftMedia(root);root.replaceChildren(template.content);observeGiftMedia(root);
 }
 function rarityText(n){return Number.isInteger(n)&&n>=0&&n<=1000?`<span class="rarity">${(n/10).toLocaleString("ru-RU",{maximumFractionDigits:1})}%</span>`:"";}
 function personalMenu(slug){
@@ -942,9 +966,12 @@ document.addEventListener("click", async (e) => {
       case "personal-detail":
         personalDetail(id); break;
       case "inventory-filter": state.inventoryFilter=id;state.inventoryLimit=24;render();break;
-      case "inventory-view": if(["grid","list"].includes(id)){state.inventoryView=id;setInventoryPref("view",id);render();}break;
+      case "inventory-view": if(["grid","list"].includes(id)){state.inventoryView=id;setInventoryPref("view",id);for(const b of document.querySelectorAll("[data-action=inventory-view]")){b.classList.toggle("active",b.dataset.id===id);b.setAttribute("aria-pressed",String(b.dataset.id===id));}updateInventoryResults();}break;
       case "inventory-more-items": state.inventoryLimit=(state.inventoryLimit||24)+24;updateInventoryResults();break;
-      case "inventory-reset": state.inventoryFilter="all";state.inventoryQuery="";state.inventoryLimit=24;render();break;
+      case "inventory-reset": state.inventoryFilter="all";state.inventoryQuery="";state.inventoryTraits={};state.inventoryLimit=24;render();break;
+      case "inventory-traits": inventoryFilterSheet();break;
+      case "inventory-traits-apply": state.inventoryTraits=Object.fromEntries(inventoryTraits.map(([key])=>[key,$("#inv-"+key).value]));state.inventoryLimit=24;modal.close();render();break;
+      case "inventory-traits-reset": state.inventoryTraits={};state.inventoryLimit=24;modal.close();render();break;
       case "catalog-open": state.page="market";state.tab="collections";render();scrollTo(0,0);break;
       case "personal-menu": personalMenu(id);break;
       case "personal-remove-confirm": show("Убрать ссылку?",`<div class="detail"><p>Подарок останется в Telegram. Удалится только ссылка из инвентаря MINION MARKET.</p>${btn("Убрать ссылку","personal-remove",id,"danger-action")}${btn("Отмена","personal-detail",id)}</div>`);break;
