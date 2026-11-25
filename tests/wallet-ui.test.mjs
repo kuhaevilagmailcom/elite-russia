@@ -6,7 +6,7 @@ const source=readFileSync(new URL("../public/app.js",import.meta.url),"utf8");
 const block=source.slice(source.indexOf("let proofListener;"),source.indexOf("let busy = false;"));
 function setup({restored=false,fail=false}={}){
  const calls=[],modal={open:true,close(){this.open=false;calls.push("native-close");}};
- const ctx={modal,location:{protocol:"https:",origin:"https://test.invalid"},tonUI:null,esc:x=>String(x),btn:(...x)=>x[0],toast:x=>calls.push(x),
+ const ctx={state:{walletConnection:null},render:()=>calls.push('render'),modal,location:{protocol:"https:",origin:"https://test.invalid"},tonUI:null,esc:x=>String(x),btn:(...x)=>x[0],toast:x=>calls.push(x),
  show:(title,body)=>{assert.notEqual(ctx.tonUI?.modalState?.status,"opened");modal.open=true;calls.push(body);},
  api:async(path)=>{calls.push(path);if(path==="wallet/connection")return {enabled:true,network:"-239",connection:restored?{address:"0:abc",network:"-239"}:null};if(path.endsWith("challenge"))return {payload:"challenge"};if(path.endsWith("verify")){if(fail)throw Error("bad signature");return {address:"0:abc"};}},
  window:{TON_CONNECT_UI:{TonConnectUI:class{
@@ -22,7 +22,7 @@ function setup({restored=false,fail=false}={}){
 }
 test("native sheet never overlays SDK; verification result appears after SDK closes",async()=>{
  const s=setup();await s.connect();assert.equal(s.modal.open,false);assert.equal(s.ctx.tonUI.modalState.status,"opened");await s.connect();assert.equal(s.calls.filter(x=>x==="sdk-open").length,1);
- await s.ctx.tonUI.callback(s.wallet);assert.equal(s.ctx.tonUI.modalState.status,"closed");assert.equal(s.modal.open,true);assert(s.calls.some(x=>x.includes("Подпись проверена сервером")));
+ await s.ctx.tonUI.callback(s.wallet);assert.equal(s.ctx.tonUI.modalState.status,"closed");assert.equal(s.modal.open,true);assert(s.calls.some(x=>x.includes("Подпись проверена сервером")));assert.equal(s.ctx.state.walletConnection.address,"0:abc");
 });
 test("proof failure closes picker and presents retry without disconnecting a verified wallet",async()=>{
  const s=setup({fail:true});await s.connect();await s.ctx.tonUI.callback(s.wallet);assert.equal(s.ctx.tonUI.modalState.status,"closed");assert(s.calls.some(x=>x.includes("bad signature")&&x.includes("Повторить подключение")));

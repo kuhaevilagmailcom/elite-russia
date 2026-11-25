@@ -37,11 +37,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install playwright && python -m playwright install --with-deps chromium
+      - run: pip install playwright && python -m playwright install --with-deps chromium webkit
       - run: |
           node --experimental-sqlite server-async.mjs > /tmp/minion.log 2>&1 &
           for i in {1..30}; do curl -fsS http://127.0.0.1:3000/health && break; sleep 1; done
           python scripts/browser_test.py
+          BROWSER_ENGINE=webkit python scripts/browser_test.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
