@@ -156,6 +156,7 @@ const files = {
   "/": "index.html",
   "/admin": "index.html",
   "/app.js": "app.js",
+  "/phosphor.js":"phosphor.js",
   "/style.css": "style.css",
   "/logo.svg": "logo.svg",
   "/beta.js": "beta.js",

@@ -65,8 +65,7 @@ const icons = {
   profile: '<circle cx="12" cy="7" r="4" fill="currentColor" stroke="none"/><path d="M3 21v-2a9 9 0 0118 0v2z" fill="currentColor" stroke="none"/>',
   cart: '<path d="M2 3h3l3 12h11l3-9H6M9 20h.01M19 20h.01"/>',
 };
-const icon = (n) =>
-  `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[n] || ""}</svg>`;
+const icon = (n) => window.MM_ICONS?.[n] || `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[n] || ""}</svg>`;
 const uiIcon = (name) =>
   ({
     plus: '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
@@ -180,7 +179,7 @@ function show(title, content) {
 const btn = (name, action, id = "", cls = "") =>
   `<button class="${cls}" data-action="${action}" data-id="${esc(id)}">${name}</button>`;
 function giftCard(g, mine = false) {
-  return `<article class="gift">${art(g)}<div class="info"><div class="name">${esc(g.collection)}</div><div class="muted">${esc(g.model)}</div><div class="price">${g.price ? fmt(g.price) : g.best_offer ? fmt(g.best_offer) : "—"} <small>${cur()}</small></div><div class="cardbuttons">${mine && g.bundle ? '<span class="muted">В составе набора</span>' : mine ? btn(g.listing ? "Изменить" : "Продать", "sell", g.id, "accent") + (g.listing ? btn("Снять", "delist", g.id) : btn("•••", "detail", g.id)) : btn("Купить", "buy", g.id, "accent") + btn(uiIcon(state.cart.has(g.id) ? "check" : "plus"), "cart-add", g.id, "icon-button")}</div></div></article>`;
+  return `<article class="gift">${art(g)}<div class="info"><div class="name">${esc(g.collection)}</div><div class="muted">${esc(g.model)}</div><div class="price">${gramIcon()} ${g.price ? fmt(g.price) : g.best_offer ? fmt(g.best_offer) : "—"} <small>${cur()}</small></div><div class="cardbuttons">${mine && g.bundle ? '<span class="muted">В составе набора</span>' : mine ? btn(g.listing ? "Изменить" : "Продать", "sell", g.id, "accent") + (g.listing ? btn("Снять", "delist", g.id) : btn("•••", "detail", g.id)) : btn("Купить", "buy", g.id, "accent") + btn(uiIcon(state.cart.has(g.id) ? "check" : "plus"), "cart-add", g.id, "icon-button")}</div></div></article>`;
 }
 // Only same-origin Telegram media proxy URLs are accepted here.
 function giftMedia(g) {
@@ -336,8 +335,8 @@ let quotedBundle = null,
 function offersContent() {
   return `<div class="panel"><h3>Мои предложения</h3>${(state.me?.offers || []).map((o) => `<div class="row"><div><b>${esc(o.collection)} #${esc(o.number)}</b><div class="muted">${esc(o.status)} · ${fmt(o.price)} ${cur()}</div></div>${o.status === "active" ? (o.buyer === state.me.user.id ? btn("Отменить", "cancel", o.id) : btn("Принять", "accept", o.id, "accent")) : ""}</div>`).join("") || empty("Нет предложений", "Создайте оффер на понравившийся подарок")}</div>`;
 }
-function gramIcon(){return `<svg class="gram-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M6.8 8.4c0-.7.5-1.2 1.3-1.2h7.8c.8 0 1.3.5 1.3 1.2 0 .3-.1.6-.3.9L12 17l-4.9-7.7a1.7 1.7 0 0 1-.3-.9ZM12 7.5v9" fill="none" stroke="#16130a" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
-function giftBoxIcon(){return `<svg class="giftbox-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M9 26 32 14 55 26v26L32 63 9 51Z" fill="#e3a91a"/><path d="m9 26 23 11v26L9 51Z" fill="#ffd435"/><path d="m32 37 23-11v26L32 63Z" fill="#d39812"/><path d="m5 19 27-12 27 12v12L32 43 5 31Z" fill="#ffdd46"/><path d="m32 31 27-12v12L32 43Z" fill="#e7ad19"/><path d="m26 28 12-5v37l-6 3-6-3ZM19 13l11-5 27 12-11 5Z" fill="#222124"/><path d="M31 17C13 16 9 4 17 2c8-3 15 7 15 13C35 3 43-2 49 4c5 6-5 12-17 13" fill="#242428" stroke="#121214" stroke-width="2"/></svg>`}
+function gramIcon(){return '<svg class="gram-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" transform="rotate(45 12 12)" fill="#30A1F5"/><path d="M12 5.5c.65 4 2.5 5.85 6.5 6.5-4 .65-5.85 2.5-6.5 6.5-.65-4-2.5-5.85-6.5-6.5 4-.65 5.85-2.5 6.5-6.5Z" fill="white"/></svg>'}
+function giftBoxIcon(){return icon("inventory")}
 function accountSummary(){
  const u=state.me?.user, name=u?.name||"Гость", rawPhoto=window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url;
  const photo=typeof rawPhoto==="string"&&/^https:\/\/[^\s]+$/i.test(rawPhoto)?`<img class="account-avatar" src="${esc(rawPhoto)}" alt="">`:`<div class="account-avatar initials">${esc(name.slice(0,1).toUpperCase())}</div>`;
@@ -350,8 +349,8 @@ function homeGift(g,personal=false){
  return `<article class="home-gift imported"><div class="personal-preview" data-action="personal-detail" data-id="${esc(g.slug)}">${giftMedia(g)}<span class="telegram-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 17-7-3 17-6-5-3 3 1-6 8-6-10 5z" fill="currentColor"/></svg></span></div><div class="home-gift-copy"><b>${esc(g.collection)}</b><div><span>#${esc(g.number)}</span>${btn("•••","personal-detail",g.slug,"home-more")}</div></div></article>`;
 }
 function homeContent(){
- const mine=state.me?.inventory||[], personal=state.personalGifts;
- return `<section class="reference-banner" aria-label="MINION MARKET — NFT подарки в Telegram"><div class="reference-banner-text"><strong>MINION<span>MARKET</span></strong><p>Лучшие NFT подарки<br>и многое другое!</p></div><div class="mascot-crop" aria-hidden="true"></div></section>${accountSummary()}<div class="home-actions"><button class="home-action wallet-action" data-action="connect">${icon("wallet")}<span><b>Подключить<br>TON-кошелёк</b><small>Проверка владения</small></span><i>›</i></button><button class="home-action add-action" data-action="deposit-gift">${giftBoxIcon()}<span><b>Добавить<br>NFT</b><small>По ссылке</small></span><i>›</i></button></div><div class="home-section"><h1>Твои подарки</h1>${btn("Все →","nav","inventory","text-action")}</div><div class="home-gifts">${[...personal.map(g=>homeGift(g,true)),...mine.map(g=>homeGift(g))].slice(0,4).join("")}</div>${mine.length||personal.length?"":`<div class="home-empty">${icon("inventory")}<b>Здесь будут твои подарки</b><span>Добавь NFT по ссылке из Telegram</span>${btn("Добавить NFT","deposit-gift","","accent")}</div>`}<div class="home-market-link">${btn(icon("market")+" Открыть маркет","nav","market","market-link")}</div>`;
+ const listings=state.market||[], catalog=state.collectibles||[];
+ return `<section class="reference-banner" aria-label="MINION MARKET"><div class="reference-banner-text"><strong>MINION<span>MARKET</span></strong><p>Коллекционные подарки Telegram</p></div><div class="banner-emblem" aria-hidden="true">${icon("inventory")}</div></section><div class="home-actions"><button class="home-action wallet-action" data-action="connect">${icon("wallet")}<span><b>Кошелёк</b><small>Подключить</small></span></button><button class="home-action add-action" data-action="deposit-gift">${giftBoxIcon()}<span><b>Добавить NFT</b><small>По ссылке</small></span></button></div><div class="home-section"><h1>Маркет</h1>${btn("Фильтры","home-filter","","text-action")}</div>${listings.length?`<div class="grid storefront-grid">${listings.slice(0,30).map(g=>giftCard(g)).join("")}</div>`:empty("Пока нет объявлений","Реальные продажи ещё не включены.")}${catalog.length?`<div class="home-section catalog-heading"><h1>Коллекционные подарки</h1></div><p class="muted">Каталог Telegram · не выставлены на продажу</p><div class="grid storefront-grid">${catalog.slice(0,40).map(collectibleCard).join("")}</div>`:""}<div class="home-market-link">${btn(icon("market")+" Все коллекции","nav","market","market-link")}</div>`;
 }
 function salesContent(){
  const mine=(state.me?.inventory||[]).filter(g=>g.listing);
@@ -385,7 +384,7 @@ function render() {
   releaseGiftMedia(app);
   if (location.pathname === "/admin") return renderAdmin();
   
- app.innerHTML=`<div class="shell reference-shell"><header class="reference-top"><button class="top-back" data-action="nav" data-id="home" aria-label="Главная">‹</button><button class="reference-brand" data-action="nav" data-id="home">Minion Market</button><button class="reference-balance" data-action="wallet">${gramIcon()}<b>${fmt(state.me?.balance.available||0)}</b></button><button class="top-cart" data-action="cart" aria-label="Корзина">${icon("cart")}${state.cart.size?`<sup>${state.cart.size}</sup>`:""}</button></header><div class="reference-shortcuts">${[["home","star","Главная"],["market","inventory","Маркет"],["offers","offers","Офферы"],["giveaways","giveaways","Розыгрыши"],["wallet","wallet","Кошелёк"]].map(([route,i,label])=>`<button class="${state.page===route?"active":""}" data-action="${route==="wallet"?"wallet":route==="offers"?"open-offers":"nav"}" data-id="${route}" title="${label}" aria-label="${label}">${icon(i)}${route==="offers"?"<span>Офферы</span>":""}</button>`).join("")}</div><div class="reference-status"><b>${state.config.demo?"TEST":"PREVIEW"}</b> · ${state.config.demo?"Тестовые подарки и средства":"Реальные сделки пока отключены"}</div>${page()}</div><nav class="nav reference-nav" aria-label="Основная навигация">${[["home","Главная"],["inventory","Инвентарь"],["sales","Мои продажи"],["activity","Статистика"],["profile","Профиль"]].map(([n,label])=>`<button data-action="nav" data-id="${n}" class="${state.page===n?"active":""}" ${state.page===n?'aria-current="page"':""}>${icon(n)}<span>${label}</span></button>`).join("")}</nav>`;
+ app.innerHTML=`<div class="shell reference-shell"><header class="reference-top"><button class="top-back" data-action="nav" data-id="home" aria-label="Главная">${icon("home")}</button><button class="reference-brand" data-action="nav" data-id="home">Minion Market</button><button class="reference-balance" data-action="wallet">${gramIcon()}<b>${fmt(state.me?.balance.available||0)}</b></button><button class="top-cart" data-action="cart" aria-label="Корзина">${icon("cart")}${state.cart.size?`<sup>${state.cart.size}</sup>`:""}</button></header><div class="reference-shortcuts">${[["home","star","Главная"],["market","market","Маркет"],["offers","offers","Офферы"],["giveaways","giveaways","Розыгрыши"],["wallet","wallet","Кошелёк"]].map(([route,i,label])=>`<button class="${state.page===route?"active":""}" data-action="${route==="wallet"?"wallet":route==="offers"?"open-offers":"nav"}" data-id="${route}" title="${label}" aria-label="${label}">${icon(i)}${route==="offers"?"<span>Офферы</span>":""}</button>`).join("")}</div><div class="reference-status"><b>${state.config.demo?"TEST":"PREVIEW"}</b> · ${state.config.demo?"Тестовые подарки и средства":"Реальные сделки пока отключены"}</div>${page()}</div><nav class="nav reference-nav" aria-label="Основная навигация">${[["home","Главная"],["inventory","Инвентарь"],["sales","Мои продажи"],["activity","Статистика"],["profile","Профиль"]].map(([n,label])=>`<button data-action="nav" data-id="${n}" class="${state.page===n?"active":""}" ${state.page===n?'aria-current="page"':""}>${icon(n)}<span>${label}</span></button>`).join("")}</nav>`;
 
   observeGiftMedia(app);
   $("#search")?.addEventListener("input", (e) => {
@@ -871,6 +870,8 @@ document.addEventListener("click", async (e) => {
         }
       case "personal-detail":
         personalDetail(id); break;
+      case "home-filter":
+        state.page="market"; state.tab="store"; render(); scrollTo(0,0); document.querySelector(".search [data-action=filters]")?.click(); break;
       case "open-offers":
         state.page="market"; state.tab="offers"; render(); scrollTo(0,0); break;
       case "nav":
@@ -1040,7 +1041,7 @@ document.addEventListener("click", async (e) => {
         const link=a==="personal-add" ? $("#gift-link").value.trim() : "https://t.me/nft/"+id;
         await api("personal-gifts",{method:"POST",body:JSON.stringify({link})});
         state.personalGifts=(await api("personal-gifts")).items;
-        modal.close(); render(); toast("Подарок проверен через Telegram");
+        state.page="inventory"; modal.close(); render(); toast("Подарок проверен через Telegram");
         break;
       }
       case "personal-remove":

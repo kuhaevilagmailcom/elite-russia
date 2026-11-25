@@ -941,3 +941,19 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
 }
 .reference-nav button:focus-visible, .reference-shortcuts button:focus-visible { outline-offset: -3px; }
 @media (hover: none) { button:hover { filter: none; } }
+
+/* Storefront revision: no cropped screenshot or private gifts on Home. */
+.reference-banner{aspect-ratio:auto;min-height:108px;background:#242427;border:1px solid #343438;border-radius:20px;margin-bottom:12px}
+.reference-banner-text{width:73%;padding:16px}.reference-banner-text strong{transform:none;font-size:clamp(27px,6.6vw,39px);font-weight:900;letter-spacing:-1.5px;line-height:.95}
+.reference-banner-text p{margin-top:8px;color:#a6a6aa;font-size:12px}
+.banner-emblem{margin-left:auto;margin-right:16px;width:62px;height:62px;border-radius:20px;background:#fbd22e;color:#211c10;display:grid;place-items:center;flex:none}
+.banner-emblem svg{width:35px;height:35px}
+.reference-shell .ph-icon,.reference-nav .ph-icon{fill:currentColor;stroke:none;stroke-width:0}
+.reference-top .top-back{display:grid;place-items:center;width:30px}.top-back svg{width:22px;height:22px}
+.home-action .ph-icon{width:32px;height:32px}.wallet-action .ph-icon{color:#fbd22e}.add-action .ph-icon{color:#201b10}
+.reference-shortcuts .active,.add-action{background:#fbd22e;box-shadow:none}
+.reference-nav button.active{background:#383324;border-color:transparent}
+.gram-icon,.account-stats button>.gram-icon{color:#30a1f5;stroke:none;flex:none}.price .gram-icon{width:17px;height:17px}
+.storefront-grid .gift{border-radius:16px}.storefront-grid .info{padding:10px}
+.catalog-heading{margin:20px 0 4px}.catalog-heading h1{font-size:19px}
+@media(max-width:350px){.banner-emblem{width:48px;height:48px;margin-right:12px}.reference-banner-text{padding:13px}.reference-banner-text strong{font-size:25px}}
