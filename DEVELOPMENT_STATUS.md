@@ -33,3 +33,6 @@ CI on 18425fb failed at 320px: banner right edge 354.72px. Explicit inline width
 
 ## Personal gift video preview (2026-11-25)
 Main CI 45539807457 succeeded. Proposed original Telegram WebM sticker playback for personal gift references with thumbnail fallback, viewport-aware playback and reduced-motion support. No ownership or custody changes. TGS rendering and live Telegram verification remain pending. New adapter test added; branch CI pending.
+
+## Motion and navigation accessibility (2026-11-25)
+Main CI 45553829890 passed after WebM preview merge. Proposed short button feedback and sheet entrance animations, reduced-motion overrides, touch hover suppression, accessible dialog title and current navigation state. Browser regression assertions added; branch CI pending. No finance or custody changes.

@@ -922,3 +922,22 @@ dialog{background:#232325;border-color:#343436}dialog::backdrop{backdrop-filter:
 .gift-media-unavailable{font-size:12px;color:var(--muted)}
 .personal-preview.media-error:after{content:"Медиа недоступно";font-size:12px;color:var(--muted)}
 @media(prefers-reduced-motion:reduce){.gift-media-video{display:none!important}.real-gift-art .gift-media-still,.personal-preview .gift-media-still{visibility:visible!important}}
+
+/* Short, restrained iOS-style feedback. No layout-affecting transitions. */
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 120ms ease, filter 120ms ease; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  dialog[open] { animation: minion-sheet-in 180ms cubic-bezier(.2,.75,.25,1) both; }
+  dialog[open]::backdrop { animation: minion-backdrop-in 150ms ease-out both; }
+  .gift-media-video { transition: opacity 120ms ease; }
+}
+@keyframes minion-sheet-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes minion-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  button, .gift, .gift-media-video, dialog, dialog::backdrop { animation: none !important; transition: none !important; }
+}
+.reference-nav button:focus-visible, .reference-shortcuts button:focus-visible { outline-offset: -3px; }
+@media (hover: none) { button:hover { filter: none; } }

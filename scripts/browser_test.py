@@ -22,9 +22,16 @@ with sync_playwright() as p:
         if w==390:
             page.locator('.home-actions [data-action="deposit-gift"]').click()
             page.locator('dialog[open] #gift-link').wait_for()
+            assert page.get_by_role('dialog').get_attribute('aria-labelledby') == 'sheet-title'
+            assert page.locator('dialog').evaluate('(e) => getComputedStyle(e).animationName') == 'minion-sheet-in'
+            page.emulate_media(reduced_motion='reduce')
+            assert page.locator('dialog').evaluate('(e) => getComputedStyle(e).animationName') == 'none'
+            assert page.locator('.reference-nav button').first.evaluate('(e) => getComputedStyle(e).transitionDuration') == '0s'
+            page.emulate_media(reduced_motion='no-preference')
             page.locator('dialog [data-action="close"]').click()
             page.locator('.reference-nav [data-id="sales"]').click()
             page.get_by_role('heading',name='Мои продажи').wait_for()
+            assert page.get_by_role('navigation',name='Основная навигация').locator('[aria-current=page]').get_attribute('data-id') == 'sales'
         page.locator('.reference-shortcuts [data-id="market"]').click()
         page.locator('.gift').first.wait_for()
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow {w}'
