@@ -1,6 +1,7 @@
 # Next actions (in priority order)
-1. Install PostgreSQL and npm dependencies in an authorized environment; run PG integration tests against a disposable empty DB and the runtime HTTP suite. Verify actual migrations, precision and concurrent locks. Never import demo funds into production.
-2. Install TON SDK; run SDK integration test and connect supported wallet on owned HTTPS domain in restricted testnet mode. Add validated wallet implementations and trusted network-provider verification.
-3. Add and test testnet deposit scanner/withdrawal state machines; independent signer and reconciliation, then real-world testnet verification. Keep mainnet off.
-4. Connect own Telegram bot and own business account; test read-only sync first. Implement verified deposit ownership/event processing and withdrawal queue with exact receipts and audit. Do not send valuable gifts now.
-5. Add original media pipeline, complete discovery, Redis/outbox, admin workflows and remaining P1/P2. Run browser QA in allowed environment and independent audit; complete legal/platform checks.
+
+1. Run the PostgreSQL integration suite against a disposable empty target-like database and the runtime HTTP suite. Verify migrations, numeric precision and concurrent locks. Never import demo funds into production.
+2. Connect a supported wallet on an owned HTTPS domain in restricted testnet mode. The local TON SDK tests pass; external wallet UX, trusted provider behavior and network verification remain to be tested.
+3. Add and test testnet deposit-scanner and withdrawal state machines, an independent signer and reconciliation, then perform real testnet verification. Keep mainnet off.
+4. Connect an owned Telegram bot and business account; test read-only synchronization and the real Mini App client first. Implement verified deposit ownership/event processing and a withdrawal queue with exact receipts and audit. Do not transfer valuable gifts in the current build.
+5. Complete media discovery, Redis/outbox and remaining operational workflows. Repeat browser QA in the actual Telegram WebView, then obtain independent security, legal and platform review before enabling live finance or custody.
