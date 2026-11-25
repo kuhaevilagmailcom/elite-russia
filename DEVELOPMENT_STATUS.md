@@ -46,3 +46,6 @@ Profile and personal inventory redesigned into compact sections; removed cropped
 
 ## Splash and collectible appearance
 PR 24 merged after successful CI. User-provided launch image optimized to WebP 320x569, served locally and displayed without cropping until initial render/error; reduced motion supported. Actual Telegram RGB backdrop and symbol thumbnail captured for both public catalog and personal gifts. Private older references upgraded using mediaVersion 3; old public catalog entries require reimport. Repeating pattern placement is approximate; no invented symbol if thumbnail missing. New automated tests and CI pending; live iOS verification still required.
+
+## Wallet overlay regression
+PR #25 merged after green CI. Fixed native dialog covering the SDK wallet picker: native sheet is closed before opening SDK and no SDK button is mounted inside it. Only verified or failed status is shown afterward. Regression tests simulate SDK modal and proof callbacks; real iOS client verification remains required. No finance/custody changes.

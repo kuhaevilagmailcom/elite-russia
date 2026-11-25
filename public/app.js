@@ -545,89 +545,63 @@ function inputSheet(title, label, action, id, value = "") {
   );
 }
 let proofListener;
+let connectingWallet=false;
+function walletResult(message,verified=false){
+  // The SDK owns its overlay. Never put a native dialog in the top layer above it.
+  if(tonUI?.modalState?.status==="opened")tonUI.closeModal();
+  if(verified)toast("Кошелёк подтверждён");
+  if(!modal.open)show("TON-кошелёк",`<div class="detail"><p id="ton-proof-status" role="status">${esc(message)}</p>${verified?btn("Отключить кошелёк","disconnect"):btn("Повторить подключение","connect","","accent")}</div>`);
+  else toast(message);
+}
 async function connect() {
-  show(
-    "TON-кошелёк",
-    `<div class="detail"><div class="muted">Подключение реального TON-кошелька с проверкой подписи. Средства не списываются.</div><div id="ton-proof-status" role="status">Проверка настроек…</div><div id="ton-root"></div>${btn("Отключить кошелёк", "disconnect")}</div>`,
-  );
-  const status = (t) => {
-    const el = $("#ton-proof-status");
-    if (el) el.textContent = t;
-  };
+  if(connectingWallet||tonUI?.modalState?.status==="opened")return;
+  connectingWallet=true;
+  // The native <dialog> occupies the browser top layer, above any SDK z-index.
+  if(modal.open)modal.close();
   try {
-    if (location.protocol !== "https:")
-      throw Error("Для TON Proof настройте публичный HTTPS-домен.");
-    const connection = await api("wallet/connection");
-    if (!connection.enabled)
-      throw Error("TON Proof отключён сервером. Требуется restricted и HTTPS.");
-    if (!window.TON_CONNECT_UI)
-      await new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.src =
-          "https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js";
-        script.onload = resolve;
-        script.onerror = () =>
-          reject(Error("SDK не загрузился. Проверьте интернет."));
-        document.head.append(script);
-      });
-    if (!tonUI)
-      tonUI = new window.TON_CONNECT_UI.TonConnectUI({
-        manifestUrl: location.origin + "/tonconnect-manifest.json",
-      });
-    if (proofListener) proofListener();
+    if(location.protocol!=="https:")throw Error("Для TON Proof настройте публичный HTTPS-домен.");
+    const connection=await api("wallet/connection");
+    if(!connection.enabled)throw Error("TON Proof отключён сервером. Требуется restricted и HTTPS.");
+    if(!window.TON_CONNECT_UI)await new Promise((resolve,reject)=>{
+      const script=document.createElement("script");
+      script.src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js";
+      script.onload=resolve;script.onerror=()=>{script.remove();reject(Error("SDK не загрузился. Проверьте интернет."));};
+      document.head.append(script);
+    });
+    if(!tonUI)tonUI=new window.TON_CONNECT_UI.TonConnectUI({manifestUrl:location.origin+"/tonconnect-manifest.json"});
+    if(proofListener){proofListener();proofListener=null;}
     await tonUI.connectionRestored;
-    if (connection.connection && tonUI.connected && tonUI.wallet?.account?.address?.toLowerCase() === connection.connection.address && tonUI.wallet?.account?.chain === connection.network && connection.connection.network === connection.network) {
-      status(
-        `Кошелёк подтверждён · ${connection.network === "-239" ? "mainnet" : "testnet"} · ${connection.connection.address.slice(0, 8)}…${connection.connection.address.slice(-6)}`,
-      );
-      tonUI.buttonRootId = "ton-root";
+    if(connection.connection&&tonUI.connected&&tonUI.wallet?.account?.address?.toLowerCase()===connection.connection.address&&tonUI.wallet?.account?.chain===connection.network&&connection.connection.network===connection.network){
+      walletResult("Кошелёк подтверждён · "+(connection.network==="-239"?"Mainnet":"Testnet")+" · "+connection.connection.address,true);
       return;
     }
-    if (tonUI.connected) await tonUI.disconnect();
-    if (connection.connection) await api("wallet/connection",{method:"DELETE"});
-    const challenge = await api("wallet/proof/challenge", {
-      method: "POST",
-      body: "{}",
+    if(tonUI.connected)await tonUI.disconnect();
+    if(connection.connection)await api("wallet/connection",{method:"DELETE"});
+    const challenge=await api("wallet/proof/challenge",{method:"POST",body:"{}"});
+    tonUI.setConnectRequestParameters({state:"ready",value:{tonProof:challenge.payload}});
+    let verifying=false;
+    proofListener=tonUI.onStatusChange(async wallet=>{
+      if(!wallet||verifying)return;
+      verifying=true;
+      connectingWallet=true;
+      try{
+        if(wallet.account.chain!==connection.network)throw Error("Выберите кошелёк в сети "+(connection.network==="-239"?"Mainnet":"Testnet"));
+        const item=wallet.connectItems?.tonProof;
+        if(!item?.proof)throw Error("Кошелёк не предоставил TON Proof.");
+        const verified=await api("wallet/proof/verify",{method:"POST",body:JSON.stringify({
+          address:wallet.account.address,network:wallet.account.chain,public_key:wallet.account.publicKey,
+          proof:{...item.proof,state_init:wallet.account.walletStateInit},
+        })});
+        walletResult("Подпись проверена сервером: "+verified.address,true);
+      }catch(e){
+        walletResult("Не удалось проверить подпись: "+e.message);
+      }finally{connectingWallet=false;}
     });
-    tonUI.setConnectRequestParameters({
-      state: "ready",
-      value: { tonProof: challenge.payload },
-    });
-    proofListener = tonUI.onStatusChange(async (wallet) => {
-      if (!wallet) return;
-      if (wallet.account.chain !== connection.network) {status("Выберите кошелёк в сети "+(connection.network==="-239"?"Mainnet":"Testnet"));return;}
-      const item = wallet.connectItems?.tonProof;
-      if (!item?.proof) {
-        status("Кошелёк не предоставил TON Proof.");
-        return;
-      }
-      try {
-        const verified = await api("wallet/proof/verify", {
-          method: "POST",
-          body: JSON.stringify({
-            address: wallet.account.address,
-            network: wallet.account.chain,
-            public_key: wallet.account.publicKey,
-            proof: {
-              ...item.proof,
-              state_init: wallet.account.walletStateInit,
-            },
-          }),
-        });
-        status("Подпись проверена сервером: " + verified.address);
-        toast("Кошелёк подтверждён");
-      } catch (e) {
-        status("Не удалось проверить подпись: "+e.message+". Откройте подключение снова для новой попытки.");
-        toast(e.message);
-      }
-    });
-    status("Ожидание подписи в кошельке…");
-    tonUI.buttonRootId = "ton-root";
+    // Only the SDK's picker is visible while connecting; no buttonRootId is needed.
+    if(modal.open)modal.close();
     await tonUI.openModal();
-  } catch (e) {
-    status(e.message);
-    toast(e.message);
-  }
+  }catch(e){walletResult(e.message);}
+  finally{connectingWallet=false;}
 }
 let busy = false;
 document.addEventListener("click", async (e) => {
