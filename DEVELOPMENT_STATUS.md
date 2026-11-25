@@ -64,3 +64,6 @@ PR #28 merged: CI 45580062830 and 45580073906 successful. Added batch selection 
 
 ## Inventory scale and responsive QA
 Baseline main e6670391 passed CI 45585302110. Added browser boundary tests for 0, 1, 20 and 100 private reference fixtures, incremental loading, selection across search, and primary-screen screenshot capture at all seven viewport widths. Fixtures are test-only; no API limit or finance changes. New CI and manual screenshot review pending.
+
+## Activity statistics
+Baseline main 48b24cee passed CI 45604511435. Added seven-day UTC count of sold events from the existing activity response, explicitly limited to available history, no fabricated volume or prices. Added event filters and browser fixture assertions. New CI pending; no financial changes or visual acceptance claimed.

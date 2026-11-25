@@ -492,12 +492,21 @@ function profileContent(){
  const menu=(i,label,action,id="")=>`<button class="profile-menu-item" data-action="${action}" data-id="${id}"><span class="profile-menu-icon">${icon(i)}</span><b>${label}</b><span class="profile-chevron">›</span></button>`;
  return `<div class="profile-screen"><h1>Профиль</h1><section class="profile-identity">${avatar}<div><h2>${esc(name)}</h2><p>${state.config.demo?"Тестовый аккаунт":state.me?.user?.username?"@"+esc(state.me.user.username):state.me?"Telegram аккаунт":"Войдите через Telegram"}</p></div></section><section class="profile-wallet"><div class="profile-wallet-title">${gramIcon()} <span>Торговый баланс</span></div><strong>${state.config.demo?fmt(state.me?.balance.available||0)+" "+esc(cur()):"—"}</strong><p>${state.config.demo?"Тестовые средства":state.walletConnection?esc(state.walletConnection.address.slice(0,9)+"…"+state.walletConnection.address.slice(-6))+" · баланс сети не получен":"Реальные операции пока отключены"}</p>${btn(state.walletConnection?"Управление":"Подключить кошелёк",state.walletConnection?"wallet":"connect","","accent")}${btn("История операций","history","","profile-secondary")}</section><div class="profile-stats"><button data-action="nav" data-id="inventory"><b>${count}</b><span>Подарки</span></button><button data-action="nav" data-id="sales"><b>${esc(stats.sold??0)}</b><span>Продажи</span></button><button data-action="nav" data-id="activity"><b>${esc(stats.bought??0)}</b><span>Покупки</span></button></div><section class="profile-menu">${menu("inventory","Мои подарки","nav","inventory")}${menu("sales","Мои продажи","nav","sales")}${menu("star","Избранное","favorites")}${menu("offers","Офферы","open-offers")}${menu("wallet","Кошелёк","connect")}${menu("support","Поддержка","support")}${state.config.demo?menu("profile","Сменить тестовый аккаунт","demo-switch"):""}</section><div class="panel"><h3>Уведомления</h3>${(state.me?.notifications||[]).map(n=>`<div class="row">${esc(n.message)}</div>`).join("")||'<div class="muted">Нет уведомлений</div>'}</div></div>`;
 }
+function activityContent(){
+ const events=state.activity||[],now=new Date(),today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()),day=86400000;
+ const days=Array.from({length:7},(_,i)=>({date:today-(6-i)*day,count:0}));
+ for(const event of events){const t=Number(event.created);if(event.type==="sold"&&Number.isFinite(t)&&t>=days[0].date&&t<=Date.now()){const i=Math.floor((t-days[0].date)/day);if(days[i])days[i].count++;}}
+ const total=days.reduce((n,d)=>n+d.count,0),max=Math.max(1,...days.map(d=>d.count));
+ const label=d=>new Date(d.date).toLocaleDateString("ru",{day:"numeric",month:"short",timeZone:"UTC"});
+ const filter=state.activityFilter||"all",visible=events.filter(e=>filter==="all"||e.type===filter);
+ const types={listed:"Выставлен",sold:"Продан",price_changed:"Цена изменена",delisted:"Снят"};
+ return `<div class="hero"><div><h1>Статистика</h1><div class="muted">Последние операции маркета</div></div>${btn("Обновить","refresh")}</div><section class="panel activity-chart"><div class="muted">Продажи в доступной истории · 7 дней UTC</div><strong class="activity-total">${total}</strong><div class="activity-bars" role="group" aria-label="Продажи по дням">${days.map(d=>`<div class="activity-day" aria-label="${esc(label(d))}: ${d.count}"><b>${d.count}</b><div class="activity-track"><span style="height:${d.count/max*100}%"></span></div><small>${esc(label(d))}</small></div>`).join("")}</div><p class="muted">Только полученные события, не полный оборот рынка. ${state.config.demo?"TEST · тестовые данные.":""}</p></section><div class="tabs activity-tabs">${[["all","Все"],["sold","Продажи"],["listed","Листинги"]].map(([id,n])=>`<button data-action="activity-filter" data-id="${id}" aria-pressed="${filter===id}" class="${filter===id?"active":""}">${n}</button>`).join("")}</div><div class="panel">${visible.map(a=>`<div class="row"><div><b>${esc(a.collection)} #${esc(a.number)}</b><div class="muted">${types[a.type]||esc(a.type)} · ${new Date(Number(a.created)).toLocaleString("ru")}</div></div><b>${fmt(a.price)} ${esc(cur())}</b></div>`).join("")||empty("Нет операций")}</div>`;
+}
 function page() {
   if (state.page === 'home') return homeContent();
   if (state.page === 'sales') return salesContent();
   if (state.page === "market") return marketContent();
-  if (state.page === "activity")
-    return `<div class="hero"><div><h1>Статистика</h1><div class="muted">Последние операции маркета</div></div>${btn("Обновить", "refresh")}</div><div class="panel">${state.activity.map((a) => `<div class="row"><div><b>${esc(a.collection)} #${esc(a.number)}</b><div class="muted">${{ listed: "Выставлен", sold: "Продан", price_changed: "Цена изменена", delisted: "Снят" }[a.type] || esc(a.type)} · ${new Date(Number(a.created)).toLocaleString("ru")}</div></div><b>${fmt(a.price)} ${cur()}</b></div>`).join("") || empty("Нет операций")}</div>`;
+  if (state.page === "activity") return activityContent();
   if (state.page === "inventory") return inventoryContent();
   if (state.page === "giveaways")
     return `<div class="hero"><div><h1>Розыгрыши</h1><div class="muted">Только бесплатное участие</div></div>${btn("Создать", "giveaway-new", "", "accent")}</div><div class="giveaway-list">${state.giveaways
@@ -1012,6 +1021,7 @@ document.addEventListener("click", async (e) => {
       case "catalog-open": state.page="market";state.tab="collections";render();scrollTo(0,0);break;
       case "personal-menu": personalMenu(id);break;
       case "personal-remove-confirm": show("Убрать ссылку?",`<div class="detail"><p>Подарок останется в Telegram. Удалится только ссылка из инвентаря MINION MARKET.</p>${btn("Убрать ссылку","personal-remove",id,"danger-action")}${btn("Отмена","personal-detail",id)}</div>`);break;
+      case "activity-filter": if(["all","sold","listed"].includes(id)){state.activityFilter=id;render();}break;
       case "sales-tab": state.salesTab=id;render();break;
       case "home-filter":
         state.page="market"; state.tab="store"; render(); scrollTo(0,0); document.querySelector(".search [data-action=filters]")?.click(); break;
