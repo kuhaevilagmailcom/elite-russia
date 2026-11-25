@@ -1,0 +1,6 @@
+GRAM Diamond Mark
+Source: TON official media library, https://ton.org/media#gram
+Asset archive: https://ton.org/assets/media/gram_diamond_mark.zip
+Retrieved: 2026-11-25
+The original SVG is stored unchanged as public/gram.svg.
+GRAM is the token name/ticker; TON is the blockchain. No ownership of the mark is claimed.
