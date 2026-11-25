@@ -149,7 +149,13 @@ async function reload() {
   }
   state.personalGifts = [];
   if (state.token && !state.config.demo) {
-    try { state.personalGifts = (await api("personal-gifts")).items || []; } catch { /* leave empty */ }
+    try {
+      const response=await api("personal-gifts");state.personalGifts=response.items||[];
+      if(response.enabled&&state.personalGifts.some(g=>g.mediaVersion!==2)&&state.mediaRefreshToken!==state.token){
+        state.mediaRefreshToken=state.token;
+        try{await api("personal-gifts/refresh-media",{method:"POST",body:"{}"});state.personalGifts=(await api("personal-gifts")).items||[];}catch{}
+      }
+    } catch { /* leave empty */ }
   }
   if (state.token) {
     try {
@@ -561,6 +567,7 @@ async function connect() {
       return;
     }
     if (tonUI.connected) await tonUI.disconnect();
+    if (connection.connection) await api("wallet/connection",{method:"DELETE"});
     const challenge = await api("wallet/proof/challenge", {
       method: "POST",
       body: "{}",
@@ -571,6 +578,7 @@ async function connect() {
     });
     proofListener = tonUI.onStatusChange(async (wallet) => {
       if (!wallet) return;
+      if (wallet.account.chain !== connection.network) {status("Выберите кошелёк в сети "+(connection.network==="-239"?"Mainnet":"Testnet"));return;}
       const item = wallet.connectItems?.tonProof;
       if (!item?.proof) {
         status("Кошелёк не предоставил TON Proof.");
@@ -592,7 +600,7 @@ async function connect() {
         status("Подпись проверена сервером: " + verified.address);
         toast("Кошелёк подтверждён");
       } catch (e) {
-        status(e.message);
+        status("Не удалось проверить подпись: "+e.message+". Откройте подключение снова для новой попытки.");
         toast(e.message);
       }
     });

@@ -39,3 +39,5 @@ Main CI 45553829890 passed after WebM preview merge. Proposed short button feedb
 
 ## Storefront and TGS revision
 Previous motion PR merged after green CI. Home shows public listings/catalog, not private inventory. Local MIT Phosphor navigation icons, blue GRAM mark based on official media description (not original download), removed cropped banner image. Vendored Lottie Light 5.13.0 and bounded TGS JSON decoder enable original Telegram vector animation. Existing imports need re-check for new animation IDs. Live Telegram media and new CI pending. Financial restrictions unchanged.
+
+Wallet proof: default Wallet V5R1 supported for mainnet and testnet, retaining state-init/address/signature matching. Added network mismatch feedback and stale connection reset. Existing private gifts refresh animation metadata in one bounded Telegram gift scan once per session. New CI and real Telegram verification pending. No transfer or payment enabled.

@@ -5,7 +5,9 @@ export function giftSlug(value) {
   if (!match) throw Error("Вставьте ссылку https://t.me/nft/Название-123");
   return match[1];
 }
-export async function findUserGift(api, user, slug) {
+export async function findUserGifts(api, user, slugs) {
+  const wanted=new Set(slugs),found=new Map();
+  if(!wanted.size)return found;
   const userId = Number(user);
   if (!/^[1-9][0-9]*$/.test(String(user)) || !Number.isSafeInteger(userId)) throw Error("Требуется Telegram-аккаунт");
   const seen = new Set();
@@ -17,8 +19,9 @@ export async function findUserGift(api, user, slug) {
       limit: 100, ...(offset ? {offset} : {})
     });
     if (!Array.isArray(r?.gifts)) throw Error("Не удалось проверить подарки Telegram");
-    const match = r.gifts.find(x => x.type === "unique" && x.gift?.name === slug);
-    if (match && !match.gift.is_burned && !match.gift.is_from_blockchain) {
+    for(const match of r.gifts){
+      const slug=match.gift?.name;
+      if(match.type!=="unique"||!wanted.has(slug)||match.gift.is_burned||match.gift.is_from_blockchain)continue;
       const g = match.gift;
       if (!g.base_name || !Number.isSafeInteger(g.number) || g.number < 1) throw Error("Некорректные данные Telegram");
       const sticker = g.model?.sticker;
@@ -26,20 +29,22 @@ export async function findUserGift(api, user, slug) {
       const animation=sticker?.is_animated===true?sticker.file_id:null;
       const thumb = sticker?.thumbnail?.file_id;
       const file = thumb || (!g.model?.sticker?.is_animated && !g.model?.sticker?.is_video ? g.model?.sticker?.file_id : null);
-      return {slug, collection:g.base_name, number:g.number, model:g.model?.name,
+      found.set(slug,{slug, collection:g.base_name, number:g.number, model:g.model?.name,
         backdrop:g.backdrop?.name, symbol:g.symbol?.name,
         modelMediaUrl:file ? "/api/v1/media/telegram/"+encodeURIComponent(file) : null,
         modelVideoUrl:video ? "/api/v1/media/telegram/"+encodeURIComponent(video) : null,
         modelAnimationUrl:animation ? "/api/v1/media/telegram/"+encodeURIComponent(animation) : null,
         mediaVersion:2,
-        checkedAt:Date.now(), status:"observed", tradable:false};
+        checkedAt:Date.now(), status:"observed", tradable:false});
+      wanted.delete(slug);
     }
-    if (!r.next_offset) return null;
+    if (!wanted.size || !r.next_offset) return found;
     if (typeof r.next_offset !== "string" || seen.has(r.next_offset)) throw Error("Ошибка пагинации Telegram");
     offset = r.next_offset; seen.add(offset);
   }
   throw Error("Слишком много подарков: проверка не завершена");
 }
+export async function findUserGift(api,user,slug){return (await findUserGifts(api,user,[slug])).get(slug)||null;}
 export class PersonalGifts {
   constructor(repo, api) { this.repo=repo; this.api=api; }
   async initialize() {
@@ -59,6 +64,13 @@ export class PersonalGifts {
   async list(user) {
     const rows=await this.repo.all("SELECT payload FROM personal_gift_refs WHERE user_id=? ORDER BY checked DESC LIMIT 100",user);
     return rows.map(x=>({...JSON.parse(x.payload),status:"observed",tradable:false}));
+  }
+  async refreshMedia(user){
+    const old=(await this.list(user)).filter(x=>x.mediaVersion!==2);
+    if(!old.length)return {updated:0};
+    const found=await findUserGifts(this.api,user,old.map(x=>x.slug));
+    await this.repo.tx(async()=>{for(const [slug,item] of found)await this.repo.run("UPDATE personal_gift_refs SET payload=?,checked=? WHERE user_id=? AND slug=?",JSON.stringify(item),item.checkedAt,user,slug);});
+    return {updated:found.size};
   }
   async remove(user,slug) {
     await this.repo.run("DELETE FROM personal_gift_refs WHERE user_id=? AND slug=?",user,slug);
